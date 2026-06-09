@@ -1,0 +1,76 @@
+"""RawMessage -> Envelope (spec §7.3): headers + a snippet, no body decode."""
+
+from __future__ import annotations
+
+from email import message_from_bytes
+from email.message import EmailMessage
+from email.policy import default as default_policy
+from email.utils import getaddresses
+from typing import Any
+
+from mailflow.core.identity import derive_canonical_id
+from mailflow.core.models import Envelope, RawMessage, Recipient
+
+
+class MimeEnvelopeParser:
+    def __init__(self, snippet_chars: int = 256) -> None:
+        self.snippet_chars = snippet_chars
+
+    def parse_envelope(self, msg: RawMessage, tenant: str) -> Envelope:
+        parsed = message_from_bytes(msg.raw_bytes, policy=default_policy)
+        assert isinstance(parsed, EmailMessage)
+
+        def recips(header: str) -> list[Recipient]:
+            return [
+                Recipient(name=n, address=a)
+                for n, a in getaddresses(parsed.get_all(header, []))
+                if a
+            ]
+
+        message_id_raw = parsed["message-id"]
+        message_id = str(message_id_raw) if message_id_raw is not None else None
+        canonical_id, present, trusted = derive_canonical_id(
+            provider=msg.provider,
+            provider_message_id=msg.provider_message_id,
+            mailbox=msg.stream.mailbox,
+            message_id=message_id,
+        )
+
+        from_ = recips("from")
+        snippet = self._snippet(parsed)
+        headers: dict[str, list[str]] = {}
+        for k, v in parsed.items():
+            headers.setdefault(k.lower(), []).append(str(v))
+
+        senders = recips("sender")
+        reply_tos = recips("reply-to")
+        alias_from: dict[str, Any] = {"from": from_[0] if from_ else Recipient()}
+
+        return Envelope(
+            canonical_id=canonical_id,
+            message_id=message_id,
+            message_id_present=present,
+            message_id_trusted=trusted,
+            provider=msg.provider,
+            provider_message_id=msg.provider_message_id,
+            stream=msg.stream,
+            **alias_from,
+            sender=senders[0] if senders else None,
+            reply_to=reply_tos[0] if reply_tos else None,
+            to=recips("to"),
+            cc=recips("cc"),
+            subject=str(parsed["subject"] or ""),
+            received_at=msg.received_at,
+            snippet=snippet,
+            list_id=str(parsed["list-id"]) if parsed["list-id"] else None,
+            list_unsubscribe=str(parsed["list-unsubscribe"]) if parsed["list-unsubscribe"] else None,
+            auto_submitted=str(parsed["auto-submitted"]) if parsed["auto-submitted"] else None,
+            headers=headers,
+        )
+
+    def _snippet(self, parsed: EmailMessage) -> str:
+        body = parsed.get_body(preferencelist=("plain", "html"))
+        if body is None:
+            return ""
+        text = str(body.get_content())
+        return text.strip().replace("\r\n", " ").replace("\n", " ")[: self.snippet_chars]
