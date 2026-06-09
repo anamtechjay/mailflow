@@ -1,0 +1,579 @@
+{
+  "<1266261635.368349.1765190831161@mail.yahoo.com>": {
+    "canonical_id": "<1266261635.368349.1765190831161@mail.yahoo.com>",
+    "message_id": "<1266261635.368349.1765190831161@mail.yahoo.com>",
+    "message_id_trusted": true,
+    "in_reply_to": null,
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>"
+    ],
+    "direction": "inbound",
+    "from": {
+      "name": "",
+      "address": "sandyqatestacc@yahoo.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "testuser1@cowboyslogistics.com"
+      }
+    ],
+    "cc": [],
+    "subject": "Peter England Logistics",
+    "body_text": "Hi Team, This is Peter England Logistics. We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC. The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs. The planned pickup date is December 28th. Please share your best available rate at the earliest. Thanks, Peter England Logistics",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  },
+  "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>": {
+    "canonical_id": "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+    "message_id": "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+    "message_id_trusted": true,
+    "in_reply_to": "<1266261635.368349.1765190831161@mail.yahoo.com>",
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>",
+      "<1266261635.368349.1765190831161@mail.yahoo.com>"
+    ],
+    "direction": "outbound",
+    "from": {
+      "name": "",
+      "address": "testuser1@cowboyslogistics.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "sandyqatestacc@yahoo.com"
+      }
+    ],
+    "cc": [
+      {
+        "name": "",
+        "address": "testuser2@cowboyslogistics.com"
+      }
+    ],
+    "subject": "Re: Peter England Logistics",
+    "body_text": "Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Dallas, TX to Greensboro, NC is $1,184.00 all-in with standard transit. Kindly confirm if we can proceed with dispatch. Thanks, Cowboy Logistics On Mon, Dec 8, 2025 at 4:17 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, This is Peter England Logistics . We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC . The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs . The planned pickup date is December 28th . Please share your best available rate at the earliest. Thanks, Peter England Logistics Regards, Santhiya K, Senior QA Engineer",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  },
+  "<817091422.3101305.1765190975670@mail.yahoo.com>": {
+    "canonical_id": "<817091422.3101305.1765190975670@mail.yahoo.com>",
+    "message_id": "<817091422.3101305.1765190975670@mail.yahoo.com>",
+    "message_id_trusted": true,
+    "in_reply_to": "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>",
+      "<1266261635.368349.1765190831161@mail.yahoo.com>",
+      "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>"
+    ],
+    "direction": "inbound",
+    "from": {
+      "name": "",
+      "address": "sandyqatestacc@yahoo.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "testuser1@cowboyslogistics.com"
+      }
+    ],
+    "cc": [
+      {
+        "name": "",
+        "address": "testuser2@cowboyslogistics.com"
+      }
+    ],
+    "subject": "Re: Peter England Logistics",
+    "body_text": "Hi Team, Thanks for the quote. Please go ahead and proceed with this shipment from Dallas, TX to Greensboro, NC. You may dispatch as planned. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:18:19 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Dallas, TX to Greensboro, NC is $1,184.00 all-in with standard transit. Kindly confirm if we can proceed with dispatch. Thanks, Cowboy Logistics On Mon, Dec 8, 2025 at 4:17 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, This is Peter England Logistics. We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC. The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs. The planned pickup date is December 28th. Please share your best available rate at the earliest. Thanks, Peter England Logistics Regards, Santhiya K, Senior QA Engineer",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  },
+  "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>": {
+    "canonical_id": "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>",
+    "message_id": "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>",
+    "message_id_trusted": true,
+    "in_reply_to": "<817091422.3101305.1765190975670@mail.yahoo.com>",
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>",
+      "<1266261635.368349.1765190831161@mail.yahoo.com>",
+      "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+      "<817091422.3101305.1765190975670@mail.yahoo.com>"
+    ],
+    "direction": "outbound",
+    "from": {
+      "name": "",
+      "address": "testuser1@cowboyslogistics.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "sandyqatestacc@yahoo.com"
+      }
+    ],
+    "cc": [],
+    "subject": "Re: Peter England Logistics",
+    "body_text": "Hi Team, Thanks for the confirmation. Your shipment has been scheduled, and the PRO number is 16002. We’ll keep you updated with pickup and transit status. Please let us know if you need anything else. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 4:19 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with this shipment from Dallas, TX to Greensboro, NC. You may dispatch as planned. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:18:19 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Dallas, TX to Greensboro, NC is $1,184.00 all-in with standard transit. Kindly confirm if we can proceed with dispatch. Thanks, Cowboy Logistics On Mon, Dec 8, 2025 at 4:17 PM, Sandy QA < sandyqatestacc@yahoo.com > wrote: Hi Team, This is Peter England Logistics . We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC . The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs . The planned pickup date is December 28th . Please share your best available rate at the earliest. Thanks, Peter England Logistics Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  },
+  "<686548984.2432221.1765191419808@mail.yahoo.com>": {
+    "canonical_id": "<686548984.2432221.1765191419808@mail.yahoo.com>",
+    "message_id": "<686548984.2432221.1765191419808@mail.yahoo.com>",
+    "message_id_trusted": true,
+    "in_reply_to": "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>",
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>",
+      "<1266261635.368349.1765190831161@mail.yahoo.com>",
+      "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+      "<817091422.3101305.1765190975670@mail.yahoo.com>",
+      "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>"
+    ],
+    "direction": "inbound",
+    "from": {
+      "name": "",
+      "address": "sandyqatestacc@yahoo.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "testuser1@cowboyslogistics.com"
+      }
+    ],
+    "cc": [],
+    "subject": "Re: Peter England Logistics",
+    "body_text": "Hi Team, Thanks for sharing the PRO 16002. I have another shipment that needs a quote. Please find the details below: Pickup: Charlotte, NC Delivery: Columbus, OH Cargo: Packed apparel cartons Dimensions: 4 pallets, each 48 x 40 x 55 inches Tentative Pickup Date: 23rd December Kindly share your best rate for this lane. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:24:02 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your shipment has been scheduled, and the PRO number is 16002. We’ll keep you updated with pickup and transit status. Please let us know if you need anything else. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 4:19 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with this shipment from Dallas, TX to Greensboro, NC. You may dispatch as planned. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:18:19 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Dallas, TX to Greensboro, NC is $1,184.00 all-in with standard transit. Kindly confirm if we can proceed with dispatch. Thanks, Cowboy Logistics On Mon, Dec 8, 2025 at 4:17 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, This is Peter England Logistics. We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC. The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs. The planned pickup date is December 28th. Please share your best available rate at the earliest. Thanks, Peter England Logistics Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  },
+  "<CAM0jTArrjguFYp0+JsyTgqmSDbjbNdT79PAuFKCWm2HxpEBLMQ@mail.gmail.com>": {
+    "canonical_id": "<CAM0jTArrjguFYp0+JsyTgqmSDbjbNdT79PAuFKCWm2HxpEBLMQ@mail.gmail.com>",
+    "message_id": "<CAM0jTArrjguFYp0+JsyTgqmSDbjbNdT79PAuFKCWm2HxpEBLMQ@mail.gmail.com>",
+    "message_id_trusted": true,
+    "in_reply_to": "<686548984.2432221.1765191419808@mail.yahoo.com>",
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>",
+      "<1266261635.368349.1765190831161@mail.yahoo.com>",
+      "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+      "<817091422.3101305.1765190975670@mail.yahoo.com>",
+      "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>",
+      "<686548984.2432221.1765191419808@mail.yahoo.com>"
+    ],
+    "direction": "outbound",
+    "from": {
+      "name": "",
+      "address": "testuser1@cowboyslogistics.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "sandyqatestacc@yahoo.com"
+      }
+    ],
+    "cc": [],
+    "subject": "Re: Peter England Logistics",
+    "body_text": "Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Charlotte, NC → Columbus, OH is $1,395 all-in with standard dock-to-dock service. Please confirm if we should proceed with booking this shipment. Thanks, Cowboy Logistics Team On Mon, Dec 8, 2025 at 4:26 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for sharing the PRO 16002. I have another shipment that needs a quote. Please find the details below: Pickup: Charlotte, NC Delivery: Columbus, OH Cargo: Packed apparel cartons Dimensions: 4 pallets, each 48 x 40 x 55 inches Tentative Pickup Date: 23rd December Kindly share your best rate for this lane. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:24:02 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your shipment has been scheduled, and the PRO number is 16002. We’ll keep you updated with pickup and transit status. Please let us know if you need anything else. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 4:19 PM, Sandy QA < sandyqatestacc@yahoo.com > wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with this shipment from Dallas, TX to Greensboro, NC. You may dispatch as planned. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:18:19 pm IST, < testuser1@cowboyslogistics.com > wrote: Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Dallas, TX to Greensboro, NC is $1,184.00 all-in with standard transit. Kindly confirm if we can proceed with dispatch. Thanks, Cowboy Logistics On Mon, Dec 8, 2025 at 4:17 PM, Sandy QA < sandyqatestacc@yahoo.com > wrote: Hi Team, This is Peter England Logistics . We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC . The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs . The planned pickup date is December 28th . Please share your best available rate at the earliest. Thanks, Peter England Logistics Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  },
+  "<798868.3129061.1765193500859@mail.yahoo.com>": {
+    "canonical_id": "<798868.3129061.1765193500859@mail.yahoo.com>",
+    "message_id": "<798868.3129061.1765193500859@mail.yahoo.com>",
+    "message_id_trusted": true,
+    "in_reply_to": "<686548984.2432221.1765191419808@mail.yahoo.com>",
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>",
+      "<1266261635.368349.1765190831161@mail.yahoo.com>",
+      "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+      "<817091422.3101305.1765190975670@mail.yahoo.com>",
+      "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>",
+      "<686548984.2432221.1765191419808@mail.yahoo.com>"
+    ],
+    "direction": "inbound",
+    "from": {
+      "name": "",
+      "address": "sandyqatestacc@yahoo.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "testuser1@cowboyslogistics.com"
+      }
+    ],
+    "cc": [],
+    "subject": "Re: Peter England Logistics",
+    "body_text": "Hi Team, Thanks for the quote. Please go ahead and proceed with the Charlotte, NC → Columbus, OH shipment. Confirmed. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:26:59 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for sharing the PRO 16002. I have another shipment that needs a quote. Please find the details below: Pickup: Charlotte, NC Delivery: Columbus, OH Cargo: Packed apparel cartons Dimensions: 4 pallets, each 48 x 40 x 55 inches Tentative Pickup Date: 23rd December Kindly share your best rate for this lane. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:24:02 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your shipment has been scheduled, and the PRO number is 16002. We’ll keep you updated with pickup and transit status. Please let us know if you need anything else. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 4:19 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with this shipment from Dallas, TX to Greensboro, NC. You may dispatch as planned. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:18:19 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Dallas, TX to Greensboro, NC is $1,184.00 all-in with standard transit. Kindly confirm if we can proceed with dispatch. Thanks, Cowboy Logistics On Mon, Dec 8, 2025 at 4:17 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, This is Peter England Logistics. We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC. The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs. The planned pickup date is December 28th. Please share your best available rate at the earliest. Thanks, Peter England Logistics Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  },
+  "<CAM0jTApZnn=XngnKOm2rGRrBn6cLyyBpAtZuM9biZTWFaYXCFw@mail.gmail.com>": {
+    "canonical_id": "<CAM0jTApZnn=XngnKOm2rGRrBn6cLyyBpAtZuM9biZTWFaYXCFw@mail.gmail.com>",
+    "message_id": "<CAM0jTApZnn=XngnKOm2rGRrBn6cLyyBpAtZuM9biZTWFaYXCFw@mail.gmail.com>",
+    "message_id_trusted": true,
+    "in_reply_to": "<798868.3129061.1765193500859@mail.yahoo.com>",
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>",
+      "<1266261635.368349.1765190831161@mail.yahoo.com>",
+      "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+      "<817091422.3101305.1765190975670@mail.yahoo.com>",
+      "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>",
+      "<686548984.2432221.1765191419808@mail.yahoo.com>",
+      "<798868.3129061.1765193500859@mail.yahoo.com>"
+    ],
+    "direction": "outbound",
+    "from": {
+      "name": "",
+      "address": "testuser1@cowboyslogistics.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "sandyqatestacc@yahoo.com"
+      }
+    ],
+    "cc": [],
+    "subject": "Re: Peter England Logistics",
+    "body_text": "Hi Team, Thanks for the confirmation. Your Charlotte, NC → Columbus, OH shipment has been scheduled, and the PRO number is 17653. We’ll keep you updated with tracking and delivery status. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 5:01 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with the Charlotte, NC → Columbus, OH shipment. Confirmed. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:26:59 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for sharing the PRO 16002. I have another shipment that needs a quote. Please find the details below: Pickup: Charlotte, NC Delivery: Columbus, OH Cargo: Packed apparel cartons Dimensions: 4 pallets, each 48 x 40 x 55 inches Tentative Pickup Date: 23rd December Kindly share your best rate for this lane. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:24:02 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your shipment has been scheduled, and the PRO number is 16002. We’ll keep you updated with pickup and transit status. Please let us know if you need anything else. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 4:19 PM, Sandy QA < sandyqatestacc@yahoo.com > wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with this shipment from Dallas, TX to Greensboro, NC. You may dispatch as planned. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:18:19 pm IST, < testuser1@cowboyslogistics.com > wrote: Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Dallas, TX to Greensboro, NC is $1,184.00 all-in with standard transit. Kindly confirm if we can proceed with dispatch. Thanks, Cowboy Logistics On Mon, Dec 8, 2025 at 4:17 PM, Sandy QA < sandyqatestacc@yahoo.com > wrote: Hi Team, This is Peter England Logistics . We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC . The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs . The planned pickup date is December 28th . Please share your best available rate at the earliest. Thanks, Peter England Logistics Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  },
+  "<CAM0jTArJVKBAUdF-uPQ4YQqcTzZeUWa1JuWOq1wXSVV0=E7DUg@mail.gmail.com>": {
+    "canonical_id": "<CAM0jTArJVKBAUdF-uPQ4YQqcTzZeUWa1JuWOq1wXSVV0=E7DUg@mail.gmail.com>",
+    "message_id": "<CAM0jTArJVKBAUdF-uPQ4YQqcTzZeUWa1JuWOq1wXSVV0=E7DUg@mail.gmail.com>",
+    "message_id_trusted": true,
+    "in_reply_to": "<CAM0jTApZnn=XngnKOm2rGRrBn6cLyyBpAtZuM9biZTWFaYXCFw@mail.gmail.com>",
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>",
+      "<1266261635.368349.1765190831161@mail.yahoo.com>",
+      "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+      "<817091422.3101305.1765190975670@mail.yahoo.com>",
+      "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>",
+      "<686548984.2432221.1765191419808@mail.yahoo.com>",
+      "<798868.3129061.1765193500859@mail.yahoo.com>",
+      "<CAM0jTApZnn=XngnKOm2rGRrBn6cLyyBpAtZuM9biZTWFaYXCFw@mail.gmail.com>"
+    ],
+    "direction": "outbound",
+    "from": {
+      "name": "",
+      "address": "testuser1@cowboyslogistics.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "sandyqatestacc@yahoo.com"
+      }
+    ],
+    "cc": [],
+    "subject": "Re: Peter England Logistics",
+    "body_text": "Based on phone conversation, we have initiated the one more shipment and please find below the PRO for tracking purpose. PRO: 17782 On Mon, Dec 8, 2025 at 5:11 PM, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your Charlotte, NC → Columbus, OH shipment has been scheduled, and the PRO number is 17653. We’ll keep you updated with tracking and delivery status. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 5:01 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with the Charlotte, NC → Columbus, OH shipment. Confirmed. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:26:59 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for sharing the PRO 16002. I have another shipment that needs a quote. Please find the details below: Pickup: Charlotte, NC Delivery: Columbus, OH Cargo: Packed apparel cartons Dimensions: 4 pallets, each 48 x 40 x 55 inches Tentative Pickup Date: 23rd December Kindly share your best rate for this lane. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:24:02 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your shipment has been scheduled, and the PRO number is 16002. We’ll keep you updated with pickup and transit status. Please let us know if you need anything else. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 4:19 PM, Sandy QA < sandyqatestacc@yahoo.com > wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with this shipment from Dallas, TX to Greensboro, NC. You may dispatch as planned. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:18:19 pm IST, < testuser1@cowboyslogistics.com > wrote: Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Dallas, TX to Greensboro, NC is $1,184.00 all-in with standard transit. Kindly confirm if we can proceed with dispatch. Thanks, Cowboy Logistics On Mon, Dec 8, 2025 at 4:17 PM, Sandy QA < sandyqatestacc@yahoo.com > wrote: Hi Team, This is Peter England Logistics . We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC . The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs . The planned pickup date is December 28th . Please share your best available rate at the earliest. Thanks, Peter England Logistics Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  },
+  "<2041977580.2440534.1765194641223@mail.yahoo.com>": {
+    "canonical_id": "<2041977580.2440534.1765194641223@mail.yahoo.com>",
+    "message_id": "<2041977580.2440534.1765194641223@mail.yahoo.com>",
+    "message_id_trusted": true,
+    "in_reply_to": "<CAM0jTArJVKBAUdF-uPQ4YQqcTzZeUWa1JuWOq1wXSVV0=E7DUg@mail.gmail.com>",
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>",
+      "<1266261635.368349.1765190831161@mail.yahoo.com>",
+      "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+      "<817091422.3101305.1765190975670@mail.yahoo.com>",
+      "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>",
+      "<686548984.2432221.1765191419808@mail.yahoo.com>",
+      "<798868.3129061.1765193500859@mail.yahoo.com>",
+      "<CAM0jTApZnn=XngnKOm2rGRrBn6cLyyBpAtZuM9biZTWFaYXCFw@mail.gmail.com>",
+      "<CAM0jTArJVKBAUdF-uPQ4YQqcTzZeUWa1JuWOq1wXSVV0=E7DUg@mail.gmail.com>"
+    ],
+    "direction": "inbound",
+    "from": {
+      "name": "",
+      "address": "sandyqatestacc@yahoo.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "testuser1@cowboyslogistics.com"
+      }
+    ],
+    "cc": [],
+    "subject": "Re: Peter England Logistics",
+    "body_text": "Thank you for sharing the PRO for SAN FRANCISCO, CA → RIVERSIDE, CA, noted. On Monday 8 December, 2025 at 05:18:33 pm IST, <testuser1@cowboyslogistics.com> wrote: Based on phone conversation, we have initiated the one more shipment and please find below the PRO for tracking purpose. PRO: 17782 On Mon, Dec 8, 2025 at 5:11 PM, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your Charlotte, NC → Columbus, OH shipment has been scheduled, and the PRO number is 17653. We’ll keep you updated with tracking and delivery status. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 5:01 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with the Charlotte, NC → Columbus, OH shipment. Confirmed. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:26:59 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for sharing the PRO 16002. I have another shipment that needs a quote. Please find the details below: Pickup: Charlotte, NC Delivery: Columbus, OH Cargo: Packed apparel cartons Dimensions: 4 pallets, each 48 x 40 x 55 inches Tentative Pickup Date: 23rd December Kindly share your best rate for this lane. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:24:02 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your shipment has been scheduled, and the PRO number is 16002. We’ll keep you updated with pickup and transit status. Please let us know if you need anything else. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 4:19 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with this shipment from Dallas, TX to Greensboro, NC. You may dispatch as planned. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:18:19 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Dallas, TX to Greensboro, NC is $1,184.00 all-in with standard transit. Kindly confirm if we can proceed with dispatch. Thanks, Cowboy Logistics On Mon, Dec 8, 2025 at 4:17 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, This is Peter England Logistics. We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC. The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs. The planned pickup date is December 28th. Please share your best available rate at the earliest. Thanks, Peter England Logistics Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  },
+  "<1752426827.3139930.1765194707554@mail.yahoo.com>": {
+    "canonical_id": "<1752426827.3139930.1765194707554@mail.yahoo.com>",
+    "message_id": "<1752426827.3139930.1765194707554@mail.yahoo.com>",
+    "message_id_trusted": true,
+    "in_reply_to": "<2041977580.2440534.1765194641223@mail.yahoo.com>",
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>",
+      "<1266261635.368349.1765190831161@mail.yahoo.com>",
+      "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+      "<817091422.3101305.1765190975670@mail.yahoo.com>",
+      "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>",
+      "<686548984.2432221.1765191419808@mail.yahoo.com>",
+      "<798868.3129061.1765193500859@mail.yahoo.com>",
+      "<CAM0jTApZnn=XngnKOm2rGRrBn6cLyyBpAtZuM9biZTWFaYXCFw@mail.gmail.com>",
+      "<CAM0jTArJVKBAUdF-uPQ4YQqcTzZeUWa1JuWOq1wXSVV0=E7DUg@mail.gmail.com>",
+      "<2041977580.2440534.1765194641223@mail.yahoo.com>"
+    ],
+    "direction": "inbound",
+    "from": {
+      "name": "",
+      "address": "sandyqatestacc@yahoo.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "testuser1@cowboyslogistics.com"
+      }
+    ],
+    "cc": [],
+    "subject": "Re: Peter England Logistics",
+    "body_text": "can you please share more details about the shipment 17782? On Monday 8 December, 2025 at 05:20:41 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Thank you for sharing the PRO for SAN FRANCISCO, CA → RIVERSIDE, CA, noted. On Monday 8 December, 2025 at 05:18:33 pm IST, <testuser1@cowboyslogistics.com> wrote: Based on phone conversation, we have initiated the one more shipment and please find below the PRO for tracking purpose. PRO: 17782 On Mon, Dec 8, 2025 at 5:11 PM, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your Charlotte, NC → Columbus, OH shipment has been scheduled, and the PRO number is 17653. We’ll keep you updated with tracking and delivery status. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 5:01 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with the Charlotte, NC → Columbus, OH shipment. Confirmed. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:26:59 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for sharing the PRO 16002. I have another shipment that needs a quote. Please find the details below: Pickup: Charlotte, NC Delivery: Columbus, OH Cargo: Packed apparel cartons Dimensions: 4 pallets, each 48 x 40 x 55 inches Tentative Pickup Date: 23rd December Kindly share your best rate for this lane. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:24:02 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your shipment has been scheduled, and the PRO number is 16002. We’ll keep you updated with pickup and transit status. Please let us know if you need anything else. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 4:19 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with this shipment from Dallas, TX to Greensboro, NC. You may dispatch as planned. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:18:19 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Dallas, TX to Greensboro, NC is $1,184.00 all-in with standard transit. Kindly confirm if we can proceed with dispatch. Thanks, Cowboy Logistics On Mon, Dec 8, 2025 at 4:17 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, This is Peter England Logistics. We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC. The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs. The planned pickup date is December 28th. Please share your best available rate at the earliest. Thanks, Peter England Logistics Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  },
+  "<CAM0jTAr_U2qQPzy7Hn7dwFdCN8zdFXEXrg0s2_r3DzZN+_S_tA@mail.gmail.com>": {
+    "canonical_id": "<CAM0jTAr_U2qQPzy7Hn7dwFdCN8zdFXEXrg0s2_r3DzZN+_S_tA@mail.gmail.com>",
+    "message_id": "<CAM0jTAr_U2qQPzy7Hn7dwFdCN8zdFXEXrg0s2_r3DzZN+_S_tA@mail.gmail.com>",
+    "message_id_trusted": true,
+    "in_reply_to": "<1752426827.3139930.1765194707554@mail.yahoo.com>",
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>",
+      "<1266261635.368349.1765190831161@mail.yahoo.com>",
+      "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+      "<817091422.3101305.1765190975670@mail.yahoo.com>",
+      "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>",
+      "<686548984.2432221.1765191419808@mail.yahoo.com>",
+      "<798868.3129061.1765193500859@mail.yahoo.com>",
+      "<CAM0jTApZnn=XngnKOm2rGRrBn6cLyyBpAtZuM9biZTWFaYXCFw@mail.gmail.com>",
+      "<CAM0jTArJVKBAUdF-uPQ4YQqcTzZeUWa1JuWOq1wXSVV0=E7DUg@mail.gmail.com>",
+      "<2041977580.2440534.1765194641223@mail.yahoo.com>",
+      "<1752426827.3139930.1765194707554@mail.yahoo.com>"
+    ],
+    "direction": "outbound",
+    "from": {
+      "name": "",
+      "address": "testuser1@cowboyslogistics.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "sandyqatestacc@yahoo.com"
+      }
+    ],
+    "cc": [],
+    "subject": "Re: Peter England Logistics",
+    "body_text": "Based on the 3rd shipment confirmation for PRO Number 17782, here are the details with Quote we confirmed; Shipment Details Quote: $3210/- Equipment Type Sprinter Van Weight 374 Route SAN FRANCISCO, CA → RIVERSIDE, CA Distance 423 Pickup Date Dec 7, 2025 Special Requirements Documentation required for air import recovery. Pickup from SFO today. Original routing was to LAX with delays. Potential hard time from Delta at pickup. On Mon, Dec 8, 2025 at 5:21 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: can you please share more details about the shipment 17782? On Monday 8 December, 2025 at 05:20:41 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Thank you for sharing the PRO for SAN FRANCISCO, CA → RIVERSIDE, CA, noted. On Monday 8 December, 2025 at 05:18:33 pm IST, <testuser1@cowboyslogistics.com> wrote: Based on phone conversation, we have initiated the one more shipment and please find below the PRO for tracking purpose. PRO: 17782 On Mon, Dec 8, 2025 at 5:11 PM, < testuser1@cowboyslogistics.com > wrote: Hi Team, Thanks for the confirmation. Your Charlotte, NC → Columbus, OH shipment has been scheduled, and the PRO number is 17653. We’ll keep you updated with tracking and delivery status. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 5:01 PM, Sandy QA < sandyqatestacc@yahoo.com > wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with the Charlotte, NC → Columbus, OH shipment. Confirmed. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:26:59 pm IST, Sandy QA < sandyqatestacc@yahoo.com > wrote: Hi Team, Thanks for sharing the PRO 16002. I have another shipment that needs a quote. Please find the details below: Pickup: Charlotte, NC Delivery: Columbus, OH Cargo: Packed apparel cartons Dimensions: 4 pallets, each 48 x 40 x 55 inches Tentative Pickup Date: 23rd December Kindly share your best rate for this lane. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:24:02 pm IST, < testuser1@cowboyslogistics.com > wrote: Hi Team, Thanks for the confirmation. Your shipment has been scheduled, and the PRO number is 16002. We’ll keep you updated with pickup and transit status. Please let us know if you need anything else. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 4:19 PM, Sandy QA < sandyqatestacc@yahoo.com > wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with this shipment from Dallas, TX to Greensboro, NC. You may dispatch as planned. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:18:19 pm IST, < testuser1@cowboyslogistics.com > wrote: Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Dallas, TX to Greensboro, NC is $1,184.00 all-in with standard transit. Kindly confirm if we can proceed with dispatch. Thanks, Cowboy Logistics On Mon, Dec 8, 2025 at 4:17 PM, Sandy QA < sandyqatestacc@yahoo.com > wrote: Hi Team, This is Peter England Logistics . We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC . The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs . The planned pickup date is December 28th . Please share your best available rate at the earliest. Thanks, Peter England Logistics Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  },
+  "<CAM0jTAo6LegzsMU47yovt_UxEddYZhz2cz8AvBQdNYx7egrqkQ@mail.gmail.com>": {
+    "canonical_id": "<CAM0jTAo6LegzsMU47yovt_UxEddYZhz2cz8AvBQdNYx7egrqkQ@mail.gmail.com>",
+    "message_id": "<CAM0jTAo6LegzsMU47yovt_UxEddYZhz2cz8AvBQdNYx7egrqkQ@mail.gmail.com>",
+    "message_id_trusted": true,
+    "in_reply_to": "<CAM0jTAr_U2qQPzy7Hn7dwFdCN8zdFXEXrg0s2_r3DzZN+_S_tA@mail.gmail.com>",
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>",
+      "<1266261635.368349.1765190831161@mail.yahoo.com>",
+      "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+      "<817091422.3101305.1765190975670@mail.yahoo.com>",
+      "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>",
+      "<686548984.2432221.1765191419808@mail.yahoo.com>",
+      "<798868.3129061.1765193500859@mail.yahoo.com>",
+      "<CAM0jTApZnn=XngnKOm2rGRrBn6cLyyBpAtZuM9biZTWFaYXCFw@mail.gmail.com>",
+      "<CAM0jTArJVKBAUdF-uPQ4YQqcTzZeUWa1JuWOq1wXSVV0=E7DUg@mail.gmail.com>",
+      "<2041977580.2440534.1765194641223@mail.yahoo.com>",
+      "<1752426827.3139930.1765194707554@mail.yahoo.com>",
+      "<CAM0jTAr_U2qQPzy7Hn7dwFdCN8zdFXEXrg0s2_r3DzZN+_S_tA@mail.gmail.com>"
+    ],
+    "direction": "outbound",
+    "from": {
+      "name": "",
+      "address": "testuser1@cowboyslogistics.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "sandyqatestacc@yahoo.com"
+      }
+    ],
+    "cc": [],
+    "subject": "Re: Peter England Logistics",
+    "body_text": "Sorry, ignore the wrong PRO: 17782 and please find below the correct PRO for the above 3rd shipment PRO Number: 17148 On Mon, Dec 8, 2025 at 5:23 PM, <testuser1@cowboyslogistics.com> wrote: Based on the 3rd shipment confirmation for PRO Number 17782, here are the details with Quote we confirmed; Shipment Details Quote: $3210/- Equipment Type Sprinter Van Weight 374 Route SAN FRANCISCO, CA → RIVERSIDE, CA Distance 423 Pickup Date Dec 7, 2025 Special Requirements Documentation required for air import recovery. Pickup from SFO today. Original routing was to LAX with delays. Potential hard time from Delta at pickup. On Mon, Dec 8, 2025 at 5:21 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: can you please share more details about the shipment 17782? On Monday 8 December, 2025 at 05:20:41 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Thank you for sharing the PRO for SAN FRANCISCO, CA → RIVERSIDE, CA, noted. On Monday 8 December, 2025 at 05:18:33 pm IST, <testuser1@cowboyslogistics.com> wrote: Based on phone conversation, we have initiated the one more shipment and please find below the PRO for tracking purpose. PRO: 17782 On Mon, Dec 8, 2025 at 5:11 PM, < testuser1@cowboyslogistics.com > wrote: Hi Team, Thanks for the confirmation. Your Charlotte, NC → Columbus, OH shipment has been scheduled, and the PRO number is 17653. We’ll keep you updated with tracking and delivery status. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 5:01 PM, Sandy QA < sandyqatestacc@yahoo.com > wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with the Charlotte, NC → Columbus, OH shipment. Confirmed. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:26:59 pm IST, Sandy QA < sandyqatestacc@yahoo.com > wrote: Hi Team, Thanks for sharing the PRO 16002. I have another shipment that needs a quote. Please find the details below: Pickup: Charlotte, NC Delivery: Columbus, OH Cargo: Packed apparel cartons Dimensions: 4 pallets, each 48 x 40 x 55 inches Tentative Pickup Date: 23rd December Kindly share your best rate for this lane. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:24:02 pm IST, < testuser1@cowboyslogistics.com > wrote: Hi Team, Thanks for the confirmation. Your shipment has been scheduled, and the PRO number is 16002. We’ll keep you updated with pickup and transit status. Please let us know if you need anything else. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 4:19 PM, Sandy QA < sandyqatestacc@yahoo.com > wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with this shipment from Dallas, TX to Greensboro, NC. You may dispatch as planned. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:18:19 pm IST, < testuser1@cowboyslogistics.com > wrote: Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Dallas, TX to Greensboro, NC is $1,184.00 all-in with standard transit. Kindly confirm if we can proceed with dispatch. Thanks, Cowboy Logistics On Mon, Dec 8, 2025 at 4:17 PM, Sandy QA < sandyqatestacc@yahoo.com > wrote: Hi Team, This is Peter England Logistics . We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC . The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs . The planned pickup date is December 28th . Please share your best available rate at the earliest. Thanks, Peter England Logistics Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  },
+  "<579206547.3142704.1765194997406@mail.yahoo.com>": {
+    "canonical_id": "<579206547.3142704.1765194997406@mail.yahoo.com>",
+    "message_id": "<579206547.3142704.1765194997406@mail.yahoo.com>",
+    "message_id_trusted": true,
+    "in_reply_to": "<CAM0jTAo6LegzsMU47yovt_UxEddYZhz2cz8AvBQdNYx7egrqkQ@mail.gmail.com>",
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>",
+      "<1266261635.368349.1765190831161@mail.yahoo.com>",
+      "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+      "<817091422.3101305.1765190975670@mail.yahoo.com>",
+      "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>",
+      "<686548984.2432221.1765191419808@mail.yahoo.com>",
+      "<798868.3129061.1765193500859@mail.yahoo.com>",
+      "<CAM0jTApZnn=XngnKOm2rGRrBn6cLyyBpAtZuM9biZTWFaYXCFw@mail.gmail.com>",
+      "<CAM0jTArJVKBAUdF-uPQ4YQqcTzZeUWa1JuWOq1wXSVV0=E7DUg@mail.gmail.com>",
+      "<2041977580.2440534.1765194641223@mail.yahoo.com>",
+      "<1752426827.3139930.1765194707554@mail.yahoo.com>",
+      "<CAM0jTAr_U2qQPzy7Hn7dwFdCN8zdFXEXrg0s2_r3DzZN+_S_tA@mail.gmail.com>",
+      "<CAM0jTAo6LegzsMU47yovt_UxEddYZhz2cz8AvBQdNYx7egrqkQ@mail.gmail.com>"
+    ],
+    "direction": "inbound",
+    "from": {
+      "name": "",
+      "address": "sandyqatestacc@yahoo.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "testuser1@cowboyslogistics.com"
+      }
+    ],
+    "cc": [],
+    "subject": "Re: Peter England Logistics",
+    "body_text": "noted On Monday 8 December, 2025 at 05:26:09 pm IST, <testuser1@cowboyslogistics.com> wrote: Sorry, ignore the wrong PRO: 17782 and please find below the correct PRO for the above 3rd shipment PRO Number: 17148 On Mon, Dec 8, 2025 at 5:23 PM, <testuser1@cowboyslogistics.com> wrote: Based on the 3rd shipment confirmation for PRO Number 17782, here are the details with Quote we confirmed; Shipment Details Quote: $3210/- Equipment Type Sprinter Van Weight 374 Route SAN FRANCISCO, CA → RIVERSIDE, CA Distance 423 Pickup Date Dec 7, 2025 Special Requirements Documentation required for air import recovery. Pickup from SFO today. Original routing was to LAX with delays. Potential hard time from Delta at pickup. On Mon, Dec 8, 2025 at 5:21 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: can you please share more details about the shipment 17782? On Monday 8 December, 2025 at 05:20:41 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Thank you for sharing the PRO for SAN FRANCISCO, CA → RIVERSIDE, CA, noted. On Monday 8 December, 2025 at 05:18:33 pm IST, <testuser1@cowboyslogistics.com> wrote: Based on phone conversation, we have initiated the one more shipment and please find below the PRO for tracking purpose. PRO: 17782 On Mon, Dec 8, 2025 at 5:11 PM, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your Charlotte, NC → Columbus, OH shipment has been scheduled, and the PRO number is 17653. We’ll keep you updated with tracking and delivery status. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 5:01 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with the Charlotte, NC → Columbus, OH shipment. Confirmed. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:26:59 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for sharing the PRO 16002. I have another shipment that needs a quote. Please find the details below: Pickup: Charlotte, NC Delivery: Columbus, OH Cargo: Packed apparel cartons Dimensions: 4 pallets, each 48 x 40 x 55 inches Tentative Pickup Date: 23rd December Kindly share your best rate for this lane. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:24:02 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your shipment has been scheduled, and the PRO number is 16002. We’ll keep you updated with pickup and transit status. Please let us know if you need anything else. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 4:19 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with this shipment from Dallas, TX to Greensboro, NC. You may dispatch as planned. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:18:19 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Dallas, TX to Greensboro, NC is $1,184.00 all-in with standard transit. Kindly confirm if we can proceed with dispatch. Thanks, Cowboy Logistics On Mon, Dec 8, 2025 at 4:17 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, This is Peter England Logistics. We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC. The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs. The planned pickup date is December 28th. Please share your best available rate at the earliest. Thanks, Peter England Logistics Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  },
+  "<2146950001.3398329.1765286210884@mail.yahoo.com>": {
+    "canonical_id": "<2146950001.3398329.1765286210884@mail.yahoo.com>",
+    "message_id": "<2146950001.3398329.1765286210884@mail.yahoo.com>",
+    "message_id_trusted": true,
+    "in_reply_to": "<579206547.3142704.1765194997406@mail.yahoo.com>",
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>",
+      "<1266261635.368349.1765190831161@mail.yahoo.com>",
+      "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+      "<817091422.3101305.1765190975670@mail.yahoo.com>",
+      "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>",
+      "<686548984.2432221.1765191419808@mail.yahoo.com>",
+      "<798868.3129061.1765193500859@mail.yahoo.com>",
+      "<CAM0jTApZnn=XngnKOm2rGRrBn6cLyyBpAtZuM9biZTWFaYXCFw@mail.gmail.com>",
+      "<CAM0jTArJVKBAUdF-uPQ4YQqcTzZeUWa1JuWOq1wXSVV0=E7DUg@mail.gmail.com>",
+      "<2041977580.2440534.1765194641223@mail.yahoo.com>",
+      "<1752426827.3139930.1765194707554@mail.yahoo.com>",
+      "<CAM0jTAr_U2qQPzy7Hn7dwFdCN8zdFXEXrg0s2_r3DzZN+_S_tA@mail.gmail.com>",
+      "<CAM0jTAo6LegzsMU47yovt_UxEddYZhz2cz8AvBQdNYx7egrqkQ@mail.gmail.com>",
+      "<579206547.3142704.1765194997406@mail.yahoo.com>"
+    ],
+    "direction": "inbound",
+    "from": {
+      "name": "",
+      "address": "sandyqatestacc@yahoo.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "testuser1@cowboyslogistics.com"
+      }
+    ],
+    "cc": [],
+    "subject": "Re: Peter England Logistics",
+    "body_text": "Any updates team? On Monday 8 December, 2025 at 05:26:37 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: noted On Monday 8 December, 2025 at 05:26:09 pm IST, <testuser1@cowboyslogistics.com> wrote: Sorry, ignore the wrong PRO: 17782 and please find below the correct PRO for the above 3rd shipment PRO Number: 17148 On Mon, Dec 8, 2025 at 5:23 PM, <testuser1@cowboyslogistics.com> wrote: Based on the 3rd shipment confirmation for PRO Number 17782, here are the details with Quote we confirmed; Shipment Details Quote: $3210/- Equipment Type Sprinter Van Weight 374 Route SAN FRANCISCO, CA → RIVERSIDE, CA Distance 423 Pickup Date Dec 7, 2025 Special Requirements Documentation required for air import recovery. Pickup from SFO today. Original routing was to LAX with delays. Potential hard time from Delta at pickup. On Mon, Dec 8, 2025 at 5:21 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: can you please share more details about the shipment 17782? On Monday 8 December, 2025 at 05:20:41 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Thank you for sharing the PRO for SAN FRANCISCO, CA → RIVERSIDE, CA, noted. On Monday 8 December, 2025 at 05:18:33 pm IST, <testuser1@cowboyslogistics.com> wrote: Based on phone conversation, we have initiated the one more shipment and please find below the PRO for tracking purpose. PRO: 17782 On Mon, Dec 8, 2025 at 5:11 PM, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your Charlotte, NC → Columbus, OH shipment has been scheduled, and the PRO number is 17653. We’ll keep you updated with tracking and delivery status. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 5:01 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with the Charlotte, NC → Columbus, OH shipment. Confirmed. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:26:59 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for sharing the PRO 16002. I have another shipment that needs a quote. Please find the details below: Pickup: Charlotte, NC Delivery: Columbus, OH Cargo: Packed apparel cartons Dimensions: 4 pallets, each 48 x 40 x 55 inches Tentative Pickup Date: 23rd December Kindly share your best rate for this lane. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:24:02 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your shipment has been scheduled, and the PRO number is 16002. We’ll keep you updated with pickup and transit status. Please let us know if you need anything else. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 4:19 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with this shipment from Dallas, TX to Greensboro, NC. You may dispatch as planned. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:18:19 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Dallas, TX to Greensboro, NC is $1,184.00 all-in with standard transit. Kindly confirm if we can proceed with dispatch. Thanks, Cowboy Logistics On Mon, Dec 8, 2025 at 4:17 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, This is Peter England Logistics. We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC. The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs. The planned pickup date is December 28th. Please share your best available rate at the earliest. Thanks, Peter England Logistics Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  },
+  "<601763063.2712032.1765286956459@mail.yahoo.com>": {
+    "canonical_id": "<601763063.2712032.1765286956459@mail.yahoo.com>",
+    "message_id": "<601763063.2712032.1765286956459@mail.yahoo.com>",
+    "message_id_trusted": true,
+    "in_reply_to": "<2146950001.3398329.1765286210884@mail.yahoo.com>",
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>",
+      "<1266261635.368349.1765190831161@mail.yahoo.com>",
+      "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+      "<817091422.3101305.1765190975670@mail.yahoo.com>",
+      "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>",
+      "<686548984.2432221.1765191419808@mail.yahoo.com>",
+      "<798868.3129061.1765193500859@mail.yahoo.com>",
+      "<CAM0jTApZnn=XngnKOm2rGRrBn6cLyyBpAtZuM9biZTWFaYXCFw@mail.gmail.com>",
+      "<CAM0jTArJVKBAUdF-uPQ4YQqcTzZeUWa1JuWOq1wXSVV0=E7DUg@mail.gmail.com>",
+      "<2041977580.2440534.1765194641223@mail.yahoo.com>",
+      "<1752426827.3139930.1765194707554@mail.yahoo.com>",
+      "<CAM0jTAr_U2qQPzy7Hn7dwFdCN8zdFXEXrg0s2_r3DzZN+_S_tA@mail.gmail.com>",
+      "<CAM0jTAo6LegzsMU47yovt_UxEddYZhz2cz8AvBQdNYx7egrqkQ@mail.gmail.com>",
+      "<579206547.3142704.1765194997406@mail.yahoo.com>",
+      "<2146950001.3398329.1765286210884@mail.yahoo.com>"
+    ],
+    "direction": "inbound",
+    "from": {
+      "name": "",
+      "address": "sandyqatestacc@yahoo.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "testuser1@cowboyslogistics.com"
+      }
+    ],
+    "cc": [],
+    "subject": "Re: Peter England Logistics",
+    "body_text": "Do you have any specific update? On Tuesday 9 December, 2025 at 06:46:50 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Any updates team? On Monday 8 December, 2025 at 05:26:37 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: noted On Monday 8 December, 2025 at 05:26:09 pm IST, <testuser1@cowboyslogistics.com> wrote: Sorry, ignore the wrong PRO: 17782 and please find below the correct PRO for the above 3rd shipment PRO Number: 17148 On Mon, Dec 8, 2025 at 5:23 PM, <testuser1@cowboyslogistics.com> wrote: Based on the 3rd shipment confirmation for PRO Number 17782, here are the details with Quote we confirmed; Shipment Details Quote: $3210/- Equipment Type Sprinter Van Weight 374 Route SAN FRANCISCO, CA → RIVERSIDE, CA Distance 423 Pickup Date Dec 7, 2025 Special Requirements Documentation required for air import recovery. Pickup from SFO today. Original routing was to LAX with delays. Potential hard time from Delta at pickup. On Mon, Dec 8, 2025 at 5:21 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: can you please share more details about the shipment 17782? On Monday 8 December, 2025 at 05:20:41 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Thank you for sharing the PRO for SAN FRANCISCO, CA → RIVERSIDE, CA, noted. On Monday 8 December, 2025 at 05:18:33 pm IST, <testuser1@cowboyslogistics.com> wrote: Based on phone conversation, we have initiated the one more shipment and please find below the PRO for tracking purpose. PRO: 17782 On Mon, Dec 8, 2025 at 5:11 PM, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your Charlotte, NC → Columbus, OH shipment has been scheduled, and the PRO number is 17653. We’ll keep you updated with tracking and delivery status. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 5:01 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with the Charlotte, NC → Columbus, OH shipment. Confirmed. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:26:59 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for sharing the PRO 16002. I have another shipment that needs a quote. Please find the details below: Pickup: Charlotte, NC Delivery: Columbus, OH Cargo: Packed apparel cartons Dimensions: 4 pallets, each 48 x 40 x 55 inches Tentative Pickup Date: 23rd December Kindly share your best rate for this lane. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:24:02 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your shipment has been scheduled, and the PRO number is 16002. We’ll keep you updated with pickup and transit status. Please let us know if you need anything else. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 4:19 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with this shipment from Dallas, TX to Greensboro, NC. You may dispatch as planned. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:18:19 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Dallas, TX to Greensboro, NC is $1,184.00 all-in with standard transit. Kindly confirm if we can proceed with dispatch. Thanks, Cowboy Logistics On Mon, Dec 8, 2025 at 4:17 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, This is Peter England Logistics. We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC. The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs. The planned pickup date is December 28th. Please share your best available rate at the earliest. Thanks, Peter England Logistics Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  },
+  "<760226359.738251.1765873407365@mail.yahoo.com>": {
+    "canonical_id": "<760226359.738251.1765873407365@mail.yahoo.com>",
+    "message_id": "<760226359.738251.1765873407365@mail.yahoo.com>",
+    "message_id_trusted": true,
+    "in_reply_to": "<601763063.2712032.1765286956459@mail.yahoo.com>",
+    "references": [
+      "<1266261635.368349.1765190831161.ref@mail.yahoo.com>",
+      "<1266261635.368349.1765190831161@mail.yahoo.com>",
+      "<CAM0jTAq2PXLS5s7o9VrbZs4NS_Hs97y87GbpoQge_An6xsFS7g@mail.gmail.com>",
+      "<817091422.3101305.1765190975670@mail.yahoo.com>",
+      "<CAM0jTArNrxaEFYidQt6spUMHbDavVXs55Gj0eW54T+-tBs6nHw@mail.gmail.com>",
+      "<686548984.2432221.1765191419808@mail.yahoo.com>",
+      "<798868.3129061.1765193500859@mail.yahoo.com>",
+      "<CAM0jTApZnn=XngnKOm2rGRrBn6cLyyBpAtZuM9biZTWFaYXCFw@mail.gmail.com>",
+      "<CAM0jTArJVKBAUdF-uPQ4YQqcTzZeUWa1JuWOq1wXSVV0=E7DUg@mail.gmail.com>",
+      "<2041977580.2440534.1765194641223@mail.yahoo.com>",
+      "<1752426827.3139930.1765194707554@mail.yahoo.com>",
+      "<CAM0jTAr_U2qQPzy7Hn7dwFdCN8zdFXEXrg0s2_r3DzZN+_S_tA@mail.gmail.com>",
+      "<CAM0jTAo6LegzsMU47yovt_UxEddYZhz2cz8AvBQdNYx7egrqkQ@mail.gmail.com>",
+      "<579206547.3142704.1765194997406@mail.yahoo.com>",
+      "<2146950001.3398329.1765286210884@mail.yahoo.com>",
+      "<601763063.2712032.1765286956459@mail.yahoo.com>"
+    ],
+    "direction": "inbound",
+    "from": {
+      "name": "",
+      "address": "sandyqatestacc@yahoo.com"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "testuser1@cowboyslogistics.com"
+      }
+    ],
+    "cc": [],
+    "subject": "Re: Peter England Logistics",
+    "body_text": "Can you please provide the quote? On Tuesday, 9 December 2025 at 06:59:16 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Do you have any specific update? On Tuesday 9 December, 2025 at 06:46:50 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Any updates team? On Monday 8 December, 2025 at 05:26:37 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: noted On Monday 8 December, 2025 at 05:26:09 pm IST, <testuser1@cowboyslogistics.com> wrote: Sorry, ignore the wrong PRO: 17782 and please find below the correct PRO for the above 3rd shipment PRO Number: 17148 On Mon, Dec 8, 2025 at 5:23 PM, <testuser1@cowboyslogistics.com> wrote: Based on the 3rd shipment confirmation for PRO Number 17782, here are the details with Quote we confirmed; Shipment Details Quote: $3210/- Equipment Type Sprinter Van Weight 374 Route SAN FRANCISCO, CA → RIVERSIDE, CA Distance 423 Pickup Date Dec 7, 2025 Special Requirements Documentation required for air import recovery. Pickup from SFO today. Original routing was to LAX with delays. Potential hard time from Delta at pickup. On Mon, Dec 8, 2025 at 5:21 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: can you please share more details about the shipment 17782? On Monday 8 December, 2025 at 05:20:41 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Thank you for sharing the PRO for SAN FRANCISCO, CA → RIVERSIDE, CA, noted. On Monday 8 December, 2025 at 05:18:33 pm IST, <testuser1@cowboyslogistics.com> wrote: Based on phone conversation, we have initiated the one more shipment and please find below the PRO for tracking purpose. PRO: 17782 On Mon, Dec 8, 2025 at 5:11 PM, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your Charlotte, NC → Columbus, OH shipment has been scheduled, and the PRO number is 17653. We’ll keep you updated with tracking and delivery status. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 5:01 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with the Charlotte, NC → Columbus, OH shipment. Confirmed. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:26:59 pm IST, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for sharing the PRO 16002. I have another shipment that needs a quote. Please find the details below: Pickup: Charlotte, NC Delivery: Columbus, OH Cargo: Packed apparel cartons Dimensions: 4 pallets, each 48 x 40 x 55 inches Tentative Pickup Date: 23rd December Kindly share your best rate for this lane. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:24:02 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for the confirmation. Your shipment has been scheduled, and the PRO number is 16002. We’ll keep you updated with pickup and transit status. Please let us know if you need anything else. Regards, Cowboy Logistics Team On Mon, Dec 8, 2025 at 4:19 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, Thanks for the quote. Please go ahead and proceed with this shipment from Dallas, TX to Greensboro, NC. You may dispatch as planned. Regards, Peter England Logistics Team On Monday 8 December, 2025 at 04:18:19 pm IST, <testuser1@cowboyslogistics.com> wrote: Hi Team, Thanks for sharing the shipment details. The rate for moving your apparel cartons from Dallas, TX to Greensboro, NC is $1,184.00 all-in with standard transit. Kindly confirm if we can proceed with dispatch. Thanks, Cowboy Logistics On Mon, Dec 8, 2025 at 4:17 PM, Sandy QA <sandyqatestacc@yahoo.com> wrote: Hi Team, This is Peter England Logistics. We need a freight quote for an upcoming shipment moving from Dallas, TX to Greensboro, NC. The cargo consists of apparel cartons with approximate dimensions 48\" x 40\" x 60\" and a total weight of 1,200 lbs. The planned pickup date is December 28th. Please share your best available rate at the earliest. Thanks, Peter England Logistics Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer Regards, Santhiya K, Senior QA Engineer",
+    "attachments": [],
+    "list_id": null,
+    "auto_submitted": null
+  }
+}
