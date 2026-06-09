@@ -59,3 +59,19 @@ def test_happy_path_emits_and_advances_cursor():
     # emitted event carries tenant + ordering key = mailbox
     assert emitter.events[0].tenant == "acme"
     assert emitter.events[0].ordering_key == "ops@acme.com"
+
+
+def test_blacklisted_mail_is_dropped_not_emitted_and_cursor_advances():
+    seed = {STREAM: [
+        SeedEmail("m1", _raw("m1", frm="spammer@spam.com")),
+        SeedEmail("m2", _raw("m2", frm="alice@partner.com")),
+    ]}
+    pipe, emitter, _ = _pipeline(seed, filters=[BlacklistFilter(domains={"spam.com"})])
+    report = pipe.run_once()
+    assert report.dropped == 1
+    assert report.emitted == 1
+    assert [e.email.provider_message_id for e in emitter.events] == ["m2"]
+    # dropped message still counts as finished -> cursor advanced past BOTH
+    assert pipe.cursor_store.get("acme", STREAM).order == 2
+    drop_trace = next(t for t in report.traces if t.disposition.value == "dropped")
+    assert drop_trace.matched_filter == "blacklist"
