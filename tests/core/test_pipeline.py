@@ -88,3 +88,15 @@ def test_duplicate_delivery_is_skipped_once_and_counts_as_finished():
     assert report.duplicates == 1       # claimed-already -> skipped
     assert len(emitter.events) == 1     # still only emitted once, ever
     assert pipe.cursor_store.get("acme", STREAM).order == 1  # duplicate advanced cursor
+
+
+def test_oversized_message_is_dead_lettered_and_cursor_advances():
+    big = _raw("big", body="x" * 100)
+    seed = {STREAM: [SeedEmail("big", big), SeedEmail("m2", _raw("m2"))]}
+    pipe, emitter, dlq = _pipeline(seed, max_message_bytes=len(big) - 1)
+    report = pipe.run_once()
+    assert report.dead_lettered == 1
+    assert report.emitted == 1                      # m2 still flows
+    assert dlq.events[0].email.provider_message_id == "big"
+    assert "oversized" in report.dlq[0].reason
+    assert pipe.cursor_store.get("acme", STREAM).order == 2  # moved past the poison message
