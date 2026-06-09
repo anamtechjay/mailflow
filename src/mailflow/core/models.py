@@ -103,3 +103,86 @@ class Attachment(BaseModel):
     storage_ref: str = ""  # pointer in BlobStore, NOT the bytes
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class Relevance(BaseModel):
+    """Classifier output — non-destructive by default (spec OD-2)."""
+
+    verdict: Verdict = Verdict.unknown
+    score: float | None = None
+    reason: str = ""
+
+
+class Envelope(BaseModel):
+    """Cheap, provider-neutral parse used by filters BEFORE full extraction (§7.3)."""
+
+    canonical_id: str
+    message_id: str | None = None
+    message_id_present: bool = False
+    message_id_trusted: bool = False
+    provider: str
+    provider_message_id: str
+    stream: StreamRef
+    from_: Recipient = Field(default_factory=Recipient, alias="from")
+    sender: Recipient | None = None
+    reply_to: Recipient | None = None
+    to: list[Recipient] = Field(default_factory=list)
+    cc: list[Recipient] = Field(default_factory=list)
+    subject: str = ""
+    date_utc: datetime | None = None
+    received_at: datetime | None = None
+    snippet: str = ""
+    list_id: str | None = None
+    list_unsubscribe: str | None = None
+    auto_submitted: str | None = None
+    headers: dict[str, list[str]] = Field(default_factory=dict)
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class CleanEmail(BaseModel):
+    """The normalized, provider-agnostic email we emit (spec §6.2)."""
+
+    canonical_id: str
+    message_id: str | None = None
+    message_id_trusted: bool = False
+    in_reply_to: str | None = None
+    references: list[str] = Field(default_factory=list)
+
+    provider: str
+    provider_message_id: str
+    provider_stream_id: str
+    direction: Direction = Direction.unknown
+    is_draft: bool = False
+
+    from_: Recipient = Field(default_factory=Recipient, alias="from")
+    sender: Recipient | None = None
+    reply_to: Recipient | None = None
+    to: list[Recipient] = Field(default_factory=list)
+    cc: list[Recipient] = Field(default_factory=list)
+    bcc: list[Recipient] = Field(default_factory=list)
+
+    subject: str = ""
+    date_utc: datetime | None = None
+    received_at: datetime | None = None
+
+    body_text: str = ""
+    body_html: str = ""
+    body_truncated: bool = False
+    attachments: list[Attachment] = Field(default_factory=list)
+
+    labels: list[str] = Field(default_factory=list)
+    categories: list[str] = Field(default_factory=list)
+    folder: str = ""
+
+    auto_submitted: str | None = None
+    list_id: str | None = None
+    list_unsubscribe: str | None = None
+    message_size_bytes: int = 0
+    raw_headers: dict[str, list[str]] = Field(default_factory=dict)
+
+    relevance: Relevance = Field(default_factory=Relevance)
+    matched_filter: str = ""
+    schema_version: str = ""
+
+    model_config = ConfigDict(populate_by_name=True)
