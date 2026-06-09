@@ -1,14 +1,9 @@
-from datetime import datetime, timezone
-
-import pytest
-
-from mailflow.core.filtering import FilterContext
 from mailflow.core.models import Cursor, StreamRef
 from mailflow.core.pipeline import Pipeline, PipelineConfig
 from mailflow.extract.envelope import MimeEnvelopeParser
 from mailflow.extract.mime import MimeExtractor
 from mailflow.filters.chain import FilterChain
-from mailflow.filters.deterministic import BlacklistFilter, WhitelistFilter
+from mailflow.filters.deterministic import BlacklistFilter
 from mailflow.emit.memory import MemoryEmitter
 from mailflow.providers.memory import MemoryProvider, SeedEmail
 from mailflow.stores.memory import InMemoryBlobStore, InMemoryCursorStore, InMemoryDedupeStore
@@ -122,3 +117,13 @@ def test_repeated_failure_routes_to_dlq_after_max_attempts():
     assert report.emitted == 0
     assert "boom" in report.dlq[0].reason
     assert pipe.cursor_store.get("acme", STREAM).order == 1
+
+
+def test_stale_cursor_commit_is_rejected():
+    seed = {STREAM: [SeedEmail("m1", _raw("m1")), SeedEmail("m2", _raw("m2"))]}
+    pipe, _, _ = _pipeline(seed)
+    pipe.run_once()                                   # cursor at order 2
+    # simulate a slow sweep trying to commit an older cursor directly
+    ok = pipe.cursor_store.commit_if_ahead("acme", STREAM, Cursor(value="stale", order=1))
+    assert ok is False
+    assert pipe.cursor_store.get("acme", STREAM).order == 2  # never regresses
