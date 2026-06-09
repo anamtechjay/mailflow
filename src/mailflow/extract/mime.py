@@ -50,7 +50,7 @@ class MimeExtractor:
         message_id_raw = msg["message-id"]
         message_id = str(message_id_raw) if message_id_raw is not None else None
         mailbox = watched_mailbox
-        canonical_id, _present, trusted = derive_canonical_id(
+        canonical_id, present, trusted = derive_canonical_id(
             provider=provider,
             provider_message_id=provider_message_id,
             mailbox=mailbox,
@@ -82,6 +82,7 @@ class MimeExtractor:
         return CleanEmail(
             canonical_id=canonical_id,
             message_id=message_id,
+            message_id_present=present,
             message_id_trusted=trusted,
             in_reply_to=str(msg["in-reply-to"]) if msg["in-reply-to"] else None,
             references=references,

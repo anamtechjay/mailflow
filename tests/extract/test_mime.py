@@ -48,6 +48,7 @@ def test_extracts_headers_addresses_and_body():
     assert ce.to[0].address == "ops@acme.com"
     assert "send a quote" in ce.body_text
     assert ce.message_id == "<abc.1@example.com>"
+    assert ce.message_id_present is True
     assert ce.message_id_trusted is True
     assert ce.raw_headers["subject"] == ["Quote request"]
 
@@ -78,4 +79,5 @@ def test_canonical_id_present_even_without_message_id():
     ce = _extract(raw)
     assert ce.canonical_id  # always present
     assert ce.message_id is None
+    assert ce.message_id_present is False
     assert ce.message_id_trusted is False

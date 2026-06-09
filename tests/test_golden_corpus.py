@@ -16,7 +16,7 @@ from mailflow.stores.memory import (
 from tests.fixtures.loader import STREAM, load_golden, seed
 
 GOLDEN_FIELDS = (
-    "canonical_id", "message_id", "message_id_trusted", "in_reply_to",
+    "canonical_id", "message_id", "message_id_present", "message_id_trusted", "in_reply_to",
     "references", "direction", "from", "to", "cc", "subject",
     "attachments", "list_id", "auto_submitted",
 )

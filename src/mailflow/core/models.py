@@ -145,6 +145,7 @@ class CleanEmail(BaseModel):
 
     canonical_id: str
     message_id: str | None = None
+    message_id_present: bool = False
     message_id_trusted: bool = False
     in_reply_to: str | None = None
     references: list[str] = Field(default_factory=list)
