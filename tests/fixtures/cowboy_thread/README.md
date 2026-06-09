@@ -28,6 +28,15 @@ Real email used as a golden-master fixture for the mailflow core spine.
   scope, spec OD-3). Attachment real-vs-inline splitting is covered by synthetic fixtures in
   plan Task 7.
 
+## Loader note (RFC822 reconstruction)
+- The 7 long gmail Message-IDs (`<CAM0jTA...@mail.gmail.com>`, ~68 chars) exceed the
+  default email policy's 78-col fold width once the `Message-ID:` header name is added, so
+  `EmailMessage.as_bytes()` folds them onto a continuation line and re-parsing prepends a
+  leading space — a pure RFC822 round-trip artifact, not how the bytes arrive on the wire.
+  `loader.py` serializes with a no-fold policy (`max_line_length=998`, the RFC 5322 hard
+  limit) so reconstructed headers stay on one line and round-trip verbatim. No golden change
+  was needed; the extractor output is correct.
+
 ## Regenerating the golden
 The golden is a frozen artifact. If a genuine extractor change alters correct output, update
 `golden_cleanemails.json` deliberately and note the reason here — never auto-overwrite it from
