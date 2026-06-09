@@ -72,6 +72,11 @@ Optionally wire a [`TaskCompleted` hook](https://code.claude.com/docs/en/hooks#t
 
 > **Single-session fallback:** if agent teams aren't enabled, the same plan runs fine via `superpowers:subagent-driven-development` (one subagent per task, lead reviews between) — the role definitions still apply as the subagent `agentType` for each task. Agent teams add parallelism between the `extract-filter` and `adapters` tracks and let you message a stuck teammate directly; they cost more tokens.
 
+> **Phase-1 learnings baked into the setup (applied to all future plans):**
+> - **Shared conventions live in `mailflow/CLAUDE.md`** — every teammate auto-loads it: the venv path, the mypy-strict gotcha catalog, the frozen contracts, the ownership table, and the required report format. The six role files in `.claude/agents/` now point at it and carry only their role-specific learning.
+> - **Serialize file-disjoint tracks in subagent mode.** `extract-filter` and `adapters` are file-disjoint and *look* parallel, but subagents share one `.git/index` and one `.mypy_cache` — concurrent commits/mypy race. Real agent-teams avoid this with per-teammate **git worktrees** (`isolation: worktree`); subagent execution runs them sequentially. The dependency DAG is unchanged; only the parallelism is.
+> - **CONTRACT DECISIONs are a required report field.** When a teammate resolves a plan ambiguity that crosses module boundaries (Phase 1: the `dead_lettered` counting rule), it must be surfaced so the lead propagates it — not resolved silently. The verifier now explicitly checks propagation.
+
 ---
 
 ## File Structure
