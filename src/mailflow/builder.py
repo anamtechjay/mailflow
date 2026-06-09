@@ -1,0 +1,50 @@
+"""Wire a MailflowConfig into a runnable Pipeline (spec §12a). For the core spine
+the only provider is `memory`, seeded by the caller."""
+
+from __future__ import annotations
+
+from mailflow.config.loader import validate
+from mailflow.config.schema import MailflowConfig
+from mailflow.core.models import StreamRef
+from mailflow.core.pipeline import Pipeline, PipelineConfig
+from mailflow.extract.envelope import MimeEnvelopeParser
+from mailflow.extract.mime import MimeExtractor
+from mailflow.filters.chain import FilterChain
+from mailflow.providers.memory import MemoryProvider, SeedEmail
+from mailflow.registry import (
+    build_blob_store,
+    build_cursor_store,
+    build_dedupe_store,
+    build_emitter,
+    build_filter,
+)
+
+
+def build_from_config(
+    cfg: MailflowConfig,
+    *,
+    seed: dict[StreamRef, list[SeedEmail]] | None = None,
+) -> Pipeline:
+    validate(cfg)  # raises on unknown kinds before we build anything
+    if cfg.provider.kind != "memory":
+        raise NotImplementedError(
+            f"provider {cfg.provider.kind!r} is not in the core spine (see Plan 2/3)"
+        )
+    provider = MemoryProvider(seed=seed or {})
+    filters = FilterChain([build_filter(f.kind, f.params) for f in cfg.filters])
+    return Pipeline(
+        provider=provider,
+        parser=MimeEnvelopeParser(),
+        filters=filters,
+        extractor=MimeExtractor(),
+        emitter=build_emitter(cfg.emitter.kind),
+        dlq_emitter=build_emitter("memory"),
+        cursor_store=build_cursor_store(cfg.stores.cursor.kind),
+        dedupe_store=build_dedupe_store(cfg.stores.dedupe.kind),
+        blob_store=build_blob_store(cfg.stores.blob.kind),
+        config=PipelineConfig(
+            tenant=cfg.tenant,
+            max_message_bytes=cfg.max_message_bytes,
+            max_attempts=cfg.max_attempts,
+        ),
+    )

@@ -52,7 +52,7 @@ class Pipeline:
         provider: MailboxProvider,
         parser: EnvelopeParser,
         filters: FilterChain,
-        extractor: ContentExtractor,
+        extractor: ContentExtractor | MimeExtractor,
         emitter: Emitter,
         dlq_emitter: Emitter,
         cursor_store: CursorStore,
