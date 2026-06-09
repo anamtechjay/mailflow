@@ -100,3 +100,25 @@ def test_oversized_message_is_dead_lettered_and_cursor_advances():
     assert dlq.events[0].email.provider_message_id == "big"
     assert "oversized" in report.dlq[0].reason
     assert pipe.cursor_store.get("acme", STREAM).order == 2  # moved past the poison message
+
+
+class _ExplodingExtractor:
+    def extract(self, msg, env):  # noqa: ANN001, ANN201
+        raise ValueError("boom")
+
+
+def test_repeated_failure_routes_to_dlq_after_max_attempts():
+    provider = MemoryProvider(seed={STREAM: [SeedEmail("m1", _raw("m1"))]})
+    emitter, dlq = MemoryEmitter(), MemoryEmitter()
+    pipe = Pipeline(
+        provider=provider, parser=MimeEnvelopeParser(), filters=FilterChain([]),
+        extractor=_ExplodingExtractor(), emitter=emitter, dlq_emitter=dlq,
+        cursor_store=InMemoryCursorStore(), dedupe_store=InMemoryDedupeStore(),
+        blob_store=InMemoryBlobStore(),
+        config=PipelineConfig(tenant="acme", max_attempts=1),
+    )
+    report = pipe.run_once()
+    assert report.dead_lettered == 1
+    assert report.emitted == 0
+    assert "boom" in report.dlq[0].reason
+    assert pipe.cursor_store.get("acme", STREAM).order == 1
