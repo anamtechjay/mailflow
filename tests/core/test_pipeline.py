@@ -75,3 +75,16 @@ def test_blacklisted_mail_is_dropped_not_emitted_and_cursor_advances():
     assert pipe.cursor_store.get("acme", STREAM).order == 2
     drop_trace = next(t for t in report.traces if t.disposition.value == "dropped")
     assert drop_trace.matched_filter == "blacklist"
+
+
+def test_duplicate_delivery_is_skipped_once_and_counts_as_finished():
+    seed = {STREAM: [SeedEmail("m1", _raw("m1"))]}
+    pipe, emitter, _ = _pipeline(seed)
+    pipe.run_once()                     # first pass emits m1
+    # reset the provider cursor to force a re-delivery of m1
+    pipe.cursor_store = InMemoryCursorStore()
+    report = pipe.run_once()            # second pass sees m1 again
+    assert report.emitted == 0
+    assert report.duplicates == 1       # claimed-already -> skipped
+    assert len(emitter.events) == 1     # still only emitted once, ever
+    assert pipe.cursor_store.get("acme", STREAM).order == 1  # duplicate advanced cursor
