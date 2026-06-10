@@ -80,6 +80,19 @@ round-trip artifacts in the fixture **loader** (e.g. long Message-IDs get header
 re-parse with a leading space) are **loader bugs** — fix the loader (no-fold policy,
 `max_line_length=998`), never weaken the golden or "fix" a correct extractor.
 
+## QA findings — log them, don't lose them in chat
+All QA / test-coverage review findings live in **`docs/qa-findings.md`**. When you run a QA pass
+(`/pr-review-toolkit:review-pr`, a test audit, etc.):
+- **Read `docs/qa-findings.md` first** — don't re-report something already logged, withdrawn, or
+  marked deferred.
+- **Append** new findings there (don't leave them only in the transcript). Give each an ID,
+  severity, evidence (`file:line`), and a **scope verdict**.
+- **Classify every coverage gap against Phase scope** (`docs/superpowers/plans/…`), not the spec's
+  full §8 ambition. Buckets: **Phase gap** (shipped code, no test — actionable now) /
+  **Deferred** (plan pushed it to a later plan — not a gap) / **Hardening** (tested per plan, extra
+  rigor) / **Withdrawn** (already covered). The spec spans 4 plans; each phase ships a narrowed
+  slice — judging against the wrong bar manufactures false gaps (see the 2026-06-09 review).
+
 ## Required report format (your final message IS the result)
 Return, tersely:
 1. Tasks completed + commit hashes (`git log --oneline`).
