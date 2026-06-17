@@ -1,0 +1,65 @@
+"""GmailProvider — notification-fed MailboxProvider. The Pub/Sub runtime feeds a
+historyId via submit(); fetch() diffs the mailbox from the stored cursor
+(history.list) and yields a RawMessage per changed message carrying the RAW RFC822
+bytes (messages.get format=raw). The pipeline's extractor seam then dispatches to the
+core MimeExtractor — so Gmail needs no provider-specific parser/extractor."""
+
+from __future__ import annotations
+
+import base64
+from datetime import datetime, timezone
+from typing import Iterable, Iterator
+
+from mailflow.adapters.gmail.client import GmailClient
+from mailflow.core.models import Cursor, RawMessage, StreamRef
+
+
+def _b64url_decode(s: str) -> bytes:
+    pad = "=" * (-len(s) % 4)
+    return base64.urlsafe_b64decode(s + pad)
+
+
+class GmailProvider:
+    PROVIDER = "gmail"
+
+    def __init__(self, *, client: GmailClient, label_id: str | None = "INBOX") -> None:
+        self.client = client
+        self.label_id = label_id
+        self._pending: dict[str, str] = {}  # mailbox -> latest submitted historyId
+
+    # --- notification feed (called by the Pub/Sub runtime) ---
+    def submit(self, email_address: str, history_id: str | int) -> None:
+        self._pending[email_address] = str(history_id)
+
+    # --- MailboxProvider port ---
+    def connect(self) -> None:
+        return None
+
+    def sync_streams(self) -> Iterable[StreamRef]:
+        return [StreamRef(mailbox=m, folder=None) for m in self._pending]
+
+    def fetch(self, stream: StreamRef, cursor: Cursor | None) -> Iterator[RawMessage]:
+        # Diff from the stored cursor; on first notification (no cursor yet) fall back
+        # to the submitted historyId so we don't full-resync the whole mailbox.
+        start = cursor.value if cursor is not None else self._pending.get(stream.mailbox)
+        if not start:
+            self._pending.pop(stream.mailbox, None)
+            return
+        ids, latest = self.client.history_message_ids(stream.mailbox, start, self.label_id)
+        new_cursor = Cursor(value=latest, order=int(latest))
+        for message_id in ids:
+            data = self.client.get_message_raw(stream.mailbox, message_id)
+            raw = _b64url_decode(str(data.get("raw", "")))
+            yield RawMessage(
+                provider=self.PROVIDER,
+                provider_message_id=message_id,
+                stream=stream,
+                size_bytes=int(data.get("sizeEstimate", len(raw)) or len(raw)),
+                received_at=datetime.now(timezone.utc),
+                cursor=new_cursor,
+                raw_bytes=raw,
+            )
+        self._pending.pop(stream.mailbox, None)
+
+    def message_size(self, msg: RawMessage) -> int | None:
+        return msg.size_bytes

@@ -170,6 +170,7 @@ class Pipeline:
                 provider_message_id=msg.provider_message_id,
                 stream_id=msg.stream.key,
                 watched_mailbox=msg.stream.mailbox,
+                blob_store=self.blob_store,
             )
         return self.extractor.extract(msg, env)
 

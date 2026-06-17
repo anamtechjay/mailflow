@@ -13,6 +13,7 @@ from typing import Any
 from mailflow.core.events import SCHEMA_VERSION
 from mailflow.core.identity import derive_canonical_id
 from mailflow.core.models import Attachment, CleanEmail, Direction, Recipient
+from mailflow.core.ports import BlobStore
 
 
 def _recipients(msg: EmailMessage, header: str) -> list[Recipient]:
@@ -43,6 +44,7 @@ class MimeExtractor:
         provider_message_id: str,
         stream_id: str,
         watched_mailbox: str,
+        blob_store: BlobStore | None = None,
     ) -> CleanEmail:
         msg = message_from_bytes(raw, policy=default_policy)
         assert isinstance(msg, EmailMessage)
@@ -64,7 +66,7 @@ class MimeExtractor:
             else Direction.inbound
         )
 
-        body_text, body_html, attachments = self._walk_body(msg)
+        body_text, body_html, attachments = self._walk_body(msg, blob_store)
 
         date_hdr = msg["date"]
         date_utc = None
@@ -110,7 +112,7 @@ class MimeExtractor:
         )
 
     def _walk_body(
-        self, msg: EmailMessage
+        self, msg: EmailMessage, blob_store: BlobStore | None = None
     ) -> tuple[str, str, list[Attachment]]:
         body_text = ""
         body_html = ""
@@ -137,14 +139,21 @@ class MimeExtractor:
                 continue
 
             if is_attachment or is_inline_media:
+                content_hash = hashlib.sha256(payload).hexdigest() if payload else ""
+                storage_ref = ""
+                # If a blob store is wired, stream the bytes into it and surface a
+                # ref so downstream apps can download the file (else metadata only).
+                if blob_store is not None and payload:
+                    storage_ref = blob_store.put_stream(content_hash, iter([payload]), ctype)
                 attachments.append(
                     Attachment(
                         filename=filename or "",
                         content_type=ctype,
                         size_bytes=len(payload),
-                        content_hash=hashlib.sha256(payload).hexdigest() if payload else "",
+                        content_hash=content_hash,
                         content_id=str(cid) if cid else "",
                         is_inline=bool(is_inline_media and not is_attachment),
+                        storage_ref=storage_ref,
                     )
                 )
 

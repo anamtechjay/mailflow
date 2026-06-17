@@ -23,8 +23,8 @@ from mailflow.stores.memory import (
     InMemoryDedupeStore,
 )
 
-PROVIDER_KINDS = {"memory"}
-EMITTER_KINDS = {"memory", "stdout"}
+PROVIDER_KINDS = {"memory", "graph", "gmail"}
+EMITTER_KINDS = {"memory", "stdout", "pubsub"}
 STORE_KINDS = {"memory"}
 FILTER_KINDS = {"whitelist", "blacklist", "internal_domain", "subject", "list_mail"}
 
@@ -48,6 +48,13 @@ def build_emitter(kind: str) -> Emitter:
         return MemoryEmitter()
     if kind == "stdout":
         return StdoutEmitter()
+    if kind == "pubsub":
+        # needs project_id + topic + live SDK -> wired via
+        # mailflow.emit.pubsub.build_pubsub_emitter, not the import-light builder.
+        raise NotImplementedError(
+            "pubsub emitter is wired via mailflow.emit.pubsub.build_pubsub_emitter "
+            "(needs project_id + topic)"
+        )
     raise ValueError(f"unknown emitter kind {kind!r}")
 
 

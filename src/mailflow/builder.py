@@ -27,8 +27,13 @@ def build_from_config(
 ) -> Pipeline:
     validate(cfg)  # raises on unknown kinds before we build anything
     if cfg.provider.kind != "memory":
+        # Live providers (graph/gmail) need injected credentials + transport, so they
+        # are wired via their own composition roots / run_service in
+        # adapters/<kind>/live.py — not the import-light core builder.
         raise NotImplementedError(
-            f"provider {cfg.provider.kind!r} is not in the core spine (see Plan 2/3)"
+            f"provider {cfg.provider.kind!r} runs via adapters.{cfg.provider.kind}.live."
+            f"run_service (or build_{cfg.provider.kind}_runtime); build_from_config only "
+            f"wires the in-memory provider"
         )
     provider = MemoryProvider(seed=seed or {})
     filters = FilterChain([build_filter(f.kind, f.params) for f in cfg.filters])

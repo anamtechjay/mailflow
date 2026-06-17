@@ -4,3 +4,9 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 dist/
+.env
+.env.*
+!.env.example
+*.db
+attachments/
+secrets/
