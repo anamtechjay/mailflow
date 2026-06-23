@@ -25,6 +25,65 @@ report = pipe.run_once()
 print(report.emitted, report.dropped, report.dead_lettered)
 ```
 
+## Use it as a library — `connect()`
+
+One front door. You bring credentials; the library hands you a `CleanEmail` and stays out
+of your way. **You store the email — the library never does.** It keeps only a tiny
+cursor/dedupe bookmark (in memory by default; on disk if you ask).
+
+```python
+from mailflow import connect
+from mailflow.core.models import StreamRef
+from mailflow.providers.memory import SeedEmail
+
+# zero-setup, in-memory (great for trying it / tests)
+stream = StreamRef(mailbox="ops@acme.com", folder="Inbox")
+raw = b"Message-ID: <m1@x>\r\nFrom: a@partner.com\r\nSubject: hi\r\n\r\nhello"
+mf = connect("memory", seed={stream: [SeedEmail("m1", raw)]}, tenant="acme")
+
+for email in mf.stream():          # email is a CleanEmail
+    print(email.subject, email.from_.address)
+```
+
+Live Gmail (needs the `gmail` extra + credentials). The same `CleanEmail` comes out:
+
+```python
+mf = connect(
+    "gmail",
+    credentials={
+        "client_id": "<oauth-client-id>",
+        "client_secret_ref": "env://GMAIL_CLIENT_SECRET",
+        "oauth_refresh_token_ref": "env://GMAIL_REFRESH_TOKEN",
+        "project_id": "<gcp-project>", "topic": "gmail-notifications", "subscription": "mailflow",
+    },
+    mailbox="me",
+    state="sqlite:///mf.db",       # opt-in: remember progress across restarts
+)
+for email in mf.stream():
+    my_app.save(email)             # YOUR database — the library ships none
+```
+
+Three ways to receive, pick one per handle:
+
+```python
+for email in mf.stream(): ...                       # pull loop
+connect("gmail", ..., on_email=handle).run()        # push to a callback (blocking)
+emails = connect("memory", seed=seed).fetch_new()   # batch: one pass -> list[CleanEmail]
+```
+
+**State (`state=`):**
+- `"memory"` (default) — stateless; on restart you may re-receive recent mail, so **dedupe
+  on `email.canonical_id`** (always present, stable).
+- `"sqlite:///path/mf.db"` — persists cursor + dedupe to one file; a restart resumes where
+  it stopped. Pure stdlib `sqlite3`, no extra dependency.
+
+### Running tests / types (this checkout, Windows)
+
+```bash
+python -m pytest      # unit suite (no cloud needed)
+python -m mypy        # strict
+```
+
 ## What's here vs later
 
 | Plan | Scope |

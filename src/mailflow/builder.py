@@ -44,9 +44,9 @@ def build_from_config(
         extractor=MimeExtractor(),
         emitter=build_emitter(cfg.emitter.kind),
         dlq_emitter=build_emitter("memory"),
-        cursor_store=build_cursor_store(cfg.stores.cursor.kind),
-        dedupe_store=build_dedupe_store(cfg.stores.dedupe.kind),
-        blob_store=build_blob_store(cfg.stores.blob.kind),
+        cursor_store=build_cursor_store(cfg.stores.cursor.kind, cfg.stores.cursor.params),
+        dedupe_store=build_dedupe_store(cfg.stores.dedupe.kind, cfg.stores.dedupe.params),
+        blob_store=build_blob_store(cfg.stores.blob.kind, cfg.stores.blob.params),
         config=PipelineConfig(
             tenant=cfg.tenant,
             max_message_bytes=cfg.max_message_bytes,

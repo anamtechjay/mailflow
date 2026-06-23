@@ -8,5 +8,7 @@ dist/
 .env.*
 !.env.example
 *.db
-attachments/
-secrets/
+/attachments/
+# Root credentials dir only (google-sa.json) — anchored so it does NOT match the
+# source package src/mailflow/secrets/, which must ship in the wheel.
+/secrets/

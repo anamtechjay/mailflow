@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailflow.core.ports import Emitter, Filter
+from mailflow.core.ports import BlobStore, CursorStore, DedupeStore, Emitter, Filter
 from mailflow.emit.memory import MemoryEmitter
 from mailflow.emit.stdout import StdoutEmitter
 from mailflow.filters.deterministic import (
@@ -17,15 +17,17 @@ from mailflow.filters.deterministic import (
     SubjectFilter,
     WhitelistFilter,
 )
+from mailflow.stores.local_blob import LocalBlobStore
 from mailflow.stores.memory import (
     InMemoryBlobStore,
     InMemoryCursorStore,
     InMemoryDedupeStore,
 )
+from mailflow.stores.sqlite import SqliteCursorStore, SqliteDedupeStore
 
 PROVIDER_KINDS = {"memory", "graph", "gmail"}
 EMITTER_KINDS = {"memory", "stdout", "pubsub"}
-STORE_KINDS = {"memory"}
+STORE_KINDS = {"memory", "sqlite", "local"}
 FILTER_KINDS = {"whitelist", "blacklist", "internal_domain", "subject", "list_mail"}
 
 
@@ -58,13 +60,25 @@ def build_emitter(kind: str) -> Emitter:
     raise ValueError(f"unknown emitter kind {kind!r}")
 
 
-def build_cursor_store(kind: str) -> InMemoryCursorStore:
-    return InMemoryCursorStore()
+def build_cursor_store(kind: str, params: dict[str, Any]) -> CursorStore:
+    if kind == "memory":
+        return InMemoryCursorStore()
+    if kind == "sqlite":
+        return SqliteCursorStore(str(params["path"]))
+    raise ValueError(f"unknown cursor store kind {kind!r}")
 
 
-def build_dedupe_store(kind: str) -> InMemoryDedupeStore:
-    return InMemoryDedupeStore()
+def build_dedupe_store(kind: str, params: dict[str, Any]) -> DedupeStore:
+    if kind == "memory":
+        return InMemoryDedupeStore()
+    if kind == "sqlite":
+        return SqliteDedupeStore(str(params["path"]))
+    raise ValueError(f"unknown dedupe store kind {kind!r}")
 
 
-def build_blob_store(kind: str) -> InMemoryBlobStore:
-    return InMemoryBlobStore()
+def build_blob_store(kind: str, params: dict[str, Any]) -> BlobStore:
+    if kind == "memory":
+        return InMemoryBlobStore()
+    if kind == "local":
+        return LocalBlobStore(str(params.get("directory", "attachments")))
+    raise ValueError(f"unknown blob store kind {kind!r}")
