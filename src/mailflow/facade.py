@@ -213,9 +213,12 @@ def connect(
     `fields` selects which data is delivered (spec §4a); `stages`/`clean_fn` post-process
     each CleanEmail (spec §5-6)."""
     stores = resolve_state(state)
-    cursor_store = build_cursor_store(stores.cursor.kind, stores.cursor.params)
-    dedupe_store = build_dedupe_store(stores.dedupe.kind, stores.dedupe.params)
-    blob_store = build_blob_store(stores.blob.kind, stores.blob.params)
+    ov = overrides or {}
+    # §A10: caller-supplied components replace the defaults for their role, before build.
+    cursor_store = ov.get("cursor_store") or build_cursor_store(stores.cursor.kind, stores.cursor.params)
+    dedupe_store = ov.get("dedupe_store") or build_dedupe_store(stores.dedupe.kind, stores.dedupe.params)
+    blob_store = ov.get("blob_store") or build_blob_store(stores.blob.kind, stores.blob.params)
+    cleaner = ov.get("cleaner")
     project = make_projection(fields) if fields is not None else None
     # if both fields + on_email are set, the callback receives the projected dict (§4a).
     if on_email is not None and project is not None:
@@ -229,10 +232,12 @@ def connect(
     # untouched (spec §5). The Mailflow handle still drains the inner `queue`.
     all_stages = ([clean_fn] if clean_fn else []) + list(stages or [])
     pipe_emitter: Emitter = StagesEmitter(emitter, all_stages) if all_stages else emitter
+    if "emitter" in ov:                         # §A10: caller replaces the sink entirely
+        pipe_emitter = ov["emitter"]
 
     if provider == "memory":
         pipeline = Pipeline(
-            provider=MemoryProvider(seed=seed or {}),
+            provider=ov.get("provider") or MemoryProvider(seed=seed or {}),
             parser=MimeEnvelopeParser(),
             filters=FilterChain(chain),
             extractor=MimeExtractor(),
@@ -241,6 +246,7 @@ def connect(
             cursor_store=cursor_store,
             dedupe_store=dedupe_store,
             blob_store=blob_store,
+            cleaner=cleaner,
             config=PipelineConfig(tenant=tenant),
         )
         return Mailflow(

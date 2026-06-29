@@ -29,7 +29,11 @@ def build_from_config(
     overrides: Mapping[str, Any] | None = None,
 ) -> Pipeline:
     validate(cfg)  # raises on unknown kinds before we build anything
-    if cfg.provider.kind != "memory":
+    ov = overrides or {}
+    # §A10: a caller-supplied component replaces the config-built default for its role.
+    if "provider" in ov:
+        provider = ov["provider"]
+    elif cfg.provider.kind != "memory":
         # Live providers (graph/gmail) need injected credentials + transport, so they
         # are wired via their own composition roots / run_service in
         # adapters/<kind>/live.py — not the import-light core builder.
@@ -38,18 +42,27 @@ def build_from_config(
             f"run_service (or build_{cfg.provider.kind}_runtime); build_from_config only "
             f"wires the in-memory provider"
         )
-    provider = MemoryProvider(seed=seed or {})
+    else:
+        provider = MemoryProvider(seed=seed or {})
     filters = FilterChain([build_filter(f.kind, f.params) for f in cfg.filters])
+    emitter = ov["emitter"] if "emitter" in ov else build_emitter(cfg.emitter.kind)
+    cursor_store = (ov["cursor_store"] if "cursor_store" in ov
+                    else build_cursor_store(cfg.stores.cursor.kind, cfg.stores.cursor.params))
+    dedupe_store = (ov["dedupe_store"] if "dedupe_store" in ov
+                    else build_dedupe_store(cfg.stores.dedupe.kind, cfg.stores.dedupe.params))
+    blob_store = (ov["blob_store"] if "blob_store" in ov
+                  else build_blob_store(cfg.stores.blob.kind, cfg.stores.blob.params))
     return Pipeline(
         provider=provider,
         parser=MimeEnvelopeParser(),
         filters=filters,
         extractor=MimeExtractor(),
-        emitter=build_emitter(cfg.emitter.kind),
+        emitter=emitter,
         dlq_emitter=build_emitter("memory"),
-        cursor_store=build_cursor_store(cfg.stores.cursor.kind, cfg.stores.cursor.params),
-        dedupe_store=build_dedupe_store(cfg.stores.dedupe.kind, cfg.stores.dedupe.params),
-        blob_store=build_blob_store(cfg.stores.blob.kind, cfg.stores.blob.params),
+        cursor_store=cursor_store,
+        dedupe_store=dedupe_store,
+        blob_store=blob_store,
+        cleaner=ov.get("cleaner"),
         config=PipelineConfig(
             tenant=cfg.tenant,
             max_message_bytes=cfg.max_message_bytes,
