@@ -9,6 +9,7 @@ from mailflow.config.loader import validate
 from mailflow.config.schema import MailflowConfig
 from mailflow.core.models import StreamRef
 from mailflow.core.pipeline import Pipeline, PipelineConfig
+from mailflow.extract.clean import ThinContentCleaner
 from mailflow.extract.envelope import MimeEnvelopeParser
 from mailflow.extract.mime import MimeExtractor
 from mailflow.filters.chain import FilterChain
@@ -62,7 +63,7 @@ def build_from_config(
         cursor_store=cursor_store,
         dedupe_store=dedupe_store,
         blob_store=blob_store,
-        cleaner=ov.get("cleaner"),
+        cleaner=ov["cleaner"] if "cleaner" in ov else ThinContentCleaner(),
         config=PipelineConfig(
             tenant=cfg.tenant,
             max_message_bytes=cfg.max_message_bytes,

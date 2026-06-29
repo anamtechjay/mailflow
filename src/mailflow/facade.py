@@ -30,6 +30,7 @@ from mailflow.core.ports import CursorStore, Emitter, Filter
 from mailflow.emit.callback import CallbackEmitter, QueueEmitter
 from mailflow.emit.memory import MemoryEmitter
 from mailflow.emit.stages import Stage, StagesEmitter
+from mailflow.extract.clean import ThinContentCleaner
 from mailflow.extract.envelope import MimeEnvelopeParser
 from mailflow.extract.mime import MimeExtractor
 from mailflow.filters.chain import FilterChain
@@ -218,7 +219,7 @@ def connect(
     cursor_store = ov.get("cursor_store") or build_cursor_store(stores.cursor.kind, stores.cursor.params)
     dedupe_store = ov.get("dedupe_store") or build_dedupe_store(stores.dedupe.kind, stores.dedupe.params)
     blob_store = ov.get("blob_store") or build_blob_store(stores.blob.kind, stores.blob.params)
-    cleaner = ov.get("cleaner")
+    cleaner = ov["cleaner"] if "cleaner" in ov else ThinContentCleaner()
     project = make_projection(fields) if fields is not None else None
     # if both fields + on_email are set, the callback receives the projected dict (§4a).
     if on_email is not None and project is not None:
