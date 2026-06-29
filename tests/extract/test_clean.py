@@ -1,6 +1,6 @@
 from mailflow.core.models import CleanEmail
 from mailflow.core.ports import ContentCleaner
-from mailflow.extract.clean import ThinContentCleaner, html_to_text
+from mailflow.extract.clean import ThinContentCleaner, html_to_text, normalize_subject
 
 
 def _email(**kw: object) -> CleanEmail:
@@ -47,3 +47,14 @@ def test_html_to_text_strips_tags_unescapes_entities_collapses_whitespace():
 
 def test_html_to_text_empty_is_empty():
     assert html_to_text("") == ""
+
+
+def test_normalize_subject_strips_reply_prefix_case_insensitively():
+    # prefix match is case-insensitive; subject case is preserved
+    assert normalize_subject("RE: Hello") == "Hello"
+    assert normalize_subject("re: Hello") == "Hello"
+    assert normalize_subject("Fwd: Re:  Hello  world") == "Hello world"
+
+
+def test_normalize_subject_empty_is_empty():
+    assert normalize_subject("") == ""
