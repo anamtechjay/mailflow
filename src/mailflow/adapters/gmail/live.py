@@ -27,32 +27,62 @@ from mailflow.core.ports import (
     Emitter,
     Filter,
     SecretProvider,
+    TokenRotationSink,
 )
 
 MessageCallback = Callable[[Any], None]
 
 
 class OAuthTokenProvider:
-    """App access token from a per-user OAuth refresh token (google-auth)."""
+    """App access token from a per-user OAuth refresh token (google-auth).
+
+    A8: Google may hand back a *rotated* refresh token on refresh. When it does and a
+    `rotation_sink` is wired, persist the new token (keyed by `refresh_token_ref`) so the
+    next process start survives. `credentials` / `request_factory` are test seams that let
+    the rotation logic be exercised without google-auth installed.
+    """
 
     def __init__(
         self, *, client_id: str, client_secret: str, refresh_token: str,
         token_uri: str, scopes: list[str],
+        rotation_sink: TokenRotationSink | None = None,
+        refresh_token_ref: str = "",
+        credentials: Any | None = None,
+        request_factory: Callable[[], Any] | None = None,
     ) -> None:
-        from google.oauth2.credentials import Credentials  # local import
+        if credentials is not None:
+            self._creds: Any = credentials
+        else:
+            from google.oauth2.credentials import Credentials  # local import
 
-        creds_cls: Any = Credentials  # route through Any: google-auth's __init__ is untyped
-        self._creds: Any = creds_cls(
-            token=None, refresh_token=refresh_token, token_uri=token_uri,
-            client_id=client_id, client_secret=client_secret, scopes=scopes,
-        )
+            creds_cls: Any = Credentials  # route through Any: google-auth's __init__ is untyped
+            self._creds = creds_cls(
+                token=None, refresh_token=refresh_token, token_uri=token_uri,
+                client_id=client_id, client_secret=client_secret, scopes=scopes,
+            )
+        self._rotation_sink = rotation_sink
+        self._refresh_token_ref = refresh_token_ref
+        self._request_factory = request_factory
 
-    def get_token(self) -> str:
+    def _new_request(self) -> Any:
+        if self._request_factory is not None:
+            return self._request_factory()
         from google.auth.transport.requests import Request  # local import
 
         request_cls: Any = Request
+        return request_cls()
+
+    def get_token(self) -> str:
         if not self._creds.valid:
-            self._creds.refresh(request_cls())
+            before = getattr(self._creds, "refresh_token", None)
+            self._creds.refresh(self._new_request())
+            after = getattr(self._creds, "refresh_token", None)
+            if (
+                self._rotation_sink is not None
+                and after is not None
+                and after != before
+            ):
+                self._rotation_sink.on_refresh(self._refresh_token_ref, str(after))
         return str(self._creds.token)
 
 
@@ -120,6 +150,7 @@ def run_service(
     credentials: Any | None = None,
     start_watch: bool = True,
     filters: list[Filter] | None = None,
+    rotation_sink: TokenRotationSink | None = None,
 ) -> None:
     """Full live entrypoint: resolve OAuth secrets, build the token provider + httpx
     transport, start the Gmail watch (seeding the cursor), wire the runtime via the
@@ -130,6 +161,8 @@ def run_service(
         refresh_token=secret_provider.get(gmail_cfg.oauth_refresh_token_ref),
         token_uri=gmail_cfg.token_uri,
         scopes=gmail_cfg.scopes,
+        rotation_sink=rotation_sink,
+        refresh_token_ref=gmail_cfg.oauth_refresh_token_ref,
     )
     transport = HttpxTransport()
     # one service-level client, reused by the watch manager + the sweep.

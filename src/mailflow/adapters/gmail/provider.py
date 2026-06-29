@@ -7,18 +7,24 @@ core MimeExtractor — so Gmail needs no provider-specific parser/extractor."""
 from __future__ import annotations
 
 import base64
+import binascii
 from datetime import datetime, timezone
 from typing import Iterable, Iterator
 
 from mailflow.adapters.gmail.client import GmailClient
 from mailflow.adapters.gmail.transport import StaleHistoryError
+from mailflow.core.errors import PermanentError
 from mailflow.core.models import Cursor, RawMessage, StreamRef
 from mailflow.core.ports import CursorStore
 
 
 def _b64url_decode(s: str) -> bytes:
     pad = "=" * (-len(s) % 4)
-    return base64.urlsafe_b64decode(s + pad)
+    try:
+        return base64.urlsafe_b64decode(s + pad)
+    except (binascii.Error, ValueError) as exc:
+        # B3: a malformed raw payload will never decode -> poison message, DLQ (no retry).
+        raise PermanentError(f"invalid base64 in gmail raw payload: {exc}") from exc
 
 
 class GmailProvider:
@@ -62,8 +68,14 @@ class GmailProvider:
             return
         new_cursor = Cursor(value=latest, order=int(latest))
         for message_id in ids:
-            data = self.client.get_message_raw(stream.mailbox, message_id)
-            raw = _b64url_decode(str(data.get("raw", "")))
+            try:
+                data = self.client.get_message_raw(stream.mailbox, message_id)
+                raw = _b64url_decode(str(data.get("raw", "")))
+            except PermanentError:
+                # B2: this one record is poison (404/410/invalid base64). Skip it so the
+                # rest of the batch still flows; AuthError/TransientError are whole-stream
+                # problems and propagate (the cursor must not advance past unread mail).
+                continue
             yield RawMessage(
                 provider=self.PROVIDER,
                 provider_message_id=message_id,
@@ -72,6 +84,7 @@ class GmailProvider:
                 received_at=datetime.now(timezone.utc),
                 cursor=new_cursor,
                 raw_bytes=raw,
+                thread_key=str(data.get("threadId", "")),  # A7: Gmail conversation id
             )
         self._pending.pop(stream.mailbox, None)
 
