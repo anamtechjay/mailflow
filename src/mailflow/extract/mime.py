@@ -14,6 +14,7 @@ from mailflow.core.events import SCHEMA_VERSION
 from mailflow.core.identity import derive_canonical_id
 from mailflow.core.models import Attachment, CleanEmail, Direction, Recipient
 from mailflow.core.ports import BlobStore
+from mailflow.extract.clean import html_to_text, normalize_subject
 
 
 def _recipients(msg: EmailMessage, header: str) -> list[Recipient]:
@@ -82,6 +83,11 @@ class MimeExtractor:
 
         alias_from: dict[str, Any] = {"from": from_}
 
+        subject = str(msg["subject"] or "")
+        # A7 subject-fallback: when the adapter passes no provider thread id, group
+        # by a case-insensitive Re:/Fwd:-stripped subject so a reply joins its root.
+        effective_thread_key = thread_key or normalize_subject(subject).lower()
+
         return CleanEmail(
             canonical_id=canonical_id,
             message_id=message_id,
@@ -92,7 +98,7 @@ class MimeExtractor:
             provider=provider,
             provider_message_id=provider_message_id,
             provider_stream_id=stream_id,
-            thread_key=thread_key,
+            thread_key=effective_thread_key,
             direction=direction,
             **alias_from,  # alias
             sender=_one(msg, "sender"),
@@ -100,7 +106,7 @@ class MimeExtractor:
             to=_recipients(msg, "to"),
             cc=_recipients(msg, "cc"),
             bcc=_recipients(msg, "bcc"),
-            subject=str(msg["subject"] or ""),
+            subject=subject,
             date_utc=date_utc,
             body_text=body_text,
             body_html=body_html,
@@ -158,5 +164,9 @@ class MimeExtractor:
                         storage_ref=storage_ref,
                     )
                 )
+
+        # Gentle HTML->text fallback when the part set is HTML-only (B5/A6).
+        if not body_text and body_html:
+            body_text = html_to_text(body_html)
 
         return body_text, body_html, attachments

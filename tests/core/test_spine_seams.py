@@ -52,8 +52,10 @@ def _extract(thread_key: str = "") -> object:
     )
 
 
-def test_extract_bytes_default_thread_key_empty() -> None:
-    assert _extract().thread_key == ""
+def test_extract_bytes_default_thread_key_falls_back_to_subject() -> None:
+    # A7: with no provider thread id, group by normalized (Re:/Fwd:-stripped,
+    # lowercased) subject. _RFC822's subject is "hello".
+    assert _extract().thread_key == "hello"  # type: ignore[attr-defined]
 
 
 def test_extract_bytes_carries_thread_key() -> None:
