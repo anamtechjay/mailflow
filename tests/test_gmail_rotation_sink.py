@@ -30,3 +30,20 @@ def test_overwrites_on_subsequent_rotation(tmp_path: Path) -> None:
     sink.on_refresh("r", "v1")
     sink.on_refresh("r", "v2")
     assert FileTokenRotationSink(p).load("r") == "v2"
+
+
+def test_token_file_is_owner_only_0600(tmp_path: Path) -> None:
+    import os
+    import stat
+    import sys
+
+    if sys.platform == "win32":  # POSIX permission bits don't apply
+        return
+    p = tmp_path / "creds.json"
+    FileTokenRotationSink(str(p)).on_refresh("r", "secret-token")
+    mode = stat.S_IMODE(os.stat(p).st_mode)
+    assert mode == 0o600, f"credential file is {oct(mode)}, expected 0o600"
+    # enforced even if the file pre-existed with looser perms
+    p.chmod(0o644)
+    FileTokenRotationSink(str(p)).on_refresh("r", "secret-token-2")
+    assert stat.S_IMODE(os.stat(p).st_mode) == 0o600
