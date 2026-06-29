@@ -5,14 +5,16 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
+from mailflow.core.errors import MailflowError
 
-class GmailError(Exception):
+
+class GmailError(MailflowError):
     def __init__(self, status_code: int, message: str) -> None:
         self.status_code = status_code
         super().__init__(f"gmail error {status_code}: {message}")
 
 
-class StaleHistoryError(Exception):
+class StaleHistoryError(MailflowError):
     """Gmail history.list returned 404 — the stored historyId is too old to diff from.
     Recovery: re-seed the cursor to the current historyId (provider self-heal)."""
 

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
+from mailflow.core.errors import MailflowError
 
-class GraphError(Exception):
+
+class GraphError(MailflowError):
     def __init__(self, status_code: int, message: str) -> None:
         self.status_code = status_code
         super().__init__(f"graph error {status_code}: {message}")
