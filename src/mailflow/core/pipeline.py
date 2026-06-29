@@ -26,6 +26,7 @@ from mailflow.core.observability import DeadLetter, DecisionTrace, RunReport
 from mailflow.core.ports import (
     BlobStore,
     Classifier,
+    ContentCleaner,
     ContentExtractor,
     CursorStore,
     DedupeStore,
@@ -60,6 +61,7 @@ class Pipeline:
         blob_store: BlobStore,
         config: PipelineConfig,
         classifier: Classifier | None = None,
+        cleaner: ContentCleaner | None = None,
     ) -> None:
         self.provider = provider
         self.parser = parser
@@ -72,6 +74,7 @@ class Pipeline:
         self.blob_store = blob_store
         self.config = config
         self.classifier = classifier
+        self.cleaner = cleaner
 
     def run_once(self) -> RunReport:
         report = RunReport()
@@ -164,15 +167,20 @@ class Pipeline:
         # (Plan 2) can implement extract(msg, env) directly without touching the
         # orchestrator.
         if isinstance(self.extractor, MimeExtractor):
-            return self.extractor.extract_bytes(
+            email = self.extractor.extract_bytes(
                 msg.raw_bytes,
                 provider=msg.provider,
                 provider_message_id=msg.provider_message_id,
                 stream_id=msg.stream.key,
                 watched_mailbox=msg.stream.mailbox,
                 blob_store=self.blob_store,
+                thread_key=msg.thread_key,
             )
-        return self.extractor.extract(msg, env)
+        else:
+            email = self.extractor.extract(msg, env)
+        if self.cleaner is not None:
+            email = self.cleaner.clean(email)
+        return email
 
     def _dead_letter(
         self, canonical_id: str, msg: RawMessage, key: str, report: RunReport, *, reason: str

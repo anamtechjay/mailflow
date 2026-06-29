@@ -58,3 +58,56 @@ def test_extract_bytes_default_thread_key_empty() -> None:
 
 def test_extract_bytes_carries_thread_key() -> None:
     assert _extract("t-9").thread_key == "t-9"
+
+
+# --- spine 3: Pipeline cleaner seam + _extract wiring ---
+
+from mailflow.core.models import CleanEmail
+from mailflow.core.pipeline import Pipeline, PipelineConfig
+from mailflow.emit.memory import MemoryEmitter
+from mailflow.extract.envelope import MimeEnvelopeParser
+from mailflow.extract.mime import MimeExtractor
+from mailflow.filters.chain import FilterChain
+from mailflow.providers.memory import MemoryProvider, SeedEmail
+from mailflow.stores.memory import (
+    InMemoryBlobStore,
+    InMemoryCursorStore,
+    InMemoryDedupeStore,
+)
+
+
+class _MarkCleaner:
+    def clean(self, email: CleanEmail) -> CleanEmail:
+        email.body_text = "CLEANED"
+        return email
+
+
+def _pipeline(*, cleaner: object | None = None) -> tuple[Pipeline, MemoryEmitter]:
+    emit = MemoryEmitter()
+    pipe = Pipeline(
+        provider=MemoryProvider(seed={STREAM: [SeedEmail("m1", _RFC822)]}),
+        parser=MimeEnvelopeParser(),
+        filters=FilterChain([]),
+        extractor=MimeExtractor(),
+        emitter=emit,
+        dlq_emitter=MemoryEmitter(),
+        cursor_store=InMemoryCursorStore(),
+        dedupe_store=InMemoryDedupeStore(),
+        blob_store=InMemoryBlobStore(),
+        config=PipelineConfig(tenant="acme"),
+        cleaner=cleaner,  # type: ignore[arg-type]
+    )
+    return pipe, emit
+
+
+def test_pipeline_accepts_and_applies_cleaner() -> None:
+    pipe, emit = _pipeline(cleaner=_MarkCleaner())
+    pipe.run_once()
+    assert emit.events[0].email.body_text == "CLEANED"
+
+
+def test_pipeline_extract_passes_thread_key_through() -> None:
+    pipe, _ = _pipeline()
+    msg = _raw(raw_bytes=_RFC822, thread_key="t-1")
+    env = MimeEnvelopeParser().parse_envelope(msg, "acme")
+    assert pipe._extract(msg, env).thread_key == "t-1"
