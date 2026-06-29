@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from mailflow.core.errors import AuthError, PermanentError, TransientError
 from mailflow.core.events import SCHEMA_VERSION, EmailEvent
 from mailflow.core.filtering import FilterContext
 from mailflow.core.identity import derive_canonical_id, idempotency_key
@@ -152,14 +153,32 @@ class Pipeline:
             ))
             return Disposition.emitted
 
-        except Exception as exc:  # noqa: BLE001 - we translate failures into DLQ routing
-            if attempts >= self.config.max_attempts:
-                return self._dead_letter(
-                    canonical_id, msg, key, report, reason=f"{type(exc).__name__}: {exc}"
-                )
-            # transient: free the claim so a later run/redelivery retries (§8.2 lease semantics).
-            self.dedupe_store.release(key)
-            return None  # NOT terminal -> cursor does NOT advance past it yet
+        except PermanentError as exc:
+            # §A2: will never succeed (403/404/410, invalid base64) -> DLQ, no retry.
+            return self._dead_letter(
+                canonical_id, msg, key, report, reason=f"{type(exc).__name__}: {exc}"
+            )
+        except AuthError as exc:
+            # §A2: refresh-and-retry — release so the next attempt re-auths (adapter refreshes
+            # the token); DLQ only once the attempt budget is spent.
+            return self._retry_or_dead_letter(canonical_id, msg, key, report, attempts, exc)
+        except TransientError as exc:
+            # §A2: temporary (429/5xx/network) -> bounded retry, else DLQ.
+            return self._retry_or_dead_letter(canonical_id, msg, key, report, attempts, exc)
+        except Exception as exc:  # noqa: BLE001 - unknown failures are treated as transient
+            return self._retry_or_dead_letter(canonical_id, msg, key, report, attempts, exc)
+
+    def _retry_or_dead_letter(
+        self, canonical_id: str, msg: RawMessage, key: str, report: RunReport,
+        attempts: int, exc: Exception,
+    ) -> Disposition | None:
+        if attempts >= self.config.max_attempts:
+            return self._dead_letter(
+                canonical_id, msg, key, report, reason=f"{type(exc).__name__}: {exc}"
+            )
+        # free the claim so a later run/redelivery retries (§8.2 lease semantics).
+        self.dedupe_store.release(key)
+        return None  # NOT terminal -> cursor does NOT advance past it yet
 
     def _extract(self, msg: RawMessage, env: Envelope) -> CleanEmail:
         # MimeExtractor exposes extract_bytes (raw RFC822); the generic port is
