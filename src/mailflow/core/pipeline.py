@@ -143,6 +143,7 @@ class Pipeline:
                 schema_version=SCHEMA_VERSION,
                 tenant=tenant,
                 ordering_key=msg.stream.mailbox,
+                idempotency_key=key,  # §A4: (tenant, mailbox, provider_message_id) on the wire
                 email=email,
             )
             self.emitter.emit(event)
