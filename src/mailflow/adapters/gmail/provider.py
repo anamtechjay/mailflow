@@ -68,8 +68,14 @@ class GmailProvider:
             return
         new_cursor = Cursor(value=latest, order=int(latest))
         for message_id in ids:
-            data = self.client.get_message_raw(stream.mailbox, message_id)
-            raw = _b64url_decode(str(data.get("raw", "")))
+            try:
+                data = self.client.get_message_raw(stream.mailbox, message_id)
+                raw = _b64url_decode(str(data.get("raw", "")))
+            except PermanentError:
+                # B2: this one record is poison (404/410/invalid base64). Skip it so the
+                # rest of the batch still flows; AuthError/TransientError are whole-stream
+                # problems and propagate (the cursor must not advance past unread mail).
+                continue
             yield RawMessage(
                 provider=self.PROVIDER,
                 provider_message_id=message_id,
