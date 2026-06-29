@@ -13,6 +13,7 @@ from mailflow.adapters.gmail.transport import (
     HttpTransport,
     StaleHistoryError,
     TokenProvider,
+    gmail_error_for,
 )
 
 
@@ -46,7 +47,7 @@ class GmailClient:
                         message = str(body.get("error", {}).get("message", ""))
                 except Exception:  # noqa: BLE001 - error body may not be JSON
                     message = ""
-                raise GmailError(resp.status_code, message)
+                raise gmail_error_for(resp.status_code, message)
             return resp
 
     def history_message_ids(
