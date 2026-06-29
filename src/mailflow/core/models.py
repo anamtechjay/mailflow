@@ -175,6 +175,7 @@ class CleanEmail(BaseModel):
     labels: list[str] = Field(default_factory=list)
     categories: list[str] = Field(default_factory=list)
     folder: str = ""
+    thread_key: str = ""  # Gmail threadId / Graph conversationId; subject-fallback in Phase 1 (A7)
 
     auto_submitted: str | None = None
     list_id: str | None = None
@@ -187,3 +188,18 @@ class CleanEmail(BaseModel):
     schema_version: str = ""
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class WebhookIdentity(BaseModel):
+    """Identity-only result of a verified push notification (A5).
+
+    Carries *who* the verified ping is for — never any trusted payload. The
+    consumer still re-derives content from the cursor (wake-signal-only rule).
+    """
+
+    provider: str
+    mailbox: str | None = None
+    stream_id: str | None = None
+    subscription_id: str | None = None
+
+    model_config = ConfigDict(frozen=True)
