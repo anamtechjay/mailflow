@@ -4,6 +4,8 @@ HTTP library here — that is the transport's job."""
 
 from __future__ import annotations
 
+import random
+import threading
 import time
 from typing import Any
 
@@ -15,31 +17,65 @@ from mailflow.adapters.gmail.transport import (
     TokenProvider,
     gmail_error_for,
 )
+from mailflow.core.errors import TransientError
 
 
 class GmailClient:
     def __init__(
         self, *, base_url: str, token_provider: TokenProvider,
         transport: HttpTransport, max_retries: int = 3,
+        max_in_flight: int = 8, backoff_base: float = 1.0,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.tokens = token_provider
         self.transport = transport
         self.max_retries = max_retries
+        self.backoff_base = backoff_base
+        # B4: bound concurrent in-flight requests so a storm can't fan out unboundedly.
+        self._inflight = threading.BoundedSemaphore(max(1, max_in_flight))
+
+    def _backoff_sleep(self, attempt: int, retry_after: str | None) -> None:
+        """Exponential backoff with jitter, never shorter than a server Retry-After."""
+        delay = self.backoff_base * (2 ** attempt) + random.uniform(0.0, self.backoff_base)
+        if retry_after:
+            try:
+                delay = max(delay, float(retry_after))
+            except ValueError:
+                pass
+        time.sleep(delay)
 
     def _request(self, method: str, url: str, *, json: Any | None = None) -> HttpResponse:
+        # B4: shed load once saturated rather than queueing without bound.
+        if not self._inflight.acquire(blocking=False):
+            raise TransientError("gmail in-flight concurrency cap reached")
+        try:
+            return self._request_inner(method, url, json=json)
+        finally:
+            self._inflight.release()
+
+    def _request_inner(self, method: str, url: str, *, json: Any | None) -> HttpResponse:
         attempt = 0
         while True:
             headers = {
                 "Authorization": f"Bearer {self.tokens.get_token()}",
                 "Content-Type": "application/json",
             }
-            resp = self.transport.request(method, url, headers=headers, json=json)
-            if resp.status_code == 429 and attempt < self.max_retries:
-                time.sleep(float(resp.headers.get("Retry-After", "1")))
+            try:
+                resp = self.transport.request(method, url, headers=headers, json=json)
+            except Exception as exc:  # noqa: BLE001 - network failure is transient
+                if attempt < self.max_retries:
+                    self._backoff_sleep(attempt, None)
+                    attempt += 1
+                    continue
+                raise TransientError(f"gmail network error: {exc}") from exc
+            status = resp.status_code
+            # B4: retry 429 AND 5xx with bounded backoff; after the bound the typed
+            # mapping turns the final 429/5xx into a TransientError (DLQ-or-retry upstream).
+            if (status == 429 or status >= 500) and attempt < self.max_retries:
+                self._backoff_sleep(attempt, resp.headers.get("Retry-After"))
                 attempt += 1
                 continue
-            if resp.status_code >= 400:
+            if status >= 400:
                 message = ""
                 try:
                     body = resp.json()
@@ -47,7 +83,7 @@ class GmailClient:
                         message = str(body.get("error", {}).get("message", ""))
                 except Exception:  # noqa: BLE001 - error body may not be JSON
                     message = ""
-                raise gmail_error_for(resp.status_code, message)
+                raise gmail_error_for(status, message)
             return resp
 
     def history_message_ids(
