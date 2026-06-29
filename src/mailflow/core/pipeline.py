@@ -110,8 +110,15 @@ class Pipeline:
 
         attempts = self.dedupe_store.record_attempt(key)
 
-        # §8.6: size guard against metadata BEFORE downloading/decoding bytes.
+        # §8.6 / §B1: size guard against metadata BEFORE downloading/decoding bytes.
+        # Fail closed: an unknown/zero reported size is treated as over-limit (we cannot
+        # vouch it is within budget, so we never download it).
         size = self.provider.message_size(msg) or msg.size_bytes
+        if size <= 0:
+            return self._dead_letter(
+                canonical_id, msg, key, report,
+                reason=f"size unknown (fail-closed): {size}",
+            )
         if size > self.config.max_message_bytes:
             return self._dead_letter(
                 canonical_id, msg, key, report,
