@@ -39,7 +39,9 @@ def build_gmail_runtime(
         max_retries=gmail_cfg.max_attempts,
     )
     label = gmail_cfg.label_ids[0] if gmail_cfg.label_ids else None
-    provider = GmailProvider(client=client, label_id=label)
+    provider = GmailProvider(
+        client=client, label_id=label, cursor_store=cursor_store, tenant=tenant,
+    )
     pipeline = Pipeline(
         provider=provider,
         parser=MimeEnvelopeParser(),

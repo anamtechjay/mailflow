@@ -32,6 +32,9 @@ class GmailConfig(BaseModel):
     base_url: str = "https://gmail.googleapis.com/gmail/v1"
     token_uri: str = "https://oauth2.googleapis.com/token"
     max_attempts: int = 3
+    # reliability (spec: keep the long-running service alive). 0 disables a feature.
+    watch_renew_seconds: int = 86400   # renew the watch daily (well under the ~7-day expiry)
+    sweep_seconds: int = 900           # safety-net poll every 15 min
 
     @field_validator("mailboxes")
     @classmethod

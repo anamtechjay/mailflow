@@ -13,13 +13,21 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from mailflow.adapters.gmail.bootstrap import bootstrap_watches
+from mailflow.adapters.gmail.bootstrap import bootstrap_watches, renew_watches, sweep_once
 from mailflow.adapters.gmail.client import GmailClient
 from mailflow.adapters.gmail.composition import build_gmail_runtime
 from mailflow.adapters.gmail.config import GmailConfig, PubSubConfig
 from mailflow.adapters.gmail.runtime import GmailPubSubRuntime
-from mailflow.adapters.gmail.watch import GmailWatchManager
-from mailflow.core.ports import BlobStore, CursorStore, DedupeStore, Emitter, SecretProvider
+from mailflow.adapters.gmail.scheduler import IntervalScheduler
+from mailflow.adapters.gmail.watch import GmailWatchManager, WatchHandle
+from mailflow.core.ports import (
+    BlobStore,
+    CursorStore,
+    DedupeStore,
+    Emitter,
+    Filter,
+    SecretProvider,
+)
 
 MessageCallback = Callable[[Any], None]
 
@@ -111,6 +119,7 @@ def run_service(
     blob_store: BlobStore,
     credentials: Any | None = None,
     start_watch: bool = True,
+    filters: list[Filter] | None = None,
 ) -> None:
     """Full live entrypoint: resolve OAuth secrets, build the token provider + httpx
     transport, start the Gmail watch (seeding the cursor), wire the runtime via the
@@ -123,15 +132,17 @@ def run_service(
         scopes=gmail_cfg.scopes,
     )
     transport = HttpxTransport()
+    # one service-level client, reused by the watch manager + the sweep.
+    client = GmailClient(
+        base_url=gmail_cfg.base_url, token_provider=token_provider,
+        transport=transport, max_retries=gmail_cfg.max_attempts,
+    )
+    watch_manager = GmailWatchManager(client=client, config=gmail_cfg, pubsub=pubsub_cfg)
+    handles: list[WatchHandle] = []
     if start_watch:
         # register the mailbox->topic watch and seed the cursor with its historyId,
         # otherwise no notifications are ever published.
-        client = GmailClient(
-            base_url=gmail_cfg.base_url, token_provider=token_provider,
-            transport=transport, max_retries=gmail_cfg.max_attempts,
-        )
-        watch_manager = GmailWatchManager(client=client, config=gmail_cfg, pubsub=pubsub_cfg)
-        bootstrap_watches(
+        handles = bootstrap_watches(
             watch_manager=watch_manager, cursor_store=cursor_store,
             tenant=tenant, mailboxes=gmail_cfg.mailboxes,
         )
@@ -140,10 +151,30 @@ def run_service(
         token_provider=token_provider, transport=transport,
         emitter=emitter, dlq_emitter=dlq_emitter,
         cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
+        filters=filters,
     )
-    run_consume_loop(
-        runtime=runtime,
-        project_id=pubsub_cfg.project_id,
-        subscription=pubsub_cfg.subscription,
-        credentials=credentials,
-    )
+
+    # Reliability: renew the watch (else it expires ~7 days) + a safety-net sweep, both
+    # on background daemon threads while run_consume_loop blocks the main thread.
+    scheduler = IntervalScheduler()
+    if start_watch and gmail_cfg.watch_renew_seconds > 0 and handles:
+        scheduler.every(
+            gmail_cfg.watch_renew_seconds,
+            lambda: renew_watches(watch_manager=watch_manager, handles=handles),
+            "gmail-watch-renew",
+        )
+    if gmail_cfg.sweep_seconds > 0:
+        scheduler.every(
+            gmail_cfg.sweep_seconds,
+            lambda: sweep_once(runtime=runtime, client=client, mailboxes=gmail_cfg.mailboxes),
+            "gmail-sweep",
+        )
+    try:
+        run_consume_loop(
+            runtime=runtime,
+            project_id=pubsub_cfg.project_id,
+            subscription=pubsub_cfg.subscription,
+            credentials=credentials,
+        )
+    finally:
+        scheduler.stop()

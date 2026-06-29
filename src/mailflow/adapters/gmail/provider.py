@@ -11,7 +11,9 @@ from datetime import datetime, timezone
 from typing import Iterable, Iterator
 
 from mailflow.adapters.gmail.client import GmailClient
+from mailflow.adapters.gmail.transport import StaleHistoryError
 from mailflow.core.models import Cursor, RawMessage, StreamRef
+from mailflow.core.ports import CursorStore
 
 
 def _b64url_decode(s: str) -> bytes:
@@ -22,9 +24,14 @@ def _b64url_decode(s: str) -> bytes:
 class GmailProvider:
     PROVIDER = "gmail"
 
-    def __init__(self, *, client: GmailClient, label_id: str | None = "INBOX") -> None:
+    def __init__(
+        self, *, client: GmailClient, label_id: str | None = "INBOX",
+        cursor_store: CursorStore | None = None, tenant: str = "",
+    ) -> None:
         self.client = client
         self.label_id = label_id
+        self._cursor_store = cursor_store      # for stale-historyId (404) self-heal
+        self._tenant = tenant
         self._pending: dict[str, str] = {}  # mailbox -> latest submitted historyId
 
     # --- notification feed (called by the Pub/Sub runtime) ---
@@ -45,7 +52,14 @@ class GmailProvider:
         if not start:
             self._pending.pop(stream.mailbox, None)
             return
-        ids, latest = self.client.history_message_ids(stream.mailbox, start, self.label_id)
+        try:
+            ids, latest = self.client.history_message_ids(stream.mailbox, start, self.label_id)
+        except StaleHistoryError:
+            # The stored historyId is too old. Re-seed to the current historyId so the
+            # mailbox isn't stuck (the gap mail is skipped — the safe recovery).
+            self._reseed(stream)
+            self._pending.pop(stream.mailbox, None)
+            return
         new_cursor = Cursor(value=latest, order=int(latest))
         for message_id in ids:
             data = self.client.get_message_raw(stream.mailbox, message_id)
@@ -60,6 +74,16 @@ class GmailProvider:
                 raw_bytes=raw,
             )
         self._pending.pop(stream.mailbox, None)
+
+    def _reseed(self, stream: StreamRef) -> None:
+        """On a stale historyId, advance the stored cursor to the current historyId."""
+        if self._cursor_store is None:
+            return
+        current = str(self.client.get_profile(stream.mailbox).get("historyId", ""))
+        if current:
+            self._cursor_store.commit_if_ahead(
+                self._tenant, stream, Cursor(value=current, order=int(current))
+            )
 
     def message_size(self, msg: RawMessage) -> int | None:
         return msg.size_bytes

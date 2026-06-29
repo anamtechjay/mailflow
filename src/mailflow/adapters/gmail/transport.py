@@ -12,6 +12,11 @@ class GmailError(Exception):
         super().__init__(f"gmail error {status_code}: {message}")
 
 
+class StaleHistoryError(Exception):
+    """Gmail history.list returned 404 — the stored historyId is too old to diff from.
+    Recovery: re-seed the cursor to the current historyId (provider self-heal)."""
+
+
 @runtime_checkable
 class HttpResponse(Protocol):
     status_code: int

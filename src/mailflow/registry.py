@@ -12,8 +12,12 @@ from mailflow.emit.memory import MemoryEmitter
 from mailflow.emit.stdout import StdoutEmitter
 from mailflow.filters.deterministic import (
     BlacklistFilter,
+    BlockSenderFilter,
     InternalDomainFilter,
     ListMailFilter,
+    NoPersonalFilter,
+    OnlyDomainFilter,
+    OnlySenderFilter,
     SubjectFilter,
     WhitelistFilter,
 )
@@ -28,12 +32,21 @@ from mailflow.stores.sqlite import SqliteCursorStore, SqliteDedupeStore
 PROVIDER_KINDS = {"memory", "graph", "gmail"}
 EMITTER_KINDS = {"memory", "stdout", "pubsub"}
 STORE_KINDS = {"memory", "sqlite", "local"}
-FILTER_KINDS = {"whitelist", "blacklist", "internal_domain", "subject", "list_mail"}
+FILTER_KINDS = {
+    "whitelist", "blacklist", "internal_domain", "subject", "list_mail", "no_personal",
+    "only_domain", "only_sender", "block_sender",
+}
 
 
 def build_filter(kind: str, params: dict[str, Any]) -> Filter:
     if kind == "whitelist":
         return WhitelistFilter(domains=set(params.get("domains", [])))
+    if kind == "only_domain":
+        return OnlyDomainFilter(domains=set(params.get("domains", [])))
+    if kind == "only_sender":
+        return OnlySenderFilter(addresses=set(params.get("addresses", [])))
+    if kind == "block_sender":
+        return BlockSenderFilter(addresses=set(params.get("addresses", [])))
     if kind == "blacklist":
         return BlacklistFilter(domains=set(params.get("domains", [])))
     if kind == "internal_domain":
@@ -42,6 +55,9 @@ def build_filter(kind: str, params: dict[str, Any]) -> Filter:
         return SubjectFilter(patterns=list(params.get("patterns", [])))
     if kind == "list_mail":
         return ListMailFilter()
+    if kind == "no_personal":
+        domains = params.get("domains")
+        return NoPersonalFilter(domains=set(domains) if domains else None)
     raise ValueError(f"unknown filter kind {kind!r}")  # validate() guards this earlier
 
 

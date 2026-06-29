@@ -71,6 +71,47 @@ connect("gmail", ..., on_email=handle).run()        # push to a callback (blocki
 emails = connect("memory", seed=seed).fetch_new()   # batch: one pass -> list[CleanEmail]
 ```
 
+### Filters, stages, and retrieval (the black box)
+
+One `filters` list — built-in specs, your own functions, or filter objects (all mixed):
+
+```python
+mf = connect("gmail", credentials=creds, mailbox="me",
+    filters=[
+        {"kind": "blacklist", "domains": ["spam.com"]},   # built-in spec
+        {"kind": "no_personal"},                          # block gmail/yahoo/…
+        lambda env: "invoice" in env.subject.lower(),     # your own function (True=keep)
+    ],
+    stages=[enrich, route],          # post-process each CleanEmail (return None to drop)
+    clean_fn=my_clean,               # optional: tweak the cleaned email
+)
+```
+`filters` defaults to empty → nothing is dropped (safe-by-default). Custom filter functions
+get the `Envelope` and return `True` (keep) / `False` (drop). Stages get the full
+`CleanEmail` and may modify it or drop it (return falsy).
+
+Select only the data you need — just name the fields (smaller payload, self-documenting):
+
+```python
+mf = connect("gmail", credentials=creds, mailbox="me",
+             fields=["subject", "from", "attachments"])
+
+for email in mf.stream():
+    # email is a dict with ONLY those keys:
+    #   {"subject": "...", "from": <Recipient>, "attachments": [...]}
+    ...
+```
+`fields=None` (default) yields the full `CleanEmail`. `"from"` is an alias for `from_`.
+Three knobs: `filters` (which emails) · `fields` (which data) · `stages` (process each).
+
+Pull any part on demand by message ID (no need to store emails):
+```python
+email = mf.get_email(message_id)        # -> CleanEmail
+mf.get_body(message_id)                 # -> str
+mf.get_recipients(message_id)           # -> list[Recipient]
+mf.get_attachments(message_id)          # -> list[Attachment]
+```
+
 **State (`state=`):**
 - `"memory"` (default) — stateless; on restart you may re-receive recent mail, so **dedupe
   on `email.canonical_id`** (always present, stable).

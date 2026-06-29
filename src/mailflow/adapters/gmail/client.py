@@ -7,7 +7,13 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from mailflow.adapters.gmail.transport import GmailError, HttpResponse, HttpTransport, TokenProvider
+from mailflow.adapters.gmail.transport import (
+    GmailError,
+    HttpResponse,
+    HttpTransport,
+    StaleHistoryError,
+    TokenProvider,
+)
 
 
 class GmailClient:
@@ -59,7 +65,17 @@ class GmailClient:
                 url += f"&labelId={label_id}"
             if page_token:
                 url += f"&pageToken={page_token}"
-            data = self._request("GET", url).json()
+            try:
+                resp = self._request("GET", url)
+            except GmailError as exc:
+                # 404 = the stored historyId is too old to diff from (spec: Gmail returns
+                # 404, not 410). Signal a re-seed; any other error propagates.
+                if exc.status_code == 404:
+                    raise StaleHistoryError(
+                        f"historyId {start_history_id} too old for {user_id}"
+                    ) from exc
+                raise
+            data = resp.json()
             if not isinstance(data, dict):
                 break
             if data.get("historyId"):
