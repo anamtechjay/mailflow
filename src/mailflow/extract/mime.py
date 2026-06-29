@@ -14,6 +14,7 @@ from mailflow.core.events import SCHEMA_VERSION
 from mailflow.core.identity import derive_canonical_id
 from mailflow.core.models import Attachment, CleanEmail, Direction, Recipient
 from mailflow.core.ports import BlobStore
+from mailflow.extract.clean import html_to_text
 
 
 def _recipients(msg: EmailMessage, header: str) -> list[Recipient]:
@@ -158,5 +159,9 @@ class MimeExtractor:
                         storage_ref=storage_ref,
                     )
                 )
+
+        # Gentle HTML->text fallback when the part set is HTML-only (B5/A6).
+        if not body_text and body_html:
+            body_text = html_to_text(body_html)
 
         return body_text, body_html, attachments
