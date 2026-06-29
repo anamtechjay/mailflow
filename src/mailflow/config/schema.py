@@ -30,6 +30,7 @@ class StoresConfig(BaseModel):
 
 
 class MailflowConfig(BaseModel):
+    version: str = "1.0"  # config-schema version; fail-fast on unknown major in Phase 1 (A11)
     tenant: str = "default"
     provider: ComponentConfig = Field(default_factory=lambda: ComponentConfig(kind="memory"))
     filters: list[ComponentConfig] = Field(default_factory=list)
