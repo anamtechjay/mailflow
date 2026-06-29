@@ -7,7 +7,12 @@ from __future__ import annotations
 
 import base64
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any, Mapping
+
+from mailflow.core.errors import MailflowError
+
+if TYPE_CHECKING:
+    from mailflow.core.ports import WebhookVerifier
 
 
 def _try(raw: bytes) -> tuple[str, int] | None:
@@ -27,8 +32,20 @@ def _try(raw: bytes) -> tuple[str, int] | None:
         return None
 
 
-def parse_pubsub_message(data: str | bytes) -> tuple[str, int] | None:
+def parse_pubsub_message(
+    data: str | bytes,
+    *,
+    verifier: "WebhookVerifier | None" = None,
+    headers: Mapping[str, str] | None = None,
+) -> tuple[str, int] | None:
     raw = data if isinstance(data, (bytes, bytearray)) else str(data).encode("utf-8")
+    if verifier is not None:
+        # A5: prove the push is genuine before trusting it as a wake-signal. A failed
+        # verification drops the notification (the cursor-driven sweep still catches mail).
+        try:
+            verifier.verify(headers=headers or {}, body=bytes(raw))
+        except MailflowError:
+            return None
     direct = _try(bytes(raw))
     if direct is not None:
         return direct
