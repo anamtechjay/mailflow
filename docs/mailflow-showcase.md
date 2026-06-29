@@ -366,7 +366,7 @@ A long-running service stays healthy automatically:
   WATCH RENEWAL        renews daily → notifications never stop (watches expire ~7 days)
   STALE-CURSOR RECOVERY re-seeds on a too-old historyId (Gmail 404) → never stuck
   SWEEP                 periodic poll catches anything a push missed
-  EXACTLY-ONCE          atomic claim → duplicates never double-processed
+  AT-LEAST-ONCE         atomic claim de-dupes in-system; idempotency_key lets consumers drop repeats
   DLQ                   poison/oversized → dead-lettered with a reason; never blocks the rest
 ```
 
@@ -393,7 +393,7 @@ A long-running service stays healthy automatically:
 ```
   ✅ Gmail flow            DONE + proven live (real email → CleanEmail)
   ✅ Library API           connect + filters + fields + stages + retrieval
-  ✅ Reliability           watch renewal · 404 recovery · sweep · exactly-once
+  ✅ Reliability           watch renewal · 404 recovery · sweep · at-least-once (idempotency_key)
   ✅ Quality               97 tests · mypy strict clean · full docs
   ⚠️ Outlook (Graph)        code-complete; needs a live Exchange mailbox to validate
   ⏸️ Publish / SaaS         deferred — later-stage decisions

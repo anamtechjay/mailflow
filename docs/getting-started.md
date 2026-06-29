@@ -179,7 +179,9 @@ A long-running service stays healthy automatically:
 - **Watch renewal** — renews daily so notifications never stop (Gmail watches expire ~7 days).
 - **Stale-cursor recovery** — re-seeds on a too-old historyId so the mailbox never gets stuck.
 - **Sweep** — periodically polls to catch anything a push notification missed.
-- **Exactly-once processing** — an atomic claim means duplicates are never double-processed.
+- **At-least-once delivery** — an atomic claim de-dupes within the system, but duplicates can
+  still occur, so every `EmailEvent` carries an `idempotency_key`
+  (`tenant|mailbox|provider_message_id`) for consumer-side dedupe.
 
 (Tune or disable via `watch_renew_seconds` / `sweep_seconds`.)
 

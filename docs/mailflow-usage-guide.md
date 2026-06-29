@@ -337,7 +337,9 @@ A long-running Gmail service stays healthy automatically:
 - **Watch renewal** — renews daily so notifications never stop (`watch_renew_seconds`).
 - **Stale-cursor recovery** — re-seeds on a too-old historyId so the mailbox never sticks.
 - **Sweep** — periodic poll catches anything a push missed (`sweep_seconds`).
-- **Exactly-once processing** — an atomic claim means duplicates are never double-processed.
+- **At-least-once delivery** — an atomic claim de-dupes within the system, but duplicates can
+  still occur, so every `EmailEvent` carries an `idempotency_key`
+  (`tenant|mailbox|provider_message_id`) for consumer-side dedupe.
 - **DLQ** — poison/oversized mail is dead-lettered with a reason; one bad email never blocks
   the rest.
 

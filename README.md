@@ -134,8 +134,14 @@ python -m mypy        # strict
 | 3 | Gmail adapter |
 | 4 | reference deploy, allowlisted plugins, attachment streaming, LLM classifier |
 
-The wire contract is `EmailEvent` / `CleanEmail` at `SCHEMA_VERSION = "1.0"`.
-Adapters plug into the ports in `mailflow.core.ports` without touching `core`.
+The wire contract is `EmailEvent` / `CleanEmail` at `SCHEMA_VERSION = "1.1"` (the `EmailEvent`
+now carries an `idempotency_key`). Adapters plug into the ports in `mailflow.core.ports`
+without touching `core`.
+
+**Delivery & concurrency (V1):** delivery is **at-least-once** — duplicates can occur, so every
+`EmailEvent` carries an `idempotency_key` (`tenant|mailbox|provider_message_id`) for
+consumer-side dedupe. V1 is **synchronous, single-worker** (`mailflow.core.ports.SYNC_ONLY =
+True`); a future async family is an additive change, not a breaking one.
 
 ## Live: Outlook via Microsoft Graph + Azure Event Hubs
 
