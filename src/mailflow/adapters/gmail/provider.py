@@ -7,18 +7,24 @@ core MimeExtractor — so Gmail needs no provider-specific parser/extractor."""
 from __future__ import annotations
 
 import base64
+import binascii
 from datetime import datetime, timezone
 from typing import Iterable, Iterator
 
 from mailflow.adapters.gmail.client import GmailClient
 from mailflow.adapters.gmail.transport import StaleHistoryError
+from mailflow.core.errors import PermanentError
 from mailflow.core.models import Cursor, RawMessage, StreamRef
 from mailflow.core.ports import CursorStore
 
 
 def _b64url_decode(s: str) -> bytes:
     pad = "=" * (-len(s) % 4)
-    return base64.urlsafe_b64decode(s + pad)
+    try:
+        return base64.urlsafe_b64decode(s + pad)
+    except (binascii.Error, ValueError) as exc:
+        # B3: a malformed raw payload will never decode -> poison message, DLQ (no retry).
+        raise PermanentError(f"invalid base64 in gmail raw payload: {exc}") from exc
 
 
 class GmailProvider:
