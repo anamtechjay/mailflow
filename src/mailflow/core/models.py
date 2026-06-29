@@ -90,6 +90,7 @@ class RawMessage(BaseModel):
     received_at: datetime
     cursor: Cursor
     raw_bytes: bytes = b""
+    thread_key: str = ""  # provider thread/conversation id, populated by the adapter (A7)
 
 
 class Attachment(BaseModel):
