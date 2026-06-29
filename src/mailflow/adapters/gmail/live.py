@@ -22,6 +22,7 @@ from mailflow.adapters.gmail.scheduler import IntervalScheduler
 from mailflow.adapters.gmail.watch import GmailWatchManager, WatchHandle
 from mailflow.core.ports import (
     BlobStore,
+    ContentCleaner,
     CursorStore,
     DedupeStore,
     Emitter,
@@ -151,6 +152,7 @@ def run_service(
     start_watch: bool = True,
     filters: list[Filter] | None = None,
     rotation_sink: TokenRotationSink | None = None,
+    cleaner: ContentCleaner | None = None,
 ) -> None:
     """Full live entrypoint: resolve OAuth secrets, build the token provider + httpx
     transport, start the Gmail watch (seeding the cursor), wire the runtime via the
@@ -184,7 +186,7 @@ def run_service(
         token_provider=token_provider, transport=transport,
         emitter=emitter, dlq_emitter=dlq_emitter,
         cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
-        filters=filters,
+        filters=filters, cleaner=cleaner,
     )
 
     # Reliability: renew the watch (else it expires ~7 days) + a safety-net sweep, both

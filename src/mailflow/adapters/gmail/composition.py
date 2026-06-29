@@ -11,7 +11,15 @@ from mailflow.adapters.gmail.provider import GmailProvider
 from mailflow.adapters.gmail.runtime import GmailPubSubRuntime
 from mailflow.adapters.gmail.transport import HttpTransport, TokenProvider
 from mailflow.core.pipeline import Pipeline, PipelineConfig
-from mailflow.core.ports import BlobStore, Classifier, CursorStore, DedupeStore, Emitter, Filter
+from mailflow.core.ports import (
+    BlobStore,
+    Classifier,
+    ContentCleaner,
+    CursorStore,
+    DedupeStore,
+    Emitter,
+    Filter,
+)
 from mailflow.extract.envelope import MimeEnvelopeParser
 from mailflow.extract.mime import MimeExtractor
 from mailflow.filters.chain import FilterChain
@@ -31,6 +39,7 @@ def build_gmail_runtime(
     blob_store: BlobStore,
     filters: list[Filter] | None = None,
     classifier: Classifier | None = None,
+    cleaner: ContentCleaner | None = None,
 ) -> GmailPubSubRuntime:
     client = GmailClient(
         base_url=gmail_cfg.base_url,
@@ -54,5 +63,6 @@ def build_gmail_runtime(
         blob_store=blob_store,
         config=PipelineConfig(tenant=tenant, max_attempts=gmail_cfg.max_attempts),
         classifier=classifier,
+        cleaner=cleaner,
     )
     return GmailPubSubRuntime(provider=provider, pipeline=pipeline)

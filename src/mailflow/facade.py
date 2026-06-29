@@ -260,11 +260,12 @@ def connect(
             credentials=credentials or {}, mailbox=mailbox, tenant=tenant,
             emitter=pipe_emitter, secret_provider=secret_provider or EnvSecretProvider(),
             cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
-            filters=chain,
+            filters=chain, cleaner=cleaner, rotation_sink=ov.get("rotation_sink"),
         )
         fetcher = _build_gmail_fetcher(
             credentials=credentials or {}, mailbox=mailbox,
             secret_provider=secret_provider or EnvSecretProvider(), blob_store=blob_store,
+            cleaner=cleaner,
         )
         return Mailflow(
             provider_kind="gmail", emitter=emitter, cursor_store=cursor_store,
@@ -275,7 +276,8 @@ def connect(
 
 
 def _build_gmail_fetcher(
-    *, credentials: dict[str, Any], mailbox: str | None, secret_provider: Any, blob_store: Any
+    *, credentials: dict[str, Any], mailbox: str | None, secret_provider: Any, blob_store: Any,
+    cleaner: Any = None,
 ) -> Callable[[str], CleanEmail]:
     """Build a fetch-by-message-id closure for Gmail (spec §4): messages.get(raw) ->
     MimeExtractor -> CleanEmail. SDK imports are lazy (inside this function)."""
@@ -305,10 +307,14 @@ def _build_gmail_fetcher(
         data = client.get_message_raw(mbx, message_id)
         b64 = str(data.get("raw", ""))
         raw = base64.urlsafe_b64decode(b64 + "=" * (-len(b64) % 4))
-        return extractor.extract_bytes(
+        thread_key = str(data.get("threadId", ""))
+        email = extractor.extract_bytes(
             raw, provider="gmail", provider_message_id=message_id,
-            stream_id=mbx, watched_mailbox=mbx, blob_store=blob_store,
+            stream_id=mbx, watched_mailbox=mbx, blob_store=blob_store, thread_key=thread_key,
         )
+        if cleaner is not None:
+            email = cleaner.clean(email)
+        return email
 
     return fetch
 
@@ -324,6 +330,8 @@ def _build_gmail_live(
     dedupe_store: Any,
     blob_store: Any,
     filters: list[Filter],
+    cleaner: Any = None,
+    rotation_sink: Any = None,
 ) -> Callable[[], None]:
     """Return a blocking callable that runs the live Gmail consume loop. The Gmail SDK is
     imported lazily inside run_service, so importing this module needs no `gmail` extra."""
@@ -348,7 +356,7 @@ def _build_gmail_live(
             gmail_cfg=gmail_cfg, pubsub_cfg=pubsub_cfg, tenant=tenant,
             secret_provider=secret_provider, emitter=emitter, dlq_emitter=MemoryEmitter(),
             cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
-            filters=filters,
+            filters=filters, cleaner=cleaner, rotation_sink=rotation_sink,
         )
 
     return live

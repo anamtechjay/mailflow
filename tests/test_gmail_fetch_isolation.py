@@ -11,7 +11,7 @@ import pytest
 
 from mailflow.adapters.gmail.client import GmailClient
 from mailflow.adapters.gmail.provider import GmailProvider
-from mailflow.core.errors import TransientError
+from mailflow.core.errors import AuthError, TransientError
 from mailflow.core.models import Cursor, StreamRef
 
 STREAM = StreamRef(mailbox="ops@acme.com", folder=None)
@@ -100,4 +100,16 @@ def test_transient_5xx_on_fetch_propagates() -> None:
     ]
     provider = _provider(routes)
     with pytest.raises(TransientError):
+        list(provider.fetch(STREAM, Cursor(value="100", order=100)))
+
+
+def test_auth_401_on_fetch_propagates() -> None:
+    routes = [
+        ("/history", _Resp(200, {"history": [
+            {"messagesAdded": [{"message": {"id": "m1"}}]},
+        ], "historyId": "200"})),
+        ("/messages/m1", _Resp(401, {"error": {"message": "invalid creds"}})),
+    ]
+    provider = _provider(routes)
+    with pytest.raises(AuthError):
         list(provider.fetch(STREAM, Cursor(value="100", order=100)))

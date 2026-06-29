@@ -224,6 +224,20 @@ The cursor is the Gmail `historyId`; `GmailWatchManager` renews the watch daily;
 Pub/Sub ack is the checkpoint. See
 `docs/superpowers/plans/2026-06-16-mailflow-gmail-adapter.md`.
 
+### V1 notes
+
+- **Refresh-token rotation (A8):** if Google rotates the OAuth refresh token, pass a
+  `TokenRotationSink` so the new token is persisted for the next run — e.g.
+  `run_service(..., rotation_sink=FileTokenRotationSink("tokens.json"))` (from
+  `mailflow.adapters.gmail.rotation`), or via `connect(overrides={"rotation_sink": ...})`.
+  Without a sink, rotation is detected but not saved and the next run may fail to auth.
+- **Push verification (A5):** `GmailWebhookVerifier` (`mailflow.adapters.gmail.webhook`)
+  validates an OIDC-JWT and returns identity only. It applies to **HTTP push** delivery
+  (verify the `Authorization` bearer before processing). The default runtime uses Pub/Sub
+  **pull**, which is authenticated by the subscriber's own GCP credentials and needs no
+  webhook verification — so the verifier is a seam to wire in only if you add an HTTP push
+  endpoint. V1 is poll-authoritative; push only wakes the poller.
+
 ### Tracking the free $200 Azure credit
 
 The raw "credit remaining" balance isn't exposed by API for trial accounts (portal
