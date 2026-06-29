@@ -3,6 +3,8 @@ the only provider is `memory`, seeded by the caller."""
 
 from __future__ import annotations
 
+from typing import Any, Mapping
+
 from mailflow.config.loader import validate
 from mailflow.config.schema import MailflowConfig
 from mailflow.core.models import StreamRef
@@ -24,6 +26,7 @@ def build_from_config(
     cfg: MailflowConfig,
     *,
     seed: dict[StreamRef, list[SeedEmail]] | None = None,
+    overrides: Mapping[str, Any] | None = None,
 ) -> Pipeline:
     validate(cfg)  # raises on unknown kinds before we build anything
     if cfg.provider.kind != "memory":

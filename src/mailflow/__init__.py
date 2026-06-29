@@ -5,7 +5,7 @@ from mailflow.config.schema import MailflowConfig
 from mailflow.core.events import SCHEMA_VERSION, EmailEvent
 from mailflow.core.models import CleanEmail
 from mailflow.core.pipeline import Pipeline, PipelineConfig
-from mailflow.facade import Mailflow, connect
+from mailflow.facade import Mailflow, as_cleaner, as_filter, connect
 
 __version__ = "0.1.0"
 
@@ -20,4 +20,6 @@ __all__ = [
     "MailflowConfig",
     "connect",
     "Mailflow",
+    "as_filter",
+    "as_cleaner",
 ]

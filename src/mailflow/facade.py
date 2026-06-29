@@ -21,7 +21,7 @@ Three ways to receive emails:
 from __future__ import annotations
 
 import threading
-from typing import Any, Callable, Iterator
+from typing import Any, Callable, Iterator, Mapping, TypeVar
 
 from mailflow.config.state import resolve_state
 from mailflow.core.models import Attachment, CleanEmail, Envelope, Recipient, StreamRef
@@ -47,6 +47,20 @@ from mailflow.secrets import EnvSecretProvider
 OnEmail = Callable[[Any], None]
 # A filter input entry: a built-in spec, a user function, or a Filter object (spec §3.1).
 FilterSpec = dict[str, Any] | Callable[[Envelope], bool] | Filter
+
+_C = TypeVar("_C", bound=Callable[..., Any])
+
+
+def as_filter(fn: _C) -> _C:
+    """Tag a callable as a filter for the overrides= seam (A10). Returns it unchanged."""
+    setattr(fn, "__mailflow_role__", "filter")
+    return fn
+
+
+def as_cleaner(fn: _C) -> _C:
+    """Tag a callable as a cleaner for the overrides= seam (A10). Returns it unchanged."""
+    setattr(fn, "__mailflow_role__", "cleaner")
+    return fn
 
 
 def make_projection(fields: list[str]) -> Callable[[CleanEmail], dict[str, Any]]:
@@ -191,6 +205,7 @@ def connect(
     clean_fn: Stage | None = None,
     on_email: OnEmail | None = None,
     secret_provider: Any | None = None,
+    overrides: Mapping[str, Any] | None = None,
     tenant: str = "default",
 ) -> Mailflow:
     """Wire a runnable Mailflow for the given provider. `provider` is "memory" | "gmail"
