@@ -45,6 +45,7 @@ class MimeExtractor:
         stream_id: str,
         watched_mailbox: str,
         blob_store: BlobStore | None = None,
+        thread_key: str = "",
     ) -> CleanEmail:
         msg = message_from_bytes(raw, policy=default_policy)
         assert isinstance(msg, EmailMessage)
@@ -91,6 +92,7 @@ class MimeExtractor:
             provider=provider,
             provider_message_id=provider_message_id,
             provider_stream_id=stream_id,
+            thread_key=thread_key,
             direction=direction,
             **alias_from,  # alias
             sender=_one(msg, "sender"),
