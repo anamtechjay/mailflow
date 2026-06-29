@@ -84,6 +84,7 @@ class GmailProvider:
                 received_at=datetime.now(timezone.utc),
                 cursor=new_cursor,
                 raw_bytes=raw,
+                thread_key=str(data.get("threadId", "")),  # A7: Gmail conversation id
             )
         self._pending.pop(stream.mailbox, None)
 
