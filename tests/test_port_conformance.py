@@ -65,3 +65,27 @@ def test_mime_extractor_accepted_despite_no_extract_method() -> None:
 
 def test_none_classifier_and_cleaner_are_allowed() -> None:
     Pipeline(**_kwargs(classifier=None, cleaner=None))  # type: ignore[arg-type]
+
+
+class _NotARefresher:
+    """No .force_refresh method -> does not satisfy the AuthRefresher port."""
+
+
+class _NotADeadLetterStore:
+    """Missing put/list_pending/delete -> does not satisfy the DeadLetterStore port."""
+
+
+def test_bad_auth_refresher_rejected() -> None:
+    with pytest.raises(ConfigError) as exc:
+        Pipeline(**_kwargs(auth_refresher=_NotARefresher()))  # type: ignore[arg-type]
+    assert "auth_refresher" in str(exc.value) and "AuthRefresher" in str(exc.value)
+
+
+def test_bad_dlq_store_rejected() -> None:
+    with pytest.raises(ConfigError) as exc:
+        Pipeline(**_kwargs(dlq_store=_NotADeadLetterStore()))  # type: ignore[arg-type]
+    assert "dlq_store" in str(exc.value) and "DeadLetterStore" in str(exc.value)
+
+
+def test_none_auth_refresher_and_dlq_store_allowed() -> None:
+    Pipeline(**_kwargs(auth_refresher=None, dlq_store=None))  # type: ignore[arg-type]

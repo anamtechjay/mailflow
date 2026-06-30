@@ -107,6 +107,10 @@ class Pipeline:
             _assert_port(classifier, Classifier, "classifier")
         if cleaner is not None:
             _assert_port(cleaner, ContentCleaner, "cleaner")
+        if auth_refresher is not None:
+            _assert_port(auth_refresher, AuthRefresher, "auth_refresher")
+        if dlq_store is not None:
+            _assert_port(dlq_store, DeadLetterStore, "dlq_store")
         self.provider = provider
         self.parser = parser
         self.filters = filters

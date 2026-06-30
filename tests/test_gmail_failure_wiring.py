@@ -28,6 +28,9 @@ class _Token:
     def get_token(self) -> str:
         return "tok"
 
+    def force_refresh(self) -> None:  # satisfies RefreshableTokenProvider/AuthRefresher
+        pass
+
 
 class _Transport:
     def request(self, method: str, url: str, *, headers: Any, json: Any) -> Any:  # pragma: no cover
