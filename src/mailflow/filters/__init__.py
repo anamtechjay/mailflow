@@ -5,6 +5,7 @@ from mailflow.filters.chain import FilterChain
 from mailflow.filters.deterministic import (
     BlacklistFilter,
     BlockSenderFilter,
+    CcFilter,
     FunctionFilter,
     InternalDomainFilter,
     ListMailFilter,
@@ -12,6 +13,7 @@ from mailflow.filters.deterministic import (
     OnlyDomainFilter,
     OnlySenderFilter,
     SubjectFilter,
+    ToFilter,
     WhitelistFilter,
 )
 
@@ -24,6 +26,8 @@ __all__ = [
     "OnlySenderFilter",
     "InternalDomainFilter",
     "SubjectFilter",
+    "ToFilter",
+    "CcFilter",
     "ListMailFilter",
     "NoPersonalFilter",
     "FunctionFilter",

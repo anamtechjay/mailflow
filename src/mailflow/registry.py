@@ -20,12 +20,14 @@ from mailflow.emit.stdout import StdoutEmitter
 from mailflow.filters.deterministic import (
     BlacklistFilter,
     BlockSenderFilter,
+    CcFilter,
     InternalDomainFilter,
     ListMailFilter,
     NoPersonalFilter,
     OnlyDomainFilter,
     OnlySenderFilter,
     SubjectFilter,
+    ToFilter,
     WhitelistFilter,
 )
 from mailflow.stores.local_blob import LocalBlobStore
@@ -46,7 +48,7 @@ EMITTER_KINDS = {"memory", "stdout", "pubsub"}
 STORE_KINDS = {"memory", "sqlite", "local"}
 FILTER_KINDS = {
     "whitelist", "blacklist", "internal_domain", "subject", "list_mail", "no_personal",
-    "only_domain", "only_sender", "block_sender",
+    "only_domain", "only_sender", "block_sender", "to", "cc",
 }
 
 
@@ -65,6 +67,16 @@ def build_filter(kind: str, params: dict[str, Any]) -> Filter:
         return InternalDomainFilter(domains=set(params.get("domains", [])))
     if kind == "subject":
         return SubjectFilter(patterns=list(params.get("patterns", [])))
+    if kind == "to":
+        return ToFilter(
+            addresses=set(params.get("addresses", [])),
+            patterns=list(params.get("patterns", [])),
+        )
+    if kind == "cc":
+        return CcFilter(
+            addresses=set(params.get("addresses", [])),
+            patterns=list(params.get("patterns", [])),
+        )
     if kind == "list_mail":
         return ListMailFilter()
     if kind == "no_personal":
