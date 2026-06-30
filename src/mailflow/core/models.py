@@ -150,6 +150,8 @@ class Envelope(BaseModel):
     list_id: str | None = None
     list_unsubscribe: str | None = None
     auto_submitted: str | None = None
+    is_auto_submitted: bool = False
+    is_bounce: bool = False
     headers: dict[str, list[str]] = Field(default_factory=dict)
 
     model_config = ConfigDict(populate_by_name=True)
@@ -193,6 +195,8 @@ class CleanEmail(BaseModel):
     thread_key: str = ""  # Gmail threadId / Graph conversationId; subject-fallback in Phase 1 (A7)
 
     auto_submitted: str | None = None
+    is_auto_submitted: bool = False
+    is_bounce: bool = False
     list_id: str | None = None
     list_unsubscribe: str | None = None
     message_size_bytes: int = 0

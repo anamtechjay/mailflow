@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from mailflow.core.models import CleanEmail
 
-SCHEMA_VERSION = "1.1"
+SCHEMA_VERSION = "1.2"
 
 
 class EmailEvent(BaseModel):

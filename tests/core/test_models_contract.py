@@ -39,3 +39,17 @@ def test_webhook_identity_is_frozen() -> None:
     wid = WebhookIdentity(provider="gmail")
     with pytest.raises(ValidationError):
         wid.provider = "graph"  # type: ignore[misc]
+
+
+def test_clean_email_classification_seam_defaults_false() -> None:
+    e = _email()
+    assert e.is_auto_submitted is False
+    assert e.is_bounce is False
+
+
+def test_envelope_classification_seam_defaults_false() -> None:
+    from mailflow.core.models import Envelope, StreamRef
+    env = Envelope(canonical_id="c", provider="memory", provider_message_id="m",
+                   stream=StreamRef(mailbox="ops@acme.com"))
+    assert env.is_auto_submitted is False
+    assert env.is_bounce is False
