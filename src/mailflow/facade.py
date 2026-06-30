@@ -25,8 +25,9 @@ from typing import Any, Callable, Iterator, Mapping, TypeVar
 
 from mailflow.config.state import resolve_state
 from mailflow.core.models import Attachment, CleanEmail, Envelope, Recipient, StreamRef
+from mailflow.core.observability import HealthReport, health as _health
 from mailflow.core.pipeline import Pipeline, PipelineConfig
-from mailflow.core.ports import CursorStore, Emitter, Filter
+from mailflow.core.ports import BlobStore, CursorStore, DedupeStore, Emitter, Filter
 from mailflow.emit.callback import CallbackEmitter, QueueEmitter
 from mailflow.emit.memory import MemoryEmitter
 from mailflow.emit.stages import Stage, StagesEmitter
@@ -115,9 +116,13 @@ class Mailflow:
         queue: QueueEmitter | None = None,
         fetcher: Callable[[str], CleanEmail] | None = None,
         project: Callable[[CleanEmail], dict[str, Any]] | None = None,
+        dedupe_store: DedupeStore | None = None,
+        blob_store: BlobStore | None = None,
     ) -> None:
         self.provider_kind = provider_kind
         self.cursor_store = cursor_store
+        self._dedupe_store = dedupe_store
+        self._blob_store = blob_store
         self._emitter = emitter
         self._run_once = run_once
         self._live_run = live_run
@@ -184,6 +189,16 @@ class Mailflow:
             self._run_once()
             return
         raise RuntimeError("nothing to run")
+
+    def health(self) -> HealthReport:
+        """Reachability of the cursor/dedupe/blob stores backing this handle."""
+        if self._dedupe_store is None or self._blob_store is None:
+            raise RuntimeError("health() requires the store-backed handle")
+        return _health(
+            cursor_store=self.cursor_store,
+            dedupe_store=self._dedupe_store,
+            blob_store=self._blob_store,
+        )
 
 
 def _pick_emitter(on_email: OnEmail | None) -> tuple[Emitter, QueueEmitter | None]:
@@ -253,6 +268,7 @@ def connect(
         return Mailflow(
             provider_kind="memory", emitter=emitter, cursor_store=cursor_store,
             run_once=pipeline.run_once, queue=queue, project=project,
+            dedupe_store=dedupe_store, blob_store=blob_store,
         )
 
     if provider == "gmail":
@@ -270,6 +286,7 @@ def connect(
         return Mailflow(
             provider_kind="gmail", emitter=emitter, cursor_store=cursor_store,
             live_run=live, queue=queue, fetcher=fetcher, project=project,
+            dedupe_store=dedupe_store, blob_store=blob_store,
         )
 
     raise ValueError(f"unknown/unsupported provider {provider!r} (use 'memory' or 'gmail')")

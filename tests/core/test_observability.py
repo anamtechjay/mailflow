@@ -40,3 +40,19 @@ def test_record_does_not_double_count_dead_lettered() -> None:
     ))
     assert report.dead_lettered == 1
     assert len(report.traces) == 1
+
+
+def test_counters_exposes_disposition_metrics() -> None:
+    report = RunReport()
+    report.fetched = 5
+    report.record(DecisionTrace(
+        canonical_id="c1", tenant="t", stream="s",
+        disposition=Disposition.emitted, stage="emit",
+    ))
+    report.add_dead_letter(
+        DeadLetter(canonical_id="c2", reason="x", provider_message_id="m2")
+    )
+    assert report.counters() == {
+        "fetched": 5, "emitted": 1, "dropped": 0,
+        "duplicate": 0, "dead_lettered": 1,
+    }

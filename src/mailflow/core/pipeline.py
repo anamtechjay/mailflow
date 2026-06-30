@@ -10,6 +10,7 @@ Poison messages go to the DLQ and the cursor moves past them (§8.4).
 from __future__ import annotations
 
 import base64
+import logging
 from datetime import datetime, timezone
 
 from pydantic import BaseModel
@@ -30,7 +31,9 @@ from mailflow.core.observability import (
     DeadLetter,
     DeadLetterRecord,
     DecisionTrace,
+    HealthReport,
     RunReport,
+    health as _health,
 )
 from mailflow.core.ports import (
     AuthRefresher,
@@ -48,6 +51,8 @@ from mailflow.core.ports import (
 )
 from mailflow.extract.mime import MimeExtractor
 from mailflow.filters.chain import FilterChain
+
+_log = logging.getLogger("mailflow.pipeline")
 
 
 class PipelineConfig(BaseModel):
@@ -154,7 +159,7 @@ class Pipeline:
 
         # §8.2: claim before any spend.
         if not self.dedupe_store.try_claim(key, self.config.claim_lease_seconds):
-            report.record(self._trace(canonical_id, msg, Disposition.duplicate, "dedupe"))
+            self._record(report, self._trace(canonical_id, msg, Disposition.duplicate, "dedupe"))
             return Disposition.duplicate
 
         attempts = self.dedupe_store.record_attempt(key)
@@ -200,7 +205,7 @@ class Pipeline:
 
         if decision.decision is Decision.drop:
             self.dedupe_store.mark_done(key, self.config.done_ttl_seconds)
-            report.record(self._trace(
+            self._record(report, self._trace(
                 env.canonical_id, msg, Disposition.dropped, "filter",
                 matched_filter=decision.filter_name, reason=decision.reason,
             ))
@@ -224,7 +229,7 @@ class Pipeline:
         )
         self.emitter.emit(event)
         self.dedupe_store.mark_done(key, self.config.done_ttl_seconds)
-        report.record(self._trace(
+        self._record(report, self._trace(
             email.canonical_id, msg, Disposition.emitted, "emit",
             relevance_score=(relevance.score if relevance else None),
         ))
@@ -314,7 +319,7 @@ class Pipeline:
             DeadLetter(canonical_id=canonical_id, reason=reason,
                        provider_message_id=msg.provider_message_id)
         )
-        report.record(self._trace(canonical_id, msg, Disposition.dead_lettered, "dlq", reason=reason))
+        self._record(report, self._trace(canonical_id, msg, Disposition.dead_lettered, "dlq", reason=reason))
         return Disposition.dead_lettered
 
     def _dead_letter_record(
@@ -349,6 +354,23 @@ class Pipeline:
             provider_stream_id=msg.stream.key,
             message_size_bytes=msg.size_bytes,
             schema_version=SCHEMA_VERSION,
+        )
+
+    def _record(self, report: RunReport, trace: DecisionTrace) -> None:
+        report.record(trace)
+        _log.info(
+            "disposition=%s stage=%s canonical_id=%s stream=%s "
+            "matched_filter=%s reason=%s",
+            trace.disposition.value, trace.stage, trace.canonical_id,
+            trace.stream, trace.matched_filter, trace.reason,
+        )
+
+    def health(self) -> HealthReport:
+        """Reachability of this pipeline's core store dependencies (ops probe)."""
+        return _health(
+            cursor_store=self.cursor_store,
+            dedupe_store=self.dedupe_store,
+            blob_store=self.blob_store,
         )
 
     def _trace(

@@ -5,11 +5,18 @@ dropped?"."""
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
 from mailflow.core.events import SCHEMA_VERSION
-from mailflow.core.models import Disposition
+from mailflow.core.models import Disposition, StreamRef
+
+if TYPE_CHECKING:
+    # Type-only imports: ports.py imports DeadLetterRecord from this module, so a
+    # real top-level import here would create a cycle. health() does a deferred
+    # runtime import of BlobStore for its isinstance check.
+    from mailflow.core.ports import BlobStore, CursorStore, DedupeStore
 
 
 class DecisionTrace(BaseModel):
@@ -82,3 +89,56 @@ class RunReport(BaseModel):
     def add_dead_letter(self, dead_letter: DeadLetter) -> None:
         self.dlq.append(dead_letter)
         self.dead_lettered += 1
+
+    def counters(self) -> dict[str, int]:
+        """Dependency-free metrics seam: disposition counters keyed by the canonical
+        Disposition names, for a metrics exporter to scrape after run_once()."""
+        return {
+            "fetched": self.fetched,
+            "emitted": self.emitted,
+            "dropped": self.dropped,
+            "duplicate": self.duplicates,
+            "dead_lettered": self.dead_lettered,
+        }
+
+
+_PROBE_TENANT = "__healthcheck__"
+_PROBE_KEY = "__healthcheck__"
+_PROBE_STREAM = StreamRef(mailbox="__healthcheck__", folder=None)
+
+
+class HealthReport(BaseModel):
+    healthy: bool
+    checks: dict[str, str] = Field(default_factory=dict)
+
+
+def health(
+    *, cursor_store: CursorStore, dedupe_store: DedupeStore, blob_store: BlobStore
+) -> HealthReport:
+    """Probe the core store dependencies via their ports. Reads are harmless; the
+    dedupe probe claims+releases a reserved key so it never corrupts real state. A
+    deep blob write-probe is deferred — blob is a structural (port) check here.
+
+    The ports import is function-local: ports.py imports DeadLetterRecord from this
+    module, so a top-level `from mailflow.core.ports import ...` would be a cycle."""
+    from mailflow.core.ports import BlobStore  # noqa: F401 - cycle-avoiding deferred import
+
+    checks: dict[str, str] = {}
+
+    try:
+        cursor_store.get(_PROBE_TENANT, _PROBE_STREAM)  # read-only liveness
+        checks["cursor"] = "ok"
+    except Exception as exc:  # noqa: BLE001 - any failure means unreachable
+        checks["cursor"] = f"error: {exc}"
+
+    try:
+        if dedupe_store.try_claim(_PROBE_KEY, 1):
+            dedupe_store.release(_PROBE_KEY)  # leave no trace
+        checks["dedupe"] = "ok"
+    except Exception as exc:  # noqa: BLE001
+        checks["dedupe"] = f"error: {exc}"
+
+    checks["blob"] = "ok" if isinstance(blob_store, BlobStore) \
+        else "error: does not satisfy BlobStore port"
+
+    return HealthReport(healthy=all(v == "ok" for v in checks.values()), checks=checks)
