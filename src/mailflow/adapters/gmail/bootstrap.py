@@ -35,6 +35,16 @@ def renew_watches(
     return [watch_manager.renew_watch(h) for h in handles]
 
 
+def should_schedule_renew(
+    *, start_watch: bool, watch_renew_seconds: int, handles: list[WatchHandle]
+) -> bool:
+    """The watch-renewal daemon is armed only when the watch was started, the renew
+    interval is positive, and at least one watch handle exists to renew. Extracted
+    from run_service so the driver-scheduling decision is testable without running the
+    blocking consume loop."""
+    return bool(start_watch and watch_renew_seconds > 0 and handles)
+
+
 def sweep_once(*, runtime: Any, client: Any, mailboxes: list[str]) -> None:
     """Safety-net poll (spec): per mailbox, submit a watermark so the stream is synced,
     then run the pipeline once — `fetch` diffs from the STORED cursor and catches anything

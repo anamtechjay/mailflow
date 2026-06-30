@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import threading
 
-from mailflow.adapters.gmail.bootstrap import renew_watches, sweep_once
+from mailflow.adapters.gmail.bootstrap import renew_watches, should_schedule_renew, sweep_once
 from mailflow.adapters.gmail.watch import WatchHandle
 from mailflow.adapters.gmail.provider import GmailProvider
 from mailflow.adapters.gmail.scheduler import IntervalScheduler
@@ -137,3 +137,14 @@ def test_renewal_driver_fires_renew_for_each_handle_through_scheduler() -> None:
     # re-arms every 0.01s, so a slow stall before sched.stop() could let a second tick
     # append more entries — the contract under test is "one tick renews every handle in order".
     assert watch_manager.renewed[:2] == ["a@x.com", "b@x.com"]
+
+
+# ---- A2: renewal-driver scheduling guard truth table ----
+
+def test_should_schedule_renew_truth_table() -> None:
+    H = [WatchHandle(mailbox="a@x.com", history_id="1")]
+    # armed only when watch started AND interval positive AND at least one handle
+    assert should_schedule_renew(start_watch=True, watch_renew_seconds=86400, handles=H) is True
+    assert should_schedule_renew(start_watch=False, watch_renew_seconds=86400, handles=H) is False
+    assert should_schedule_renew(start_watch=True, watch_renew_seconds=0, handles=H) is False
+    assert should_schedule_renew(start_watch=True, watch_renew_seconds=86400, handles=[]) is False

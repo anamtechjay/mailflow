@@ -13,7 +13,12 @@ from __future__ import annotations
 
 from typing import Any, Callable, Protocol
 
-from mailflow.adapters.gmail.bootstrap import bootstrap_watches, renew_watches, sweep_once
+from mailflow.adapters.gmail.bootstrap import (
+    bootstrap_watches,
+    renew_watches,
+    should_schedule_renew,
+    sweep_once,
+)
 from mailflow.adapters.gmail.client import GmailClient
 from mailflow.adapters.gmail.composition import build_gmail_runtime
 from mailflow.adapters.gmail.config import GmailConfig, PubSubConfig
@@ -249,7 +254,11 @@ def run_service(
     # Reliability: renew the watch (else it expires ~7 days) + a safety-net sweep, both
     # on background daemon threads while run_consume_loop blocks the main thread.
     scheduler = IntervalScheduler()
-    if start_watch and gmail_cfg.watch_renew_seconds > 0 and handles:
+    if should_schedule_renew(
+        start_watch=start_watch,
+        watch_renew_seconds=gmail_cfg.watch_renew_seconds,
+        handles=handles,
+    ):
         scheduler.every(
             gmail_cfg.watch_renew_seconds,
             lambda: renew_watches(watch_manager=watch_manager, handles=handles),
