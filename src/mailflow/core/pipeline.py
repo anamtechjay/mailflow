@@ -9,6 +9,9 @@ Poison messages go to the DLQ and the cursor moves past them (§8.4).
 
 from __future__ import annotations
 
+import base64
+from datetime import datetime, timezone
+
 from pydantic import BaseModel
 
 from mailflow.core.errors import AuthError, PermanentError, TransientError
@@ -23,7 +26,12 @@ from mailflow.core.models import (
     RawMessage,
     StreamRef,
 )
-from mailflow.core.observability import DeadLetter, DecisionTrace, RunReport
+from mailflow.core.observability import (
+    DeadLetter,
+    DeadLetterRecord,
+    DecisionTrace,
+    RunReport,
+)
 from mailflow.core.ports import (
     AuthRefresher,
     BlobStore,
@@ -31,6 +39,7 @@ from mailflow.core.ports import (
     ContentCleaner,
     ContentExtractor,
     CursorStore,
+    DeadLetterStore,
     DedupeStore,
     Emitter,
     EnvelopeParser,
@@ -65,6 +74,7 @@ class Pipeline:
         classifier: Classifier | None = None,
         cleaner: ContentCleaner | None = None,
         auth_refresher: AuthRefresher | None = None,
+        dlq_store: DeadLetterStore | None = None,
     ) -> None:
         self.provider = provider
         self.parser = parser
@@ -79,6 +89,7 @@ class Pipeline:
         self.classifier = classifier
         self.cleaner = cleaner
         self.auth_refresher = auth_refresher
+        self.dlq_store = dlq_store
 
     def run_once(self) -> RunReport:
         report = RunReport()
@@ -121,11 +132,13 @@ class Pipeline:
             return self._dead_letter(
                 canonical_id, msg, key, report,
                 reason=f"size unknown (fail-closed): {size}",
+                attempts=attempts, error_class="SizeUnknownError",
             )
         if size > self.config.max_message_bytes:
             return self._dead_letter(
                 canonical_id, msg, key, report,
                 reason=f"oversized: {size} > {self.config.max_message_bytes}",
+                attempts=attempts, error_class="OversizedMessageError",
             )
 
         try:
@@ -133,7 +146,8 @@ class Pipeline:
         except PermanentError as exc:
             # §A2: will never succeed (403/404/410, invalid base64) -> DLQ, no retry.
             return self._dead_letter(
-                canonical_id, msg, key, report, reason=f"{type(exc).__name__}: {exc}"
+                canonical_id, msg, key, report, reason=f"{type(exc).__name__}: {exc}",
+                attempts=attempts, error_class=type(exc).__name__,
             )
         except AuthError as exc:
             # §A2: 401 -> force ONE refresh and retry the body exactly once; not the loop.
@@ -200,6 +214,7 @@ class Pipeline:
                     f"(original: {type(exc).__name__}: {exc}): "
                     f"{type(retry_exc).__name__}: {retry_exc}"
                 ),
+                attempts=1, error_class=type(exc).__name__,
             )
 
     def _retry_or_dead_letter(
@@ -208,7 +223,8 @@ class Pipeline:
     ) -> Disposition | None:
         if attempts >= self.config.max_attempts:
             return self._dead_letter(
-                canonical_id, msg, key, report, reason=f"{type(exc).__name__}: {exc}"
+                canonical_id, msg, key, report, reason=f"{type(exc).__name__}: {exc}",
+                attempts=attempts, error_class=type(exc).__name__,
             )
         # free the claim so a later run/redelivery retries (§8.2 lease semantics).
         self.dedupe_store.release(key)
@@ -236,7 +252,8 @@ class Pipeline:
         return email
 
     def _dead_letter(
-        self, canonical_id: str, msg: RawMessage, key: str, report: RunReport, *, reason: str
+        self, canonical_id: str, msg: RawMessage, key: str, report: RunReport, *,
+        reason: str, attempts: int = 0, error_class: str = "",
     ) -> Disposition:
         self.dlq_emitter.emit(  # DLQ is just another Emitter sink in the core spine
             EmailEvent(
@@ -252,7 +269,39 @@ class Pipeline:
                        provider_message_id=msg.provider_message_id)
         )
         report.record(self._trace(canonical_id, msg, Disposition.dead_lettered, "dlq", reason=reason))
+        # ADDITIVE: durable, replayable record. Does NOT touch any counter.
+        if self.dlq_store is not None:
+            self.dlq_store.put(
+                self._dead_letter_record(
+                    canonical_id, msg, key,
+                    reason=reason, attempts=attempts, error_class=error_class,
+                )
+            )
         return Disposition.dead_lettered
+
+    def _dead_letter_record(
+        self, canonical_id: str, msg: RawMessage, key: str, *,
+        reason: str, attempts: int, error_class: str,
+    ) -> DeadLetterRecord:
+        return DeadLetterRecord(
+            record_id=key,  # = idempotency_key; re-dead-letter overwrites
+            tenant=self.config.tenant,
+            provider=msg.provider,
+            provider_message_id=msg.provider_message_id,
+            mailbox=msg.stream.mailbox,
+            folder=msg.stream.folder,
+            canonical_id=canonical_id,
+            reason=reason,
+            error_class=error_class,
+            attempts=attempts,
+            size_bytes=msg.size_bytes,
+            thread_key=msg.thread_key,
+            cursor_value=msg.cursor.value,
+            cursor_order=msg.cursor.order,
+            received_at=msg.received_at,
+            dead_lettered_at=datetime.now(timezone.utc),
+            raw_b64=base64.b64encode(msg.raw_bytes).decode("ascii") if msg.raw_bytes else "",
+        )
 
     def _stub_email(self, canonical_id: str, msg: RawMessage) -> CleanEmail:
         return CleanEmail(
