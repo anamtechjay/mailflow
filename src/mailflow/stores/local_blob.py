@@ -15,6 +15,8 @@ class LocalBlobStore:
 
     def put_stream(self, ref: str, chunks: Iterator[bytes], content_type: str) -> str:
         path = os.path.join(self.directory, ref)
+        if os.path.exists(path):
+            return ref  # content-addressed dedupe: identical bytes already stored, skip
         with open(path, "wb") as f:
             for chunk in chunks:
                 f.write(chunk)

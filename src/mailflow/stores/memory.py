@@ -93,6 +93,8 @@ class InMemoryBlobStore:
     _blobs: dict[str, bytes] = field(default_factory=dict)
 
     def put_stream(self, ref: str, chunks: Iterator[bytes], content_type: str) -> str:
+        if ref in self._blobs:
+            return ref  # content-addressed dedupe: identical bytes already stored, skip
         self._blobs[ref] = b"".join(chunks)
         return ref
 
