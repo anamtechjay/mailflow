@@ -57,8 +57,6 @@ class _RedriveProvider:
     """A one-shot MailboxProvider that re-yields exactly the rebuilt RawMessages
     (preserving cursor + thread_key, which MemoryProvider/SeedEmail would lose)."""
 
-    PROVIDER = "redrive"
-
     def __init__(self, messages: list[RawMessage]) -> None:
         self._by_stream: dict[StreamRef, list[RawMessage]] = {}
         for msg in messages:
@@ -79,6 +77,9 @@ class _RedriveProvider:
 
 
 def _accumulate(into: RunReport, part: RunReport) -> None:
+    # NOTE: keep this field list in sync with RunReport. Merging two already-finalized
+    # reports is safe — the frozen "only add_dead_letter increments" rule isn't violated
+    # because both inputs are final counts, not live increments.
     into.fetched += part.fetched
     into.emitted += part.emitted
     into.dropped += part.dropped
