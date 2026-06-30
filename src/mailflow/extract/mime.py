@@ -178,7 +178,10 @@ class MimeExtractor:
                     is_inline=bool(is_inline_media and not is_attachment),
                 )
                 # Safety seam: allowlist first, then the scanner hook. Runs BEFORE any
-                # blob is persisted; a block fails closed -> DLQ.
+                # blob is persisted; a block fails closed -> DLQ. NOTE: this block sits
+                # under `is_attachment or is_inline_media`, so it intentionally governs
+                # inline media (logos, tracking pixels) too — one blocked part DLQs the
+                # whole message (a non-empty allowlist must include expected inline types).
                 result = check_allowlist(meta, self.allowlist)
                 if result.verdict is ScanVerdict.allow:
                     result = self.scanner.scan(meta)

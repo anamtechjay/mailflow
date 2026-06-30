@@ -75,3 +75,15 @@ The suite is **faithful to the Phase-1 plan and not under-delivering against its
 Of 15 raw findings: **2 are true Phase-1 gaps (C1, I5)**, the rest are deferred-by-design or
 test-rigor upgrades the plan never asked for, and 1 (I4) was withdrawn. Recommended order if we
 act: **C1 → I5**, then the hardening sweep (C3, I1–I3, S2/S3/S6) as a Plan-2 warm-up.
+
+---
+
+## Review 2026-06-30 — Attachment safety seam (Task 2)
+
+Reviewer: code review of the just-landed attachment safety seam. Outcome: behaviour is correct as
+designed; one correct-but-undocumented footgun captured below. Documentation-only follow-up — no
+behaviour change (docstrings + this entry).
+
+| ID | Sev | Finding | Evidence | Scope verdict |
+|----|-----|---------|----------|---------------|
+| **A1** | 🟡 Low/Medium | The allowlist/scanner safety check governs BOTH real attachments AND inline media (logos, tracking pixels, CID images) — it sits under `is_attachment or is_inline_media`. Because a single blocked part raises and fails the WHOLE message (fail-closed quarantine → DLQ), an allowlist scoped to attachment types (e.g. `{"application/pdf"}`) would also block an inline `image/png` logo and dead-letter otherwise-normal mail. By design (the plan scoped inline-in); only triggers when an operator enables a **non-empty** allowlist (V1 default empty allowlist + no-op scanner = allow-all, so default behaviour is unaffected). Documented in the `safety.py` module docstring + a `mime.py` inline comment. | `src/mailflow/extract/mime.py` safety block (`_walk_body`, the `if is_attachment or is_inline_media:` branch, allowlist/scan check); `src/mailflow/extract/safety.py` (`check_allowlist` + module docstring) | **Documented design caveat** — deferred decision: whether inline media should be exempt from the attachment allowlist or governed by a separate one (P2/follow-up). |

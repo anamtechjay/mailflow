@@ -168,6 +168,11 @@ class TokenRotationSink(Protocol):
 @runtime_checkable
 class AttachmentScanner(Protocol):
     """Safety hook run on each attachment BEFORE its bytes are persisted. The V1
-    default is a no-op (allow-all); a real AV/CDR scanner is a P2 concern."""
+    default is a no-op (allow-all); a real AV/CDR scanner is a P2 concern.
+
+    NOTE — V1 seam limitation: `scan` receives attachment METADATA only
+    (filename / content_type / size_bytes / content_hash), NOT the raw bytes. A
+    real AV/CDR scanner that needs the content is a P2 concern that may evolve
+    this provisional signature (e.g. to accept a bytes-stream accessor)."""
 
     def scan(self, attachment: Attachment) -> ScanResult: ...

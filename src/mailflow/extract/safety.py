@@ -2,7 +2,21 @@
 content-type/extension allowlist, run on each attachment BEFORE its bytes are
 persisted. V1 ships the SLOT with a no-op scanner and an empty (allow-all)
 allowlist; a real AV/CDR scanner is a P2 concern. A blocked attachment fails
-closed: the message is dead-lettered (PermanentError -> DLQ)."""
+closed: the message is dead-lettered (PermanentError -> DLQ).
+
+Scope + footgun (read before enabling an allowlist):
+- The allowlist/scanner apply to BOTH real attachments AND inline media (logos,
+  tracking pixels, CID-referenced images) — the MIME walker runs this check on
+  every non-body part, not just disposition=attachment parts.
+- A SINGLE blocked part fails the ENTIRE message: it raises and the whole message
+  is quarantined (fail-closed -> DLQ). One blocked part dead-letters otherwise
+  normal mail; it is not dropped per-part.
+- The V1 default is an empty allowlist + no-op scanner == allow-all, so default
+  behaviour is UNAFFECTED (nothing is ever blocked).
+- Operators who enable a non-empty allowlist MUST include the inline media types
+  they expect in normal mail (e.g. `image/png`, `image/jpeg` for logos); an
+  allowlist scoped only to attachment types (e.g. `{"application/pdf"}`) will
+  block an inline `image/png` logo and dead-letter ordinary messages."""
 
 from __future__ import annotations
 
