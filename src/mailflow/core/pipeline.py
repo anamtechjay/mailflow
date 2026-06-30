@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel
 
-from mailflow.core.errors import AuthError, PermanentError, TransientError
+from mailflow.core.errors import AuthError, ConfigError, PermanentError, TransientError
 from mailflow.core.events import SCHEMA_VERSION, EmailEvent
 from mailflow.core.filtering import FilterContext
 from mailflow.core.identity import derive_canonical_id, idempotency_key
@@ -43,6 +43,7 @@ from mailflow.core.ports import (
     DedupeStore,
     Emitter,
     EnvelopeParser,
+    Filter,
     MailboxProvider,
 )
 from mailflow.extract.mime import MimeExtractor
@@ -55,6 +56,21 @@ class PipelineConfig(BaseModel):
     max_attempts: int = 3
     claim_lease_seconds: int = 300
     done_ttl_seconds: int = 60 * 60 * 24 * 60  # 60 days (spec §11 dedupe ttl)
+
+
+def _assert_port(component: object, port: type, role: str) -> None:
+    """Fail fast if `component` does not structurally satisfy `port` (A-port check).
+    runtime_checkable isinstance only verifies method-name presence — cheap, and run
+    once at construction. mypy strict is the real conformance gate; this catches the
+    injection seams (overrides=, connect(), hand-built pipelines) mypy can't see."""
+    if isinstance(component, port):
+        return
+    attrs: frozenset[str] = getattr(port, "__protocol_attrs__", frozenset())
+    missing = sorted(a for a in attrs if not hasattr(component, a))
+    raise ConfigError(
+        f"{role} component {type(component).__name__!r} does not satisfy the "
+        f"{port.__name__} port (missing: {missing or 'unknown'})"
+    )
 
 
 class Pipeline:
@@ -76,6 +92,21 @@ class Pipeline:
         auth_refresher: AuthRefresher | None = None,
         dlq_store: DeadLetterStore | None = None,
     ) -> None:
+        _assert_port(provider, MailboxProvider, "provider")
+        _assert_port(parser, EnvelopeParser, "parser")
+        for _f in filters.filters:
+            _assert_port(_f, Filter, "filter")
+        if not isinstance(extractor, (ContentExtractor, MimeExtractor)):
+            _assert_port(extractor, ContentExtractor, "extractor")
+        _assert_port(emitter, Emitter, "emitter")
+        _assert_port(dlq_emitter, Emitter, "dlq_emitter")
+        _assert_port(cursor_store, CursorStore, "cursor_store")
+        _assert_port(dedupe_store, DedupeStore, "dedupe_store")
+        _assert_port(blob_store, BlobStore, "blob_store")
+        if classifier is not None:
+            _assert_port(classifier, Classifier, "classifier")
+        if cleaner is not None:
+            _assert_port(cleaner, ContentCleaner, "cleaner")
         self.provider = provider
         self.parser = parser
         self.filters = filters
