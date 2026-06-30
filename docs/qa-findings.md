@@ -50,7 +50,7 @@ calls these out so the gaps are deliberate, not accidental.
 | ID | Finding | Where it lands |
 |----|---------|----------------|
 | **C2** | Concurrency / same-key dedupe race (two claimants, one emits). The in-memory store is, verbatim, a *"Single-process in-memory model"* that *"does not simulate lease expiry"* — you can't meaningfully test a concurrency invariant against a single-process dict. Phase-1's bar is `test_dedupe_claim_is_exclusive` (sequential), which is correct. | **Plan 2** — Firestore/Redis adapter, where real claim races and lease expiry exist. |
-| **S4** | `security.read_allowlist` enforcement is not asserted. The config field round-trips now; enforcement is *"inside provider adapters in Plan 2."* | **Plan 2** — provider adapters. |
+| **S4** | ~~`security.read_allowlist` enforcement is not asserted. The config field round-trips now; enforcement is *"inside provider adapters in Plan 2."*~~ **Withdrawn (field deleted in Phase 1, config-hardening Task 3):** its "fail-closed / empty = read nothing" semantics were inverted from real behavior (default `[]` read everything = fake security), enforcement was deferred to Plan 2, and sender/domain allowlisting is already covered by OnlySender/OnlyDomain/Whitelist filters. Plan 2 reintroduces an enforced version at the point it is applied. | **Plan 2** — provider adapters. |
 | — | Attachment streaming, LLM classifier hardening, webhooks/heartbeats/canary/resync, Pub/Sub ordering, plugin allowlist. | **Plans 2 & 4** (see scope note). |
 
 ### Withdrawn on review

@@ -11,7 +11,7 @@ supplies the client secret + refresh token via the SecretProvider; nothing hardc
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, Protocol
 
 from mailflow.adapters.gmail.bootstrap import bootstrap_watches, renew_watches, sweep_once
 from mailflow.adapters.gmail.client import GmailClient
@@ -20,6 +20,7 @@ from mailflow.adapters.gmail.config import GmailConfig, PubSubConfig
 from mailflow.adapters.gmail.runtime import GmailPubSubRuntime
 from mailflow.adapters.gmail.scheduler import IntervalScheduler
 from mailflow.adapters.gmail.watch import GmailWatchManager, WatchHandle
+from mailflow.core.errors import AuthError
 from mailflow.core.ports import (
     BlobStore,
     ContentCleaner,
@@ -33,6 +34,18 @@ from mailflow.core.ports import (
 )
 
 MessageCallback = Callable[[Any], None]
+
+
+class _ScopeVerifiable(Protocol):
+    def verify_scopes(self, required: list[str]) -> None: ...
+
+
+def verify_oauth_scopes(
+    token_provider: _ScopeVerifiable, required: list[str], *, enabled: bool
+) -> None:
+    """Run the startup scope check when enabled (SecurityConfig.verify_scope_on_startup)."""
+    if enabled:
+        token_provider.verify_scopes(required)
 
 
 class OAuthTokenProvider:
@@ -95,6 +108,28 @@ class OAuthTokenProvider:
         look locally-valid but be server-rejected, so this ignores `.valid`. Honors the
         same A8 rotation-sink path as `get_token`."""
         self._refresh_and_maybe_rotate()
+
+    def verify_scopes(self, required: list[str]) -> None:
+        """A9/§9: fail fast if the granted OAuth scopes do not cover `required`.
+        Forces a token refresh (so google-auth populates granted_scopes), then checks
+        the granted set. Falls back to the requested scopes only when the provider does
+        not report granted scopes (older google-auth); a missing required scope raises
+        AuthError so a mis-scoped credential never silently under-delivers mail."""
+        self.get_token()  # forces refresh when the token is not yet valid
+        raw = getattr(self._creds, "granted_scopes", None)
+        granted: set[str]
+        if raw is None:
+            granted = set(getattr(self._creds, "scopes", None) or [])
+        elif isinstance(raw, str):
+            granted = set(raw.split())
+        else:
+            granted = set(raw)
+        missing = [s for s in required if s not in granted]
+        if missing:
+            raise AuthError(
+                f"OAuth token is missing required scope(s) {missing}; "
+                f"granted={sorted(granted)}"
+            )
 
 
 class HttpxTransport:
@@ -160,6 +195,7 @@ def run_service(
     blob_store: BlobStore,
     credentials: Any | None = None,
     start_watch: bool = True,
+    verify_scope: bool = True,
     filters: list[Filter] | None = None,
     rotation_sink: TokenRotationSink | None = None,
     cleaner: ContentCleaner | None = None,
@@ -177,6 +213,8 @@ def run_service(
         rotation_sink=rotation_sink,
         refresh_token_ref=gmail_cfg.oauth_refresh_token_ref,
     )
+    # A9/§9: fail fast on a mis-scoped credential before any watch is registered.
+    verify_oauth_scopes(token_provider, gmail_cfg.scopes, enabled=verify_scope)
     transport = HttpxTransport()
     # one service-level client, reused by the watch manager + the sweep.
     client = GmailClient(

@@ -878,7 +878,6 @@ subscriptions:
   watch_renew_minutes: 720          # 12h, well under the limit
 
 security:
-  read_allowlist: ["ops@example.com", "bids@example.com"]   # fail-closed; empty = read nothing
   verify_scope_on_startup: true
 
 filters:                            # ORDERED list = the chain. Destructive filters default EMPTY.
@@ -947,7 +946,7 @@ decision = FilterChain([WhitelistFilter(domains={"partner.com"}), SubjectFilter(
 ```python
 from mailflow.providers.graph import GraphProvider
 provider = GraphProvider(tenant_id=..., client_id=..., secret_ref="env://GRAPH_SECRET")
-for raw in provider.fetch(stream="ops@example.com:Inbox", cursor=None):  # honors read_allowlist
+for raw in provider.fetch(stream="ops@example.com:Inbox", cursor=None):
     ...
 ```
 

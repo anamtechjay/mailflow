@@ -23,6 +23,7 @@ from __future__ import annotations
 import threading
 from typing import Any, Callable, Iterator, Mapping, TypeVar
 
+from mailflow.config.schema import SecurityConfig
 from mailflow.config.state import resolve_state
 from mailflow.core.models import Attachment, CleanEmail, Envelope, Recipient, StreamRef
 from mailflow.core.observability import HealthReport, health as _health
@@ -51,6 +52,9 @@ OnEmail = Callable[[Any], None]
 FilterSpec = dict[str, Any] | Callable[[Envelope], bool] | Filter
 
 _C = TypeVar("_C", bound=Callable[..., Any])
+
+# Default for connect(verify_scope_on_startup=...), making the schema field load-bearing.
+_DEFAULT_VERIFY_SCOPE = SecurityConfig().verify_scope_on_startup
 
 
 def as_filter(fn: _C) -> _C:
@@ -223,6 +227,7 @@ def connect(
     secret_provider: Any | None = None,
     overrides: Mapping[str, Any] | None = None,
     tenant: str = "default",
+    verify_scope_on_startup: bool = _DEFAULT_VERIFY_SCOPE,
 ) -> Mailflow:
     """Wire a runnable Mailflow for the given provider. `provider` is "memory" | "gmail"
     (graph is wired but not exposed here yet). `filters` is the unified list (spec §3);
@@ -277,6 +282,7 @@ def connect(
             emitter=pipe_emitter, secret_provider=secret_provider or EnvSecretProvider(),
             cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
             filters=chain, cleaner=cleaner, rotation_sink=ov.get("rotation_sink"),
+            verify_scope_on_startup=verify_scope_on_startup,
         )
         fetcher = _build_gmail_fetcher(
             credentials=credentials or {}, mailbox=mailbox,
@@ -349,6 +355,7 @@ def _build_gmail_live(
     filters: list[Filter],
     cleaner: Any = None,
     rotation_sink: Any = None,
+    verify_scope_on_startup: bool = True,
 ) -> Callable[[], None]:
     """Return a blocking callable that runs the live Gmail consume loop. The Gmail SDK is
     imported lazily inside run_service, so importing this module needs no `gmail` extra."""
@@ -374,6 +381,7 @@ def _build_gmail_live(
             secret_provider=secret_provider, emitter=emitter, dlq_emitter=MemoryEmitter(),
             cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
             filters=filters, cleaner=cleaner, rotation_sink=rotation_sink,
+            verify_scope=verify_scope_on_startup,
         )
 
     return live
