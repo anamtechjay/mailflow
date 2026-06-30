@@ -133,4 +133,7 @@ def test_renewal_driver_fires_renew_for_each_handle_through_scheduler() -> None:
         assert fired.wait(2.0) is True                      # the daemon tick ran
     finally:
         sched.stop()
-    assert watch_manager.renewed == ["a@x.com", "b@x.com"]  # both mailboxes re-watched on a tick
+    # both mailboxes re-watched on a tick. Assert on the first two only: the scheduler
+    # re-arms every 0.01s, so a slow stall before sched.stop() could let a second tick
+    # append more entries — the contract under test is "one tick renews every handle in order".
+    assert watch_manager.renewed[:2] == ["a@x.com", "b@x.com"]
