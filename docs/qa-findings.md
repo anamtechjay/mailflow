@@ -87,3 +87,18 @@ behaviour change (docstrings + this entry).
 | ID | Sev | Finding | Evidence | Scope verdict |
 |----|-----|---------|----------|---------------|
 | **A1** | 🟡 Low/Medium | The allowlist/scanner safety check governs BOTH real attachments AND inline media (logos, tracking pixels, CID images) — it sits under `is_attachment or is_inline_media`. Because a single blocked part raises and fails the WHOLE message (fail-closed quarantine → DLQ), an allowlist scoped to attachment types (e.g. `{"application/pdf"}`) would also block an inline `image/png` logo and dead-letter otherwise-normal mail. By design (the plan scoped inline-in); only triggers when an operator enables a **non-empty** allowlist (V1 default empty allowlist + no-op scanner = allow-all, so default behaviour is unaffected). Documented in the `safety.py` module docstring + a `mime.py` inline comment. | `src/mailflow/extract/mime.py` safety block (`_walk_body`, the `if is_attachment or is_inline_media:` branch, allowlist/scan check); `src/mailflow/extract/safety.py` (`check_allowlist` + module docstring) | **Documented design caveat** — deferred decision: whether inline media should be exempt from the attachment allowlist or governed by a separate one (P2/follow-up). |
+
+---
+
+## Review 2026-06-30 — Attachment Handling holistic
+
+Reviewer: holistic review of the landed attachment-handling feature. Outcome: one behaviour-neutral
+reorder shipped (allowlist-before-decode, commit `97fe433`) + the missing quoted-printable decode
+test; the four findings below are notes/caveats logged for follow-up (no behaviour change here).
+
+| ID | Sev | Finding | Evidence | Scope |
+|----|-----|---------|----------|-------|
+| **A2** | 🟡 | DLQ durable-write amplification: a message under the 50 MB B1 message cap but carrying an over-25MB-per-attachment-cap attachment dead-letters and writes ~40 MB of base64 into the `DeadLetterRecord` (the whole raw message is persisted as `raw_b64`). An attachment just over the per-attachment cap therefore costs a large durable DLQ write. | `core/pipeline.py` `_dead_letter_record` (`raw_b64`); `extract/streaming.py` `MAX_ATTACHMENT_BYTES` | **Deferred** — Plan-2/DLQ hardening (cap or strip the raw bytes persisted on attachment-cap DLQs). |
+| **A3** | 🟢 | Fail-closed malformed-base64 DLQ shift: the new streaming path raises `AttachmentUnreadableError` on slightly-malformed base64 that the legacy lenient decode tolerated, dead-lettering the whole message. | `extract/streaming.py` base64 branch | **Documented design caveat** — on-call should expect DLQs for non-conformant senders; not a code bug. |
+| **A4** | 🟢 | Allowlist not case-normalized: operator-supplied allowlist entries must be lowercase. `check_allowlist` lowercases the attachment's content-type/extension but NOT the allowlist set, so an entry like `"application/PDF"` silently never matches. | `extract/safety.py` `check_allowlist` | **Hardening** — normalize the allowlist on construction or document the lowercase requirement. |
+| **A5** | 🟢 | Redrive cap not threaded: redrive re-runs with `MimeExtractor()`'s default 25 MB cap regardless of the cap that originally DLQ'd the message. | `core/redrive.py` | **Note** — operator-invoked, no auto poison-loop; thread cap config into redrive if/when custom caps are used. |

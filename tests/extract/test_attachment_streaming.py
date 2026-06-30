@@ -77,6 +77,29 @@ def test_iter_decoded_8bit_binary_high_bytes_round_trip() -> None:
     assert digest == hashlib.sha256(body).hexdigest()
 
 
+def test_iter_decoded_quoted_printable_round_trips() -> None:
+    body = b"caf\xc3\xa9 = espresso\r\nsecond line"  # utf-8 'café' + an '=' to force QP escapes
+    import quopri
+
+    encoded = quopri.encodestring(body)
+    raw = (
+        b"Message-ID: <qp.1@example.com>\r\n"
+        b"From: alice@partner.com\r\n"
+        b"To: ops@acme.com\r\n"
+        b"Subject: qp\r\n"
+        b"Content-Type: application/octet-stream\r\n"
+        b'Content-Disposition: attachment; filename="x.txt"\r\n'
+        b"Content-Transfer-Encoding: quoted-printable\r\n"
+        b"\r\n"
+    ) + encoded
+    parsed = message_from_bytes(raw, policy=default_policy)
+    assert isinstance(parsed, EmailMessage)
+    part = next(p for p in parsed.walk() if p.get_filename() == "x.txt")
+    assert b"".join(iter_decoded(part)) == body
+    digest, size = digest_and_size(part, cap=10_000_000)
+    assert size == len(body) and digest == hashlib.sha256(body).hexdigest()
+
+
 def test_invalid_base64_is_unreadable_fail_closed() -> None:
     raw = (
         b"Message-ID: <bad.1@example.com>\r\n"
