@@ -20,6 +20,7 @@ from mailflow.core.models import (
     StreamRef,
     WebhookIdentity,
 )
+from mailflow.core.observability import DeadLetterRecord
 
 # V1 runs synchronously — one message at a time, no internal concurrency. A future
 # async family is an *additive* set of ports, never a breaking change to these (A11).
@@ -123,6 +124,18 @@ class SecretProvider(Protocol):
 class BlobStore(Protocol):
     def put_stream(self, ref: str, chunks: Iterator[bytes], content_type: str) -> str: ...
     def open(self, ref: str) -> Iterator[bytes]: ...
+
+
+@stable
+@runtime_checkable
+class DeadLetterStore(Protocol):
+    """Durable, replayable dead-letter records (A2 redrive). Separate from the
+    fire-and-forget `dlq_emitter` sink: this one is queryable + deletable so an operator
+    can redrive after fixing the root cause."""
+
+    def put(self, record: DeadLetterRecord) -> None: ...
+    def list_pending(self, *, limit: int | None = None) -> list[DeadLetterRecord]: ...
+    def delete(self, record_id: str) -> None: ...
 
 
 @provisional

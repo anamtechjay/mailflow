@@ -4,8 +4,11 @@ dropped?"."""
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
+from mailflow.core.events import SCHEMA_VERSION
 from mailflow.core.models import Disposition
 
 
@@ -24,6 +27,34 @@ class DeadLetter(BaseModel):
     canonical_id: str
     reason: str
     provider_message_id: str
+
+
+class DeadLetterRecord(BaseModel):
+    """A durable, replayable dead-letter: everything needed to rebuild the original
+    RawMessage and re-submit it through the pipeline once the root cause is fixed.
+
+    `record_id` is the idempotency_key (tenant, mailbox, provider_message_id), so a
+    re-dead-letter of the same message overwrites rather than duplicates. `raw_b64` is
+    the base64 of the original RFC822 bytes (may be empty if the message had none)."""
+
+    record_id: str
+    tenant: str
+    provider: str
+    provider_message_id: str
+    mailbox: str
+    folder: str | None = None
+    canonical_id: str
+    reason: str
+    error_class: str = ""
+    attempts: int = 0
+    size_bytes: int = 0
+    thread_key: str = ""
+    cursor_value: str = ""
+    cursor_order: int = 0
+    received_at: datetime
+    dead_lettered_at: datetime
+    raw_b64: str = ""
+    schema_version: str = SCHEMA_VERSION
 
 
 class RunReport(BaseModel):
