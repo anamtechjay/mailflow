@@ -263,13 +263,10 @@ class Pipeline:
                 email=self._stub_email(canonical_id, msg),
             )
         )
-        self.dedupe_store.mark_done(key, self.config.done_ttl_seconds)
-        report.add_dead_letter(
-            DeadLetter(canonical_id=canonical_id, reason=reason,
-                       provider_message_id=msg.provider_message_id)
-        )
-        report.record(self._trace(canonical_id, msg, Disposition.dead_lettered, "dlq", reason=reason))
-        # ADDITIVE: durable, replayable record. Does NOT touch any counter.
+        # ADDITIVE: durable, replayable record. Does NOT touch any counter. Runs BEFORE the
+        # irreversible mark_done so a store failure is recoverable: if put() raises, we abort
+        # before the message is claimed-as-done, it stays reclaimable, and a later run
+        # re-dead-letters it (put is idempotent by record_id, so no duplication).
         if self.dlq_store is not None:
             self.dlq_store.put(
                 self._dead_letter_record(
@@ -277,6 +274,12 @@ class Pipeline:
                     reason=reason, attempts=attempts, error_class=error_class,
                 )
             )
+        self.dedupe_store.mark_done(key, self.config.done_ttl_seconds)
+        report.add_dead_letter(
+            DeadLetter(canonical_id=canonical_id, reason=reason,
+                       provider_message_id=msg.provider_message_id)
+        )
+        report.record(self._trace(canonical_id, msg, Disposition.dead_lettered, "dlq", reason=reason))
         return Disposition.dead_lettered
 
     def _dead_letter_record(
