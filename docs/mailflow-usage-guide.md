@@ -382,5 +382,5 @@ connect("gmail", mailbox=..., credentials={...},
 
 ---
 
-*One contract: `CleanEmail` at `SCHEMA_VERSION = "1.0"`. Same object from Gmail or Outlook —
+*One contract: `CleanEmail` at `SCHEMA_VERSION = "1.2"`. Same object from Gmail or Outlook —
 write your app once.*

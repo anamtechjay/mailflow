@@ -109,11 +109,11 @@ Gmail. Both are required.
 
 ## 6. What the application receives — the `CleanEmail`
 
-One consistent JSON object per email (`schema_version: "1.0"`):
+One consistent JSON object per email (`schema_version: "1.2"`):
 
 ```json
 {
-  "schema_version": "1.0", "tenant": "me", "ordering_key": "ops@…",
+  "schema_version": "1.2", "tenant": "me", "ordering_key": "ops@…",
   "email": {
     "canonical_id": "<…@mail.gmail.com>", "message_id": "<…>",
     "in_reply_to": "<parent@…>", "references": ["<root@…>", "<…>"],
@@ -125,7 +125,7 @@ One consistent JSON object per email (`schema_version: "1.0"`):
                      "size_bytes": 84213, "content_hash": "sha256…",
                      "is_inline": false, "storage_ref": "sha256…"}],
     "labels": [], "categories": [], "folder": "",
-    "message_size_bytes": 7610, "schema_version": "1.0"
+    "message_size_bytes": 7610, "schema_version": "1.2"
   }
 }
 ```

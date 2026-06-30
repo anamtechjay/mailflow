@@ -425,7 +425,7 @@ feeds the provider via the transport.
 | `raw_headers` | `internetMessageHeaders[]` → `{lower(name): [values]}` | ⚠️ may be truncated by Graph |
 | `message_size_bytes` | Σ attachment `size` (+ body) or `PidTagMessageSize` | no `size` on v1.0 message (§H) |
 | `relevance` / `matched_filter` | set by pipeline, not the adapter | |
-| `schema_version` | `"1.0"` | |
+| `schema_version` | `"1.2"` | |
 
 ---
 
