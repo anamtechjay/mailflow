@@ -73,18 +73,27 @@ class OAuthTokenProvider:
         request_cls: Any = Request
         return request_cls()
 
+    def _refresh_and_maybe_rotate(self) -> None:
+        before = getattr(self._creds, "refresh_token", None)
+        self._creds.refresh(self._new_request())
+        after = getattr(self._creds, "refresh_token", None)
+        if (
+            self._rotation_sink is not None
+            and after is not None
+            and after != before
+        ):
+            self._rotation_sink.on_refresh(self._refresh_token_ref, str(after))
+
     def get_token(self) -> str:
         if not self._creds.valid:
-            before = getattr(self._creds, "refresh_token", None)
-            self._creds.refresh(self._new_request())
-            after = getattr(self._creds, "refresh_token", None)
-            if (
-                self._rotation_sink is not None
-                and after is not None
-                and after != before
-            ):
-                self._rotation_sink.on_refresh(self._refresh_token_ref, str(after))
+            self._refresh_and_maybe_rotate()
         return str(self._creds.token)
+
+    def force_refresh(self) -> None:
+        """A2: unconditionally re-mint the access token after a 401. The cached token may
+        look locally-valid but be server-rejected, so this ignores `.valid`. Honors the
+        same A8 rotation-sink path as `get_token`."""
+        self._refresh_and_maybe_rotate()
 
 
 class HttpxTransport:

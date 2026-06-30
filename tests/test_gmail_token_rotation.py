@@ -62,3 +62,20 @@ def test_no_rotation_does_not_call_sink() -> None:
 
 def test_run_service_exposes_rotation_sink_param() -> None:
     assert "rotation_sink" in inspect.signature(run_service).parameters
+
+
+def test_force_refresh_remints_and_rotates() -> None:
+    creds = _RotatingCreds(refresh_token="old", new_refresh_token="new")
+    sink = _FakeSink()
+    provider = _provider(creds, sink)
+    provider.force_refresh()
+    assert creds.token == "access-token"
+    assert sink.calls == [("secret/refresh", "new")]
+
+
+def test_force_refresh_without_rotation_does_not_call_sink() -> None:
+    creds = _RotatingCreds(refresh_token="old", new_refresh_token=None)
+    sink = _FakeSink()
+    provider = _provider(creds, sink)
+    provider.force_refresh()
+    assert sink.calls == []
