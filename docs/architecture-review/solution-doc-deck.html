@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>mailflow — V1 Deck</title>
+<script src="./mermaid.min.js"></script>
+<style>
+  :root{
+    --bg0:#070b18; --bg1:#0e1430; --bg2:#161d44;
+    --ink:#eef2fb; --muted:#9aa6c8; --faint:#6b779c;
+    --cyan:#3ee8d6; --violet:#a78bfa; --blue:#5b8bff;
+    --panel:#ffffff; --panel-line:#dfe5f1;
+    --ok:#16a34a; --ok-bg:#dcfce7; --ok-ink:#14532d;
+    --partial:#d97706; --partial-bg:#fef3c7; --partial-ink:#7c2d12;
+    --miss:#dc2626; --miss-bg:#fee2e2; --miss-ink:#7f1d1d;
+    --defer:#475569; --defer-bg:#e2e8f0; --defer-ink:#334155;
+    --mono:"SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:radial-gradient(1200px 800px at 18% -10%, #1b2455 0%, transparent 55%),
+               radial-gradient(1000px 700px at 100% 0%, #2a1c4d 0%, transparent 50%),
+               linear-gradient(160deg, var(--bg0), var(--bg1) 60%, var(--bg2));
+    color:var(--ink);
+    font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    overflow:hidden;
+  }
+  code,.mono{font-family:var(--mono)}
+
+  /* ---------- progress bar ---------- */
+  #progress{position:fixed;top:0;left:0;height:4px;width:0;z-index:50;
+    background:linear-gradient(90deg,var(--cyan),var(--violet));
+    box-shadow:0 0 16px rgba(62,232,214,.5);transition:width .35s ease}
+
+  /* ---------- deck / slides ---------- */
+  #deck{position:fixed;inset:0}
+  .slide{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;justify-content:center;
+    padding:64px 7vw 92px;
+    opacity:0;visibility:hidden;pointer-events:none;
+    transform:translateY(14px);
+    transition:opacity .45s ease, transform .45s ease, visibility 0s linear .45s;
+  }
+  .slide.active{opacity:1;visibility:visible;pointer-events:auto;transform:none;
+    transition:opacity .5s ease, transform .5s ease, visibility 0s;}
+  .slide.prev{transform:translateY(-14px)}
+
+  .kicker{font:700 13px var(--mono);letter-spacing:.22em;text-transform:uppercase;
+    color:var(--cyan);margin:0 0 14px}
+  h1{font-size:clamp(40px,7vw,86px);line-height:1.02;letter-spacing:-.03em;margin:0;font-weight:800}
+  h1 .dot{color:var(--cyan)}
+  h2{font-size:clamp(28px,4.4vw,52px);line-height:1.08;letter-spacing:-.02em;margin:0 0 6px;font-weight:800}
+  h3{font-size:clamp(20px,2.6vw,30px);margin:0 0 4px;font-weight:700}
+  .lede{font-size:clamp(18px,2.3vw,26px);color:var(--muted);max-width:60ch;font-weight:400}
+  .sub{color:var(--faint);font-size:clamp(14px,1.6vw,18px);font-style:italic;margin:.3em 0 0}
+  p{margin:.5em 0}
+
+  .accent{color:var(--cyan)}
+  .accent2{color:var(--violet)}
+  b,strong{color:#fff}
+
+  /* slide-head pattern for stage slides */
+  .shead{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:6px}
+
+  /* bullet rows */
+  ul.points{list-style:none;margin:22px 0 0;padding:0;max-width:74ch}
+  ul.points li{position:relative;padding:10px 0 10px 30px;font-size:clamp(16px,1.9vw,21px);
+    border-bottom:1px solid rgba(255,255,255,.07)}
+  ul.points li:last-child{border-bottom:none}
+  ul.points li::before{content:"";position:absolute;left:0;top:19px;width:11px;height:11px;
+    border-radius:3px;background:linear-gradient(135deg,var(--cyan),var(--violet))}
+  ul.points li .k{display:inline-block;min-width:128px;color:var(--violet);font-weight:700;
+    font-size:.82em;text-transform:uppercase;letter-spacing:.04em}
+
+  /* key/value grid for stage slides */
+  .kv{margin:20px 0 0;max-width:80ch}
+  .kv .row{display:grid;grid-template-columns:150px 1fr;gap:8px 20px;
+    padding:11px 0;border-top:1px solid rgba(255,255,255,.08);font-size:clamp(15px,1.7vw,19px)}
+  .kv .row:first-child{border-top:none}
+  .kv .row .k{color:var(--cyan);font:700 12.5px var(--mono);letter-spacing:.05em;
+    text-transform:uppercase;padding-top:3px}
+
+  code{font-family:var(--mono);font-size:.86em;background:rgba(122,162,255,.16);
+    color:#bcd0ff;padding:1px 7px;border-radius:6px}
+
+  /* ---------- chips & id pills ---------- */
+  .chip{display:inline-block;font:800 12.5px/1 inherit;padding:6px 12px;border-radius:999px;
+    white-space:nowrap;vertical-align:middle}
+  .c-ok{background:var(--ok-bg);color:var(--ok-ink)}
+  .c-partial{background:var(--partial-bg);color:var(--partial-ink)}
+  .c-miss{background:var(--miss-bg);color:var(--miss-ink)}
+  .c-defer{background:var(--defer-bg);color:var(--defer-ink)}
+  .id{display:inline-block;font:800 13px var(--mono);letter-spacing:.04em;
+    background:rgba(167,139,250,.18);color:#cbb8ff;border:1px solid rgba(167,139,250,.4);
+    padding:4px 9px;border-radius:7px}
+
+  /* ---------- diagram panel ---------- */
+  .diagram{background:var(--panel);border:1px solid var(--panel-line);border-radius:16px;
+    padding:20px 22px;box-shadow:0 24px 60px rgba(0,0,0,.45);width:100%;overflow:auto}
+  .diagram.center{margin:0 auto;max-width:1180px}
+  .diagram .cap{font-size:13px;color:#64748b;text-align:center;margin:0 0 12px}
+  .mermaid{display:flex;justify-content:center}
+
+  /* ---------- KPI strip ---------- */
+  .kpis{display:flex;flex-wrap:wrap;gap:16px;margin-top:34px}
+  .kpi{flex:1 1 160px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
+    border-radius:14px;padding:16px 18px;backdrop-filter:blur(4px)}
+  .kpi b{display:block;font-size:clamp(20px,2.4vw,28px);letter-spacing:-.01em;color:#fff}
+  .kpi span{font-size:13px;color:var(--muted)}
+
+  /* ---------- roadmap tiers ---------- */
+  .tiers{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:24px;max-width:1100px}
+  .tier{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
+    border-radius:14px;padding:16px 18px}
+  .tier .t{font:800 14px var(--mono);letter-spacing:.05em;margin-bottom:6px}
+  .tier.p0 .t{color:var(--cyan)} .tier.p1 .t{color:var(--violet)}
+  .tier.p2 .t{color:var(--blue)} .tier.p3 .t{color:var(--faint)}
+  .tier p{font-size:14.5px;color:var(--muted);margin:0}
+
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13.5px;color:var(--muted);margin-top:26px}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+
+  .note{border-left:3px solid var(--cyan);background:rgba(62,232,214,.08);
+    padding:14px 18px;border-radius:0 12px 12px 0;margin-top:24px;max-width:78ch;
+    font-size:clamp(15px,1.7vw,18px);color:#d7def0}
+
+  .footline{position:absolute;left:7vw;bottom:34px;color:var(--faint);font:600 13px var(--mono);
+    letter-spacing:.04em}
+
+  /* ---------- controls ---------- */
+  #ctrl{position:fixed;right:24px;bottom:22px;z-index:40;display:flex;align-items:center;gap:10px}
+  .btn{appearance:none;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);
+    color:var(--ink);width:46px;height:46px;border-radius:12px;font-size:20px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;transition:.18s}
+  .btn:hover{background:rgba(255,255,255,.16);border-color:var(--cyan)}
+  .btn:active{transform:scale(.94)}
+  #counter{font:700 14px var(--mono);color:var(--muted);min-width:62px;text-align:center}
+  #hint{position:fixed;left:24px;bottom:26px;z-index:40;color:var(--faint);font:600 12.5px var(--mono);
+    letter-spacing:.03em}
+  .brandmark{position:fixed;left:7vw;top:30px;z-index:30;font:800 16px/1 inherit;
+    letter-spacing:-.01em;color:#fff;opacity:.85}
+  .brandmark .dot{color:var(--cyan)}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div class="brandmark">mail<span class="dot">flow</span></div>
+
+<div id="deck">
+
+  <!-- 1 — TITLE -->
+  <section class="slide">
+    <p class="kicker">Solution Overview · V1 · 2026-06-29</p>
+    <h1>mail<span class="dot">flow</span></h1>
+    <p class="lede" style="margin-top:22px">An automated mailroom for software — it watches an inbox and turns every new email into a clean, de-duplicatable structured event your app can trust.</p>
+    <div class="kpis">
+      <div class="kpi"><b>Gmail</b><span>live provider in V1</span></div>
+      <div class="kpi"><b>Poll-authoritative</b><span>push only <i>wakes</i> the poller</span></div>
+      <div class="kpi"><b>Single-tenant</b><span>one worker, synchronous</span></div>
+      <div class="kpi"><b>At-least-once</b><span>dedupe via idempotency_key</span></div>
+    </div>
+    <div class="footline">A reusable library · ports &amp; adapters · contracts frozen before 1.0</div>
+  </section>
+
+  <!-- 2 — WHAT IS IT -->
+  <section class="slide">
+    <p class="kicker">The 30-second frame</p>
+    <h2>What is mailflow?</h2>
+    <p class="lede" style="margin-top:14px">A library other programs plug into. On every new email it <b class="accent">fetches → cleans → emits</b> a tidy structured record — handling auth, throttling, duplicates and broken mail for you.</p>
+    <div class="note">
+      <b>Mental model — an automated mailroom.</b> A letter arrives → the clerk is pinged → the clerk fetches the letter using a <i>bookmark</i> (never the ping) → opens it, pulls out the useful parts, discards junk → hands a summary card to the department that asked. Everything that follows is how that mailroom is built.
+    </div>
+    <ul class="points">
+      <li><span class="k">Watches</span> a live inbox (Gmail in V1) for new mail</li>
+      <li><span class="k">Produces</span> a clean <code>EmailEvent</code> — sender, subject, plain-text body, thread key, fingerprint</li>
+      <li><span class="k">Promises</span> stable <i>contracts</i> so consumers build against it without fear of breakage</li>
+    </ul>
+  </section>
+
+  <!-- 3 — THE JOURNEY -->
+  <section class="slide">
+    <p class="kicker">The journey</p>
+    <h2 style="margin-bottom:14px">The path every email takes</h2>
+    <div class="diagram center">
+      <div class="cap">Each step maps to a slide that follows — feature IDs in parentheses.</div>
+      <pre class="mermaid">
+flowchart LR
+    A["📨 Inbox<br/>Gmail"] -->|"push ping (Pub/Sub)"| B{"Ping<br/>genuine? (A5)"}
+    B -->|forged| X["🗑️ Reject"]
+    B -->|genuine| C["Wake → poll<br/>from cursor (A1/A3)"]
+    C --> D["Fetch changed<br/>page-atomic (B6)"]
+    D --> E{"Size OK? (B1)"}
+    E -->|"unknown / too big"| DLQ[("Problem pile<br/>DLQ (B2/B3)")]
+    E -->|ok| F["Extract fields<br/>+ thread_key (A7)"]
+    F --> G["Clean<br/>HTML→text (A6/B5)"]
+    G --> H["Filters (A10)"]
+    H --> I["Emit EmailEvent<br/>+ idempotency_key (A4)"]
+    I --> J["🎯 Consumer<br/>(your app)"]
+    classDef dlq fill:#fee2e2,stroke:#b91c1c,color:#000
+    classDef ok fill:#dcfce7,stroke:#15803d,color:#000
+    class DLQ dlq
+    class J ok
+      </pre>
+    </div>
+  </section>
+
+  <!-- 4 — ARCHITECTURE -->
+  <section class="slide">
+    <p class="kicker">Architecture</p>
+    <h2 style="margin-bottom:4px">A small core of frozen contracts, surrounded by swappable parts</h2>
+    <p class="sub" style="margin-bottom:14px">The core knows the <i>shape</i> of a provider, a verifier, a cleaner, a store — never a specific vendor.</p>
+    <div class="diagram center" style="max-width:1080px">
+      <pre class="mermaid">
+flowchart TB
+    APP["Your app — the consumer"]
+    subgraph FAC["Library facade — connect() / builder"]
+      F1["overrides= · as_filter · as_cleaner (A10)"]
+    end
+    subgraph CORE["Core — frozen contracts (sync, single-worker)"]
+      PIPE["Pipeline"]
+      P["Ports: MailboxProvider · WebhookVerifier · ContentCleaner<br/>SecretProvider · BlobStore · CursorStore · DedupeStore"]
+      M["Models: CleanEmail · EmailEvent · Envelope<br/>Errors: Auth / Permanent / Transient (A2)"]
+    end
+    subgraph IMPL["Swappable implementations"]
+      GM["Gmail adapter<br/>(live in V1)"]
+      GR["Graph / Outlook<br/>(fast-follow)"]
+      ST["Stores:<br/>memory · sqlite · local blob"]
+    end
+    APP --> FAC --> PIPE
+    PIPE --> P
+    PIPE --> M
+    P -. implemented by .-> GM
+    P -. implemented by .-> GR
+    P -. implemented by .-> ST
+    classDef core fill:#eaf1ff,stroke:#2f6df0,color:#000
+    class CORE core
+      </pre>
+    </div>
+  </section>
+
+  <!-- 5 — STAGE: WAKE & VERIFY -->
+  <section class="slide">
+    <p class="kicker">Pipeline · stage 1</p>
+    <div class="shead"><h2>Wake signal &amp; webhook verification</h2><span class="id">A5</span><span class="chip c-partial">reduced → Gmail OIDC-JWT</span></div>
+    <p class="sub">"A new-mail ping arrived — but is it really from Google, and is it safe to act on?"</p>
+    <div class="kv">
+      <div class="row"><div class="k">Contract</div><div><code>WebhookVerifier</code> port returns <b>identity only</b> (verified subscription / mailbox) — never payload trust.</div></div>
+      <div class="row"><div class="k">V1 impl</div><div>Gmail Pub/Sub <b>OIDC-JWT</b> — signature via JWKS, audience, issuer. (Outlook <code>validationToken</code> handshake deferred.)</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>Push is internet-facing — anyone could forge a ping. A verified ping still only earns a <b class="accent">wake</b>, never "fetch this exact ID."</div></div>
+    </div>
+  </section>
+
+  <!-- 6 — STAGE: FETCH & CURSOR -->
+  <section class="slide">
+    <p class="kicker">Pipeline · stage 2 · the golden rule</p>
+    <div class="shead"><h2>Fetch &amp; cursor</h2><span class="id">A1</span><span class="id">A3</span><span class="id">B6</span><span class="chip c-partial">Gmail compliant</span></div>
+    <p class="sub">"On wake, re-derive what changed from a durable bookmark — never trust the ID inside a ping."</p>
+    <div class="kv">
+      <div class="row"><div class="k">Contract</div><div>Cursor is <b>durable</b>, <b>strictly monotonic</b> (<code>commit_if_ahead</code>), and advances on <i>every</i> terminal disposition. Gmail = <code>historyId</code>; Outlook = <code>deltaLink</code>.</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>Pings can be forged, duplicated, or reordered. The bookmark is the only trustworthy "where I stopped" — a crash resumes exactly there, no gaps, no re-scans.</div></div>
+      <div class="row"><div class="k">V1 status</div><div>Gmail re-derives from <code>historyId</code> and commits one cursor per page (B6 ✓). Outlook wake-rewire is deferred.</div></div>
+    </div>
+  </section>
+
+  <!-- 7 — STAGE: SIZE GUARD -->
+  <section class="slide">
+    <p class="kicker">Pipeline · stage 3</p>
+    <div class="shead"><h2>Size guard — fail closed</h2><span class="id">B1</span><span class="chip c-partial">to fix</span></div>
+    <p class="sub">"If we can't tell how big an email is, assume it's too big and set it aside — before downloading."</p>
+    <div class="kv">
+      <div class="row"><div class="k">Behavior</div><div>Unknown / omitted size ⇒ treat as over-limit ⇒ <b>DLQ before fetch</b>. (Today an unknown size becomes 0 and sneaks under the ceiling — the bug.)</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>"Fail open" on size lets an unbounded payload load into memory and crash the run. The safe default is to <b class="accent">reject, not guess</b>.</div></div>
+    </div>
+  </section>
+
+  <!-- 8 — STAGE: EXTRACT & THREAD -->
+  <section class="slide">
+    <p class="kicker">Pipeline · stage 4</p>
+    <div class="shead"><h2>Extract fields &amp; thread key</h2><span class="id">A7</span><span class="chip c-miss">to build</span></div>
+    <p class="sub">"Open the envelope, pull out sender / subject / body / attachments — and the ID that groups a conversation."</p>
+    <div class="kv">
+      <div class="row"><div class="k">Contract</div><div>New <code>thread_key</code> on <code>CleanEmail</code>; maps Gmail <code>threadId</code> / Outlook <code>conversationId</code>, with a subject-normalized fallback.</div></div>
+      <div class="row"><div class="k">Seam</div><div><code>MimeExtractor.extract_bytes(...)</code> for raw RFC822 (Gmail); other providers implement <code>extract(msg, env)</code> directly (Outlook/Graph).</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>Without a provider-native thread key, consumers can't tie a reply back to its original — conversation grouping breaks.</div></div>
+    </div>
+  </section>
+
+  <!-- 9 — STAGE: CLEAN -->
+  <section class="slide">
+    <p class="kicker">Pipeline · stage 5</p>
+    <div class="shead"><h2>Clean — HTML → text</h2><span class="id">A6</span><span class="id">B5</span><span class="chip c-miss">to build</span></div>
+    <p class="sub">"Turn an email's HTML into readable plain text — gently by default, aggressively only if asked."</p>
+    <div class="kv">
+      <div class="row"><div class="k">Contract</div><div><code>ContentCleaner</code> port (<code>clean(CleanEmail) -&gt; CleanEmail</code>), wired as a <b>real pipeline stage</b> — not a post-emit afterthought.</div></div>
+      <div class="row"><div class="k">Parity (B5)</div><div>A shared HTML→text converter runs in <b>both</b> extractors, so an HTML-only email yields non-empty <code>body_text</code> identically across providers.</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>V1 is plain-text-only (no HTML renderer). If HTML-only mail produced blank text, the product would look empty. This stage is what makes the output usable.</div></div>
+    </div>
+  </section>
+
+  <!-- 10 — STAGE: EMIT & IDEMPOTENCY -->
+  <section class="slide">
+    <p class="kicker">Pipeline · stage 6</p>
+    <div class="shead"><h2>Emit event &amp; idempotency</h2><span class="id">A4</span><span class="chip c-partial">key not yet on wire</span></div>
+    <p class="sub">"Hand the consumer a clean event stamped with a fingerprint so they can spot duplicates."</p>
+    <div class="kv">
+      <div class="row"><div class="k">Contract</div><div><code>idempotency_key</code> on <code>EmailEvent</code> = <code>(tenant, mailbox, provider_message_id)</code>. Wire schema bumps <code>1.0 → 1.1</code> (additive).</div></div>
+      <div class="row"><div class="k">Delivery</div><div><b class="accent">At-least-once</b>, documented honestly. Exactly-once is <i>not</i> promised; duplicates are expected and handled by the key.</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>The emitted event <i>is</i> the public contract. The fingerprint is already computed internally — V1 simply exposes it so consumers needn't rebuild it.</div></div>
+    </div>
+  </section>
+
+  <!-- 11 — ERROR TAXONOMY -->
+  <section class="slide">
+    <p class="kicker">Cross-cutting · the keystone</p>
+    <div class="shead"><h2>Error taxonomy &amp; routing</h2><span class="id">A2</span><span class="id">B3</span><span class="chip c-miss">foundational</span></div>
+    <p class="sub" style="margin-bottom:12px">Sort every failure into Auth / Permanent / Transient — react differently to each. B3 &amp; B4 both depend on it.</p>
+    <div class="diagram center" style="max-width:980px">
+      <pre class="mermaid">
+flowchart TD
+    E["Failure at provider boundary"] --> Q{"What kind? (A2)"}
+    Q -->|"401 — login expired"| R["🔄 Refresh token,<br/>retry once"]
+    Q -->|"403/404/410/decode<br/>Permanent (B3)"| D[("🗑️ DLQ — never retry")]
+    Q -->|"429/5xx/network<br/>Transient (B4)"| T["⏳ Backoff + jitter,<br/>honor Retry-After, bounded"]
+    R -->|still failing| D
+    T -->|retries exhausted| D
+    classDef dlq fill:#fee2e2,stroke:#b91c1c,color:#000
+    class D dlq
+      </pre>
+    </div>
+  </section>
+
+  <!-- 12 — RELIABILITY -->
+  <section class="slide">
+    <p class="kicker">Cross-cutting</p>
+    <div class="shead"><h2>Reliability — isolation, backoff, storm containment</h2><span class="id">B2</span><span class="id">B4</span><span class="chip c-partial">partial</span></div>
+    <p class="sub">"The difference between 'one bad email' and 'the whole run dies.'"</p>
+    <div class="kv">
+      <div class="row"><div class="k">DLQ isolation (B2)</div><div>One broken/oversized message is set aside <b>alone</b> — never crashes the batch. Counted exactly once (<code>add_dead_letter()</code> + paired trace). Gap: the <i>fetch</i> stage still lacks per-record isolation.</div></div>
+      <div class="row"><div class="k">Backoff + storm (B4)</div><div>Retry 5xx; exponential backoff + jitter honoring <code>Retry-After</code>; bounded concurrency cap; and crucially <b class="accent">contain an exhausted-retry storm</b> so it can't abort the run.</div></div>
+      <div class="row"><div class="k">Today's bug</div><div>A 429 storm propagates uncaught and takes everything down — exactly what B4 fixes.</div></div>
+    </div>
+  </section>
+
+  <!-- 13 — SCOPE & ROADMAP -->
+  <section class="slide">
+    <p class="kicker">Direction</p>
+    <h2>Scope &amp; roadmap</h2>
+    <div class="note"><b>V1 in one line:</b> a <b class="accent">Gmail-only</b>, <b class="accent">single-tenant</b>, <b class="accent">poll-authoritative</b> library (Gmail push only <i>wakes</i> the poller), cleaning each email to plain text and emitting a clean, de-duplicatable event.</div>
+    <div class="tiers">
+      <div class="tier p0"><div class="t">P0 · V1</div><p>Frozen contracts + correctness defects: A2 taxonomy, A4 idempotency_key, A5 Gmail verify, A6 cleaner, A7 thread key, A10 overrides, A11 sync/version; B1–B5.</p></div>
+      <div class="tier p1"><div class="t">P1 · should-have</div><p>Subscription-renewal driver, missed-email backfill, attachment streaming + dedup, replayable DLQ, reference blob store, fuller observability.</p></div>
+      <div class="tier p2"><div class="t">P2 · post-V1 seams</div><p>Rich cleaning heuristics, HTML sanitizer, malware scanner, KMS encryption, S3 stores, async inbound buffer, persistent dedupe, GDPR DSAR, bounce engine.</p></div>
+      <div class="tier p3"><div class="t">P3 · future</div><p>Plugin kind registry, iCalendar parsing, TNEF decode, encrypted Graph resource-data, more providers (IMAP, SES).</p></div>
+    </div>
+    <p class="sub" style="margin-top:18px"><b class="accent2">Deferred out of V1:</b> Outlook live (A1/C1/C2), GDPR erase + encryption (A9), PII redaction, multi-tenant, multi-worker, strict ordering, HTML sanitizer.</p>
+  </section>
+
+  <!-- 14 — STATUS & BUILD PHASES -->
+  <section class="slide">
+    <p class="kicker">Where it stands</p>
+    <h2 style="margin-bottom:4px">A usable Gmail library; the frozen contracts are the remaining work</h2>
+    <p class="sub" style="margin-bottom:14px">11 Gmail e2e + reliability tests pass today. What's unfinished is exactly the part that's expensive to change after 1.0.</p>
+    <div class="diagram center" style="max-width:1040px">
+      <div class="cap">Freeze contracts serially → implement in parallel (TDD) → adversarially verify → integrate &amp; tag.</div>
+      <pre class="mermaid">
+flowchart LR
+    P0["Phase 0<br/>Freeze contracts<br/>(serial)"] --> G0{"Human<br/>gate"}
+    G0 --> P1["Phase 1<br/>Implement — 4 parallel<br/>tracks, TDD"]
+    P1 --> P2["Phase 2<br/>Adversarial<br/>verify"]
+    P2 --> G1{"All in-scope<br/>done?"}
+    G1 -->|gaps| P1
+    G1 -->|clean| P3["Phase 3<br/>Integrate +<br/>tag V1"]
+    classDef p0 fill:#fef3c7,stroke:#b45309,color:#000
+    classDef p3 fill:#dcfce7,stroke:#15803d,color:#000
+    class P0 p0
+    class P3 p3
+      </pre>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><b>~18–26 dev-days</b><span>locked-scope effort (≈4–5 wks, 1 eng)</span></div>
+      <div class="kpi"><b>A2 first</b><span>keystone — unblocks B3 &amp; B4</span></div>
+      <div class="kpi"><b>11 tests ✓</b><span>Gmail e2e + reliability green</span></div>
+    </div>
+  </section>
+
+  <!-- 15 — DEFINITION OF DONE -->
+  <section class="slide">
+    <p class="kicker">Definition of done</p>
+    <h2>When is V1 actually done?</h2>
+    <ul class="points">
+      <li><span class="k">Tests</span> full <code>pytest</code> suite green — e2e + reliability + new unit tests</li>
+      <li><span class="k">Types</span> <code>mypy --strict</code> clean across the whole importable tree</li>
+      <li><span class="k">Coverage</span> every in-scope item (A2, A4, A5-Gmail, A6, A7, A8-reduced, A10, A11, B1–B5) verified with quoted proof</li>
+      <li><span class="k">Live run</span> push wakes → poll from cursor → clean → emit <i>with</i> <code>idempotency_key</code>; forged push rejected; oversized/unknown DLQ'd pre-download; a 429-storm does not abort the run</li>
+      <li><span class="k">Docs</span> say <b class="accent">at-least-once</b> — no exactly-once claims anywhere</li>
+    </ul>
+    <div class="legend">
+      <span><span class="chip c-ok">done</span> shipped &amp; tested</span>
+      <span><span class="chip c-partial">partial</span> present, incomplete</span>
+      <span><span class="chip c-miss">missing</span> to build for V1</span>
+      <span><span class="chip c-defer">deferred</span> out of V1 scope</span>
+    </div>
+    <div class="footline">mailflow · V1 · freeze the right promises, then build behind them</div>
+  </section>
+
+</div>
+
+<div id="hint">← → / Space · click to advance</div>
+<div id="ctrl">
+  <button class="btn" id="prev" aria-label="Previous slide">‹</button>
+  <span id="counter">1 / 15</span>
+  <button class="btn" id="next" aria-label="Next slide">›</button>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    flowchart:{useMaxWidth:true,htmlLabels:true,curve:'basis'},
+    themeVariables:{
+      fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif',
+      primaryColor:'#eaf1ff', primaryBorderColor:'#2f6df0', primaryTextColor:'#1d2530',
+      lineColor:'#8a97a8', fontSize:'14px'
+    }
+  });
+
+  const slides=[...document.querySelectorAll('.slide')];
+  const total=slides.length;
+  const counter=document.getElementById('counter');
+  const progress=document.getElementById('progress');
+  let cur=0;
+
+  function show(n){
+    n=Math.max(0,Math.min(total-1,n));
+    slides.forEach((s,i)=>{
+      s.classList.toggle('active', i===n);
+      s.classList.toggle('prev', i<n);
+    });
+    cur=n;
+    counter.textContent=(n+1)+' / '+total;
+    progress.style.width=((n+1)/total*100)+'%';
+  }
+  const next=()=>show(cur+1);
+  const prev=()=>show(cur-1);
+
+  document.getElementById('next').addEventListener('click',e=>{e.stopPropagation();next();});
+  document.getElementById('prev').addEventListener('click',e=>{e.stopPropagation();prev();});
+
+  // click anywhere on the deck advances (ignore link/button clicks)
+  document.getElementById('deck').addEventListener('click',e=>{
+    if(e.target.closest('a,button')) return;
+    next();
+  });
+
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'||e.key==='Spacebar'){e.preventDefault();next();}
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();prev();}
+    else if(e.key==='Home'){e.preventDefault();show(0);}
+    else if(e.key==='End'){e.preventDefault();show(total-1);}
+    else if(/^[1-9]$/.test(e.key)){const i=parseInt(e.key,10)-1; if(i<total)show(i);}
+  });
+
+  show(0);
+</script>
+</body>
+</html>

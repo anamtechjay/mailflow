@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>mailflow — V1 Readiness Report Card</title>
+<script src="./mermaid.min.js"></script>
+<style>
+  :root{
+    /* dashboard palette — distinct from the blue solution-doc: violet + slate + traffic-light */
+    --bg:#eef1f6; --panel:#ffffff; --ink:#15202e; --muted:#5d6b7e; --line:#dde3ec;
+    --accent:#7c3aed; --accent-2:#4f46e5; --accent-soft:#f1ecff;
+    --ok:#16a34a; --ok-bg:#dcfce7; --ok-line:#86efac;
+    --partial:#d97706; --partial-bg:#fef3c7; --partial-line:#fcd34d;
+    --miss:#dc2626; --miss-bg:#fee2e2; --miss-line:#fca5a5;
+    --defer:#64748b; --defer-bg:#e6eaf0; --defer-line:#cbd5e1;
+    --nogo:#dc2626; --nogo-bg:#fff1f1;
+    --code:#5b21b6;
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 6px 22px rgba(16,24,40,.07);
+    --shadow-lg:0 10px 40px rgba(31,17,71,.18);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  code,.mono{font-family:"SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85em}
+  code{background:#f0ecfb;color:var(--code);padding:1px 5px;border-radius:5px}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 22px 120px}
+
+  /* ===== top banner / report-card header ===== */
+  header.report{
+    background:linear-gradient(135deg,#1e1b4b 0%,#312e81 45%,#4c1d95 100%);
+    color:#fff;border-radius:0 0 22px 22px;padding:30px 34px 26px;margin:0 -22px 26px;
+    box-shadow:var(--shadow-lg);position:relative;overflow:hidden}
+  header.report::after{content:"";position:absolute;right:-60px;top:-60px;width:260px;height:260px;
+    background:radial-gradient(circle,rgba(167,139,250,.35),transparent 65%);pointer-events:none}
+  .eyebrow{font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;color:#c4b5fd;font-weight:700;margin:0}
+  header.report h1{font-size:33px;line-height:1.1;letter-spacing:-.02em;margin:.18em 0 .1em;font-weight:800}
+  header.report h1 .dot{color:#a78bfa}
+  header.report .sub{color:#ddd6fe;font-size:14.5px;margin:0}
+  header.report .meta{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;font-size:12.5px;color:#c7c2ee}
+  header.report .meta b{color:#fff;font-weight:600}
+
+  /* ===== GO / NO-GO verdict banner ===== */
+  .verdict{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-top:20px;
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
+    border-radius:16px;padding:16px 20px;backdrop-filter:blur(2px)}
+  .verdict .stamp{font-size:30px;font-weight:900;letter-spacing:.02em;padding:8px 22px;border-radius:12px;
+    background:var(--nogo);color:#fff;box-shadow:0 6px 18px rgba(220,38,38,.45);white-space:nowrap;
+    border:2px solid #fecaca}
+  .verdict .vtext{font-size:14px;color:#ece9fb;max-width:640px}
+  .verdict .vtext b{color:#fff}
+
+  /* ===== KPI tiles ===== */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:22px 0 6px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 16px 14px;
+    box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .kpi .lab{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:0}
+  .kpi .big{font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1.05;margin:.12em 0 .05em}
+  .kpi .hint{font-size:12px;color:var(--muted);margin:0}
+  .kpi .spark{position:absolute;right:0;top:0;bottom:0;width:6px}
+  .kpi.k-red .big{color:var(--miss)} .kpi.k-red .spark{background:var(--miss)}
+  .kpi.k-amber .big{color:var(--partial)} .kpi.k-amber .spark{background:var(--partial)}
+  .kpi.k-violet .big{color:var(--accent)} .kpi.k-violet .spark{background:var(--accent)}
+  .kpi.k-slate .big{color:#475569} .kpi.k-slate .spark{background:#64748b}
+
+  /* ===== sections / headings ===== */
+  section{scroll-margin-top:14px;margin:34px 0}
+  h2{font-size:21px;letter-spacing:-.01em;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  h2 .num{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;
+    background:var(--accent-soft);color:var(--accent);font-size:13px;font-weight:800}
+  h3{font-size:15.5px;margin:1.3em 0 .4em}
+  .sec-sub{color:var(--muted);font-size:13.5px;margin:.1em 0 14px}
+  p{margin:.5em 0}
+  .muted{color:var(--muted)}
+  ul{margin:.4em 0 .6em;padding-left:1.2em} li{margin:.28em 0}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;
+    box-shadow:var(--shadow);margin:12px 0}
+
+  /* ===== category scoreboard bars ===== */
+  .scoreboard{display:grid;gap:14px;margin:6px 0}
+  .sbrow{display:grid;grid-template-columns:230px 1fr 52px;align-items:center;gap:14px}
+  .sbrow .name{font-size:13.5px;font-weight:600}
+  .sbrow .name small{display:block;color:var(--muted);font-weight:400;font-size:11.5px}
+  .track{height:22px;background:#eef1f6;border-radius:11px;overflow:hidden;position:relative;border:1px solid var(--line)}
+  .fill{height:100%;border-radius:11px;display:flex;align-items:center;justify-content:flex-end;
+    padding-right:8px;color:#fff;font-size:11px;font-weight:700;min-width:26px;transition:width .6s}
+  .fill.lo{background:linear-gradient(90deg,#ef4444,#dc2626)}
+  .fill.mid{background:linear-gradient(90deg,#fbbf24,#d97706)}
+  .fill.hi{background:linear-gradient(90deg,#34d399,#16a34a)}
+  .sbrow .pct{text-align:right;font-weight:800;font-size:15px}
+  .rollup{display:flex;gap:8px;margin-top:3px;flex-wrap:wrap}
+  .tally{font-size:11px;font-weight:700;padding:1px 7px;border-radius:6px}
+  .tally.t-ok{background:var(--ok-bg);color:var(--ok)}
+  .tally.t-pt{background:var(--partial-bg);color:var(--partial)}
+  .tally.t-ms{background:var(--miss-bg);color:var(--miss)}
+
+  /* ===== scope buckets ===== */
+  .buckets{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .bucket{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:var(--panel);box-shadow:var(--shadow)}
+  .bucket h4{margin:0 0 8px;font-size:13.5px;display:flex;align-items:center;gap:8px}
+  .bucket h4 .led{width:10px;height:10px;border-radius:50%}
+  .bucket.b-build{border-top:4px solid var(--miss)}
+  .bucket.b-reduced{border-top:4px solid var(--partial)}
+  .bucket.b-done{border-top:4px solid var(--ok)}
+  .bucket.b-defer{border-top:4px solid var(--defer)}
+  .bucket .items{display:flex;flex-wrap:wrap;gap:6px}
+  .pill{font:600 11.5px ui-monospace,monospace;padding:2px 8px;border-radius:7px;background:#f1f4f9;color:#3a475a;
+    border:1px solid var(--line)}
+  .bucket p{font-size:12.5px;color:var(--muted);margin:8px 0 0}
+
+  /* ===== item status table ===== */
+  table{border-collapse:separate;border-spacing:0;width:100%;margin:6px 0;font-size:13.4px;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+  thead th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+    background:#f5f7fb;text-align:left;padding:9px 11px;border-bottom:1px solid var(--line)}
+  tbody td{padding:8px 11px;border-bottom:1px solid #eef1f6;vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:#faf9ff}
+  td.id{font:700 12px ui-monospace,monospace;color:#3a475a;white-space:nowrap}
+  td.item{font-weight:500;min-width:200px}
+  td.item small{color:var(--muted);font-weight:400}
+  td.num{text-align:right;font-weight:700;white-space:nowrap}
+  .secthead td{background:#f0ecfb;color:var(--accent);font-weight:800;font-size:11px;text-transform:uppercase;
+    letter-spacing:.06em;padding:6px 11px}
+
+  /* ===== chips ===== */
+  .chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 9px;
+    border-radius:999px;white-space:nowrap;border:1px solid transparent}
+  .c-ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok-line)}
+  .c-partial{background:var(--partial-bg);color:var(--partial);border-color:var(--partial-line)}
+  .c-miss{background:var(--miss-bg);color:var(--miss);border-color:var(--miss-line)}
+  .c-defer{background:var(--defer-bg);color:var(--defer);border-color:var(--defer-line)}
+  .eff{display:inline-block;font:700 11px ui-monospace,monospace;padding:1px 7px;border-radius:6px;border:1px solid var(--line)}
+  .eff.s{background:#dcfce7;color:#15803d;border-color:#86efac}
+  .eff.m{background:#fef3c7;color:#b45309;border-color:#fcd34d}
+  .eff.l{background:#fee2e2;color:#b91c1c;border-color:#fca5a5}
+
+  /* mini inline pct bar inside table */
+  .mbar{display:inline-block;width:54px;height:7px;background:#eef1f6;border-radius:4px;overflow:hidden;
+    vertical-align:middle;margin-left:7px;border:1px solid var(--line)}
+  .mbar i{display:block;height:100%}
+  .mbar i.lo{background:#dc2626}.mbar i.mid{background:#d97706}.mbar i.hi{background:#16a34a}
+
+  /* ===== ranked gaps ===== */
+  .gaps{display:grid;gap:10px;counter-reset:g}
+  .gap{display:grid;grid-template-columns:40px 1fr;gap:14px;align-items:start;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+  .gap .rank{display:grid;place-items:center;width:40px;height:40px;border-radius:10px;
+    font-size:17px;font-weight:800;color:#fff;background:linear-gradient(135deg,#7c3aed,#4f46e5)}
+  .gap.crit .rank{background:linear-gradient(135deg,#dc2626,#b91c1c)}
+  .gap .gtitle{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .gap .gtitle .id{font:700 11px ui-monospace,monospace;background:#f1f4f9;color:#3a475a;padding:1px 6px;border-radius:5px;border:1px solid var(--line)}
+  .gap p{margin:.3em 0 0;font-size:13px;color:#3a4655}
+
+  /* ===== diagrams ===== */
+  .diagram{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;
+    margin:14px 0;overflow:auto;box-shadow:var(--shadow)}
+  .diagram .cap{font-size:12.5px;color:var(--muted);margin:2px 4px 10px;text-align:center}
+  .mermaid{display:flex;justify-content:center}
+
+  /* ===== checklist (definition of done) ===== */
+  .dod{display:grid;gap:9px;margin:8px 0}
+  .dod .ck{display:grid;grid-template-columns:24px 1fr;gap:11px;align-items:start;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 13px;box-shadow:var(--shadow)}
+  .dod .box{width:22px;height:22px;border-radius:6px;border:2px solid var(--accent);display:grid;place-items:center;
+    color:var(--accent);font-weight:900;font-size:13px;background:var(--accent-soft)}
+  .dod .ck div b{font-size:13.5px}
+  .dod .ck div span{display:block;color:var(--muted);font-size:12.5px;margin-top:1px}
+
+  .note{border-left:4px solid var(--accent);background:var(--accent-soft);padding:11px 15px;
+    border-radius:0 10px 10px 0;margin:14px 0;font-size:13.5px}
+  .note.warn{border-color:var(--partial);background:var(--partial-bg)}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:10px 0 0;align-items:center}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  footer{color:var(--muted);font-size:12px;text-align:center;margin-top:40px;padding-top:18px;border-top:1px solid var(--line)}
+
+  @media(max-width:820px){
+    .kpis{grid-template-columns:repeat(2,1fr)}
+    .buckets{grid-template-columns:1fr}
+    .sbrow{grid-template-columns:150px 1fr 44px}
+    header.report{padding:24px 20px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============================== HEADER / VERDICT ============================== -->
+  <header class="report">
+    <p class="eyebrow">V1 Status &amp; Readiness Review · Go / No-Go</p>
+    <h1>mail<span class="dot">flow</span> — Release Report Card</h1>
+    <p class="sub">A reusable library that watches a Gmail inbox and emits clean, de-duplicatable email events. Locked V1 scope: Gmail-only · single-tenant · poll-authoritative · at-least-once.</p>
+    <p class="meta">
+      <span><b>Branch</b> feature/library @ 8b0cc4b</span>
+      <span><b>Date</b> 2026-06-29</span>
+      <span><b>Scope</b> P0 (V1) tier</span>
+      <span><b>Evidence</b> 27 agents · 21 verified items · ~100 refs re-checked</span>
+    </p>
+
+    <div class="verdict">
+      <div class="stamp">NO-GO</div>
+      <div class="vtext">
+        Not ready for V1 against the original P0 set. The plumbing works — it's the
+        <b>frozen-forever contracts</b> (Category A) that are mostly absent or wrong, and those are
+        exactly the parts you can't change after release without breaking consumers.
+        In-scope completeness is meaningfully higher than the headline because the least-finished
+        items (Outlook live, GDPR) were deferred out of V1.
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================== KPI TILES ============================== -->
+  <div class="kpis">
+    <div class="kpi k-red"><span class="spark"></span>
+      <p class="lab">Verdict</p><div class="big">NO-GO</div><p class="hint">contracts not yet frozen</p></div>
+    <div class="kpi k-amber"><span class="spark"></span>
+      <p class="lab">V1 completeness</p><div class="big">35%</div><p class="hint">original P0 snapshot</p></div>
+    <div class="kpi k-violet"><span class="spark"></span>
+      <p class="lab">Integration ease</p><div class="big">5/10</div><p class="hint">usable Gmail polling lib</p></div>
+    <div class="kpi k-slate"><span class="spark"></span>
+      <p class="lab">Effort to V1</p><div class="big">18–26</div><p class="hint">dev-days, locked scope (≈4–5 wks)</p></div>
+  </div>
+  <p class="muted" style="font-size:12.5px;margin-top:6px">
+    Headline % and verdict were computed against the <i>original</i> P0 set (all of A1–A12, B1–B6, C1–C2, D1)
+    and kept as the evidence snapshot. Original-set effort was ~30–40 dev-days; deferring Outlook live and the
+    A5/A8 reductions removed roughly a third. <b>What works today:</b> a poll/pull Gmail integration with
+    injectable filters &amp; cleaners, backed by <b>11 passing tests</b>.
+  </p>
+
+  <!-- ============================== 1 · SCOREBOARD ============================== -->
+  <section id="scoreboard">
+    <h2><span class="num">1</span>Category scoreboard</h2>
+    <p class="sec-sub">Completeness by category. The shorter the bar, the more work remains — and the two weakest areas (A and C) are exactly the ones that block release.</p>
+    <div class="panel">
+      <div class="scoreboard">
+        <div class="sbrow">
+          <div class="name">A — freeze-now contracts <small>11 in scope (A9 deferred)</small>
+            <div class="rollup"><span class="tally t-ok">1 done</span><span class="tally t-pt">5 partial</span><span class="tally t-ms">5 missing</span></div></div>
+          <div class="track"><div class="fill lo" style="width:32%">32%</div></div>
+          <div class="pct" style="color:var(--miss)">32%</div>
+        </div>
+        <div class="sbrow">
+          <div class="name">B — correctness defects <small>B1–B6</small>
+            <div class="rollup"><span class="tally t-ok">1 done</span><span class="tally t-pt">4 partial</span><span class="tally t-ms">1 missing</span></div></div>
+          <div class="track"><div class="fill mid" style="width:39%">39%</div></div>
+          <div class="pct" style="color:var(--partial)">39%</div>
+        </div>
+        <div class="sbrow">
+          <div class="name">C — live blockers <small>C1–C2 (Outlook, deferred)</small>
+            <div class="rollup"><span class="tally t-pt">2 partial</span></div></div>
+          <div class="track"><div class="fill lo" style="width:18%">18%</div></div>
+          <div class="pct" style="color:var(--miss)">18%</div>
+        </div>
+        <div class="sbrow">
+          <div class="name">D — verification gate <small>D1 (Gmail proof)</small>
+            <div class="rollup"><span class="tally t-ok">1 done</span></div></div>
+          <div class="track"><div class="fill hi" style="width:80%">80%</div></div>
+          <div class="pct" style="color:var(--ok)">80%</div>
+        </div>
+      </div>
+    </div>
+    <p class="muted" style="font-size:12.5px">
+      <b>A</b> = promises consumers build against (most important). <b>B</b> = existing bugs / risky behaviors.
+      <b>C</b> = blockers against the real services. <b>D</b> = proof the design works with more than one provider.
+    </p>
+  </section>
+
+  <!-- ============================== 2 · SCOPE BUCKETS ============================== -->
+  <section id="scope">
+    <h2><span class="num">2</span>Locked V1 scope</h2>
+    <p class="sec-sub">Eleven product decisions (locked 2026-06-29) narrowed V1 to a coherent, shippable slice. Every graded item falls into one of these four buckets.</p>
+    <div class="buckets">
+      <div class="bucket b-build">
+        <h4><span class="led" style="background:var(--miss)"></span>Build for V1 — full implementation</h4>
+        <div class="items">
+          <span class="pill">A2</span><span class="pill">A4</span><span class="pill">A6</span><span class="pill">A7</span>
+          <span class="pill">A10</span><span class="pill">A11</span><span class="pill">B1</span><span class="pill">B2</span>
+          <span class="pill">B3</span><span class="pill">B4</span><span class="pill">B5</span>
+        </div>
+        <p>Error taxonomy, idempotency_key + honest docs, thin HTML→text cleaner, Gmail thread key, overrides/decorators, sync+version policy; plus the correctness defects.</p>
+      </div>
+      <div class="bucket b-reduced">
+        <h4><span class="led" style="background:var(--partial)"></span>Reduced for V1</h4>
+        <div class="items"><span class="pill">A5 → Gmail OIDC-JWT only</span><span class="pill">A8 → rotation-persistence only</span></div>
+        <p>Push is a wake-trigger via Gmail Pub/Sub, so only Gmail signed-token verification is needed. Single-tenant means A8 keeps only refresh-token rotation persistence (shrinks L → S).</p>
+      </div>
+      <div class="bucket b-done">
+        <h4><span class="led" style="background:var(--ok)"></span>Already done</h4>
+        <div class="items"><span class="pill">A3 (Gmail)</span><span class="pill">A12</span><span class="pill">B6</span><span class="pill">D1 (Gmail)</span></div>
+        <p>Gmail cursor contract, provider-defined StreamRef granularity, page-atomic commit, and the second-provider conformance proof (Gmail, 11 passing tests).</p>
+      </div>
+      <div class="bucket b-defer">
+        <h4><span class="led" style="background:var(--defer)"></span>Deferred — out of V1</h4>
+        <div class="items"><span class="pill">A1 (Outlook rewire)</span><span class="pill">A9 (GDPR)</span><span class="pill">C1</span><span class="pill">C2</span><span class="pill">PII redaction</span></div>
+        <p>Outlook live blockers + wake-rewire (Gmail already complies), GDPR erasure/encryption (team owns all stores), and log PII redaction. The Outlook adapter stays in the tree.</p>
+      </div>
+    </div>
+    <div class="note"><b>V1 in one line:</b> a <b>Gmail-only</b>, <b>single-tenant</b>, <b>poll-authoritative</b> library (Gmail push only <i>wakes</i> the poller), cleaning each email to plain text and emitting a clean, de-duplicatable event.</div>
+  </section>
+
+  <!-- ============================== 3 · ITEM TABLE ============================== -->
+  <section id="items">
+    <h2><span class="num">3</span>Item-by-item status</h2>
+    <p class="sec-sub">Every must-have, color-chipped, with % complete and remaining effort (S ≈ 1–2d · M ≈ 3–5d · L ≈ 5–8d).</p>
+    <p class="legend">
+      <span><span class="chip c-ok">✅ done</span></span>
+      <span><span class="chip c-partial">🟡 partial</span> present, incomplete/wrong</span>
+      <span><span class="chip c-miss">❌ missing</span></span>
+      <span><span class="chip c-defer">⏸ deferred</span> out of V1</span>
+    </p>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Item</th><th>Status</th><th style="text-align:right">% complete</th><th>Effort</th></tr>
+      </thead>
+      <tbody>
+        <tr class="secthead"><td colspan="5">A — Freeze-now contracts</td></tr>
+        <tr><td class="id">A2</td><td class="item">Typed error taxonomy <small>(Auth/Permanent/Transient)</small></td><td><span class="chip c-miss">❌ missing</span></td><td class="num">10%<span class="mbar"><i class="lo" style="width:10%"></i></span></td><td><span class="eff l">L</span></td></tr>
+        <tr><td class="id">A4</td><td class="item">idempotency_key on EmailEvent <small>+ at-least-once docs</small></td><td><span class="chip c-partial">🟡 partial</span></td><td class="num">15%<span class="mbar"><i class="lo" style="width:15%"></i></span></td><td><span class="eff s">S</span></td></tr>
+        <tr><td class="id">A5</td><td class="item">WebhookVerifier port <small>(reduced: Gmail OIDC-JWT)</small></td><td><span class="chip c-partial">🟡 partial</span></td><td class="num">22%<span class="mbar"><i class="lo" style="width:22%"></i></span></td><td><span class="eff l">L</span></td></tr>
+        <tr><td class="id">A6</td><td class="item">ContentCleaner port <small>(thin HTML→text default)</small></td><td><span class="chip c-miss">❌ missing</span></td><td class="num">15%<span class="mbar"><i class="lo" style="width:15%"></i></span></td><td><span class="eff m">M</span></td></tr>
+        <tr><td class="id">A7</td><td class="item">Provider-native thread key on CleanEmail</td><td><span class="chip c-miss">❌ missing</span></td><td class="num">10%<span class="mbar"><i class="lo" style="width:10%"></i></span></td><td><span class="eff m">M</span></td></tr>
+        <tr><td class="id">A8</td><td class="item">Widened SecretProvider <small>(reduced: token rotation)</small></td><td><span class="chip c-miss">❌ missing</span></td><td class="num">10%<span class="mbar"><i class="lo" style="width:10%"></i></span></td><td><span class="eff l">L</span></td></tr>
+        <tr><td class="id">A10</td><td class="item">Builder overrides= + as_filter/as_cleaner sugar</td><td><span class="chip c-partial">🟡 partial</span></td><td class="num">55%<span class="mbar"><i class="mid" style="width:55%"></i></span></td><td><span class="eff m">M</span></td></tr>
+        <tr><td class="id">A11</td><td class="item">Sync-only declaration + stability/config-version policy</td><td><span class="chip c-miss">❌ missing</span></td><td class="num">10%<span class="mbar"><i class="lo" style="width:10%"></i></span></td><td><span class="eff s">S</span></td></tr>
+
+        <tr class="secthead"><td colspan="5">B — Correctness defects</td></tr>
+        <tr><td class="id">B1</td><td class="item">Size guard fails CLOSED on unknown size</td><td><span class="chip c-partial">🟡 partial</span></td><td class="num">15%<span class="mbar"><i class="lo" style="width:15%"></i></span></td><td><span class="eff s">S</span></td></tr>
+        <tr><td class="id">B2</td><td class="item">Per-message DLQ isolation</td><td><span class="chip c-partial">🟡 partial</span></td><td class="num">60%<span class="mbar"><i class="mid" style="width:60%"></i></span></td><td><span class="eff m">M</span></td></tr>
+        <tr><td class="id">B3</td><td class="item">404/410 &amp; invalid-base64 classified Permanent</td><td><span class="chip c-partial">🟡 partial</span></td><td class="num">15%<span class="mbar"><i class="lo" style="width:15%"></i></span></td><td><span class="eff m">M</span></td></tr>
+        <tr><td class="id">B4</td><td class="item">Retry-After backoff + concurrency cap + storm containment</td><td><span class="chip c-partial">🟡 partial</span></td><td class="num">40%<span class="mbar"><i class="mid" style="width:40%"></i></span></td><td><span class="eff l">L</span></td></tr>
+        <tr><td class="id">B5</td><td class="item">Cross-provider body_text parity <small>(HTML→text)</small></td><td><span class="chip c-miss">❌ missing</span></td><td class="num">20%<span class="mbar"><i class="lo" style="width:20%"></i></span></td><td><span class="eff m">M</span></td></tr>
+
+        <tr class="secthead"><td colspan="5">✅ Already done (in scope)</td></tr>
+        <tr><td class="id">A3</td><td class="item">Cursor contract <small>(Gmail durable resume token)</small></td><td><span class="chip c-ok">✅ done</span></td><td class="num">60%<span class="mbar"><i class="mid" style="width:60%"></i></span></td><td><span class="eff m">M</span></td></tr>
+        <tr><td class="id">A12</td><td class="item">Provider-defined StreamRef granularity</td><td><span class="chip c-ok">✅ done</span></td><td class="num">90%<span class="mbar"><i class="hi" style="width:90%"></i></span></td><td><span class="eff s">S</span></td></tr>
+        <tr><td class="id">B6</td><td class="item">Page-atomic cursor commit <small>(no $top=1)</small></td><td><span class="chip c-ok">✅ done</span></td><td class="num">82%<span class="mbar"><i class="hi" style="width:82%"></i></span></td><td><span class="eff s">S</span></td></tr>
+        <tr><td class="id">D1</td><td class="item">Second-provider conformance proof <small>(Gmail)</small></td><td><span class="chip c-ok">✅ done</span></td><td class="num">80%<span class="mbar"><i class="hi" style="width:80%"></i></span></td><td><span class="eff m">M</span></td></tr>
+
+        <tr class="secthead"><td colspan="5">⏸ Deferred — out of V1 (not counted in totals)</td></tr>
+        <tr><td class="id">A1</td><td class="item">Notifications wake-signals only <small>(Gmail ✔; Outlook rewire)</small></td><td><span class="chip c-defer">⏸ deferred</span></td><td class="num">50%<span class="mbar"><i class="mid" style="width:50%"></i></span></td><td><span class="eff m">M</span></td></tr>
+        <tr><td class="id">A9</td><td class="item">Store erasure + encryption-context <small>(GDPR)</small></td><td><span class="chip c-defer">⏸ deferred</span></td><td class="num">—</td><td><span class="eff l">L</span></td></tr>
+        <tr><td class="id">C1</td><td class="item">Graph subscription expiry ≤4230 min <small>(Outlook)</small></td><td><span class="chip c-defer">⏸ deferred</span></td><td class="num">15%<span class="mbar"><i class="lo" style="width:15%"></i></span></td><td><span class="eff s">S</span></td></tr>
+        <tr><td class="id">C2</td><td class="item">Graph size-probe verified <small>(Outlook)</small></td><td><span class="chip c-defer">⏸ deferred</span></td><td class="num">20%<span class="mbar"><i class="lo" style="width:20%"></i></span></td><td><span class="eff m">M</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============================== 4 · TOP GAPS ============================== -->
+  <section id="gaps">
+    <h2><span class="num">4</span>Top gaps, ranked</h2>
+    <p class="sec-sub">If you fix only a few things, fix these — most blocking first.</p>
+    <div class="gaps">
+      <div class="gap crit"><div class="rank">1</div><div>
+        <div class="gtitle"><span class="id">A2</span>Typed error taxonomy missing entirely <span class="chip c-miss">keystone</span></div>
+        <p>No Auth/Permanent/Transient classes; the pipeline only counts retry attempts. <b>Foundational</b> — both B3 and B4 depend on it. Do this first.</p>
+      </div></div>
+      <div class="gap crit"><div class="rank">2</div><div>
+        <div class="gtitle"><span class="id">B4</span>Throttle storm crashes the run</div>
+        <p>When "slow down" retries are exhausted the error propagates all the way up and aborts everything. No 5xx retry, no progressive backoff, no concurrency cap.</p>
+      </div></div>
+      <div class="gap crit"><div class="rank">3</div><div>
+        <div class="gtitle"><span class="id">B1</span>Size guard fails open on unknown size</div>
+        <p>An unknown size becomes 0 and sneaks past the limit, so oversized/unknown emails slip through instead of being safely rejected before download. Low effort, high impact.</p>
+      </div></div>
+      <div class="gap"><div class="rank">4</div><div>
+        <div class="gtitle"><span class="id">A4</span>No fingerprint on the outgoing event; docs claim exactly-once</div>
+        <p>The idempotency_key is computed internally but never put on the wire, and the docs promise exactly-once — the opposite of the real at-least-once. A breaking wire-contract change if deferred past V1.</p>
+      </div></div>
+      <div class="gap"><div class="rank">5</div><div>
+        <div class="gtitle"><span class="id">A5</span>No way to verify a "new mail" ping is genuine</div>
+        <p>Gmail has zero verification; push ingestion is currently unauthenticated. V1 needs Gmail OIDC-JWT (signature/audience/issuer).</p>
+      </div></div>
+      <div class="gap"><div class="rank">6</div><div>
+        <div class="gtitle"><span class="id">B3</span>"Not found / gone / garbled" not treated as permanent</div>
+        <p>404 is silently skipped, 410 is retried forever, garbled data is retried wastefully. Depends on A2 landing first.</p>
+      </div></div>
+      <div class="gap"><div class="rank">7</div><div>
+        <div class="gtitle"><span class="id">A8</span>SecretProvider can't save a rotated token</div>
+        <p>No on-refresh persistence callback — a renewed OAuth refresh token is forgotten, so the next run silently breaks. (Multi-tenant/DWD intentionally out of V1.)</p>
+      </div></div>
+      <div class="gap"><div class="rank">8</div><div>
+        <div class="gtitle"><span class="id">A7</span>No conversation-thread ID on the clean email</div>
+        <p>Gmail threadId is unmapped, with no subject-line fallback — consumers can't reliably group conversations.</p>
+      </div></div>
+      <div class="gap"><div class="rank">9</div><div>
+        <div class="gtitle"><span class="id">B5</span>No shared HTML→text fallback</div>
+        <p>HTML-only emails come out with blank plain text. Since V1 is plain-text-only, this is what makes the output usable.</p>
+      </div></div>
+    </div>
+    <p class="muted" style="font-size:12.5px">A9 (store erasure/encryption) was previously ranked here but is now dropped from V1 scope. C1 (Outlook expiry clamp) and A1 (Outlook wake-rewire) are deferred with the rest of the Outlook fast-follow.</p>
+  </section>
+
+  <!-- ============================== 5 · SEQUENCING & PHASES ============================== -->
+  <section id="plan">
+    <h2><span class="num">5</span>Effort, sequencing &amp; build phases</h2>
+    <p class="sec-sub">~18–26 dev-days for the locked scope (≈4–5 focused weeks for one engineer). Suggested order: <b>A2 first</b> (unblocks B3 &amp; B4) → <b>C-class live safety (B4 + B1)</b> → freeze the remaining contracts.</p>
+
+    <div class="diagram">
+      <div class="cap">Sequencing — land the keystone first, reach a live-safe gate, then freeze remaining contracts. Dotted arrows show what A2 unblocks.</div>
+      <pre class="mermaid">
+flowchart TD
+    A2["① A2 · Error taxonomy<br/>(do this first)"]:::p1
+    A2 -.->|unblocks| B3["B3 · Treat 404/410/garbled<br/>as permanent"]
+    A2 -.->|unblocks| B4["B4 · Backoff +<br/>throttle-storm containment"]
+    B4 --> SAFE
+    B1["② B1 · Size guard fail-closed"]:::p2 --> SAFE
+    SAFE(["✅ Live-safe enough to test"]):::gate
+    SAFE --> FREEZE["③ Freeze remaining contracts<br/>A4 · A5 · A7 · A8 · A11"]:::p3
+    classDef p1 fill:#fde68a,stroke:#b45309,color:#000
+    classDef p2 fill:#ddd6fe,stroke:#5b21b6,color:#000
+    classDef p3 fill:#bbf7d0,stroke:#15803d,color:#000
+    classDef gate fill:#f3f4f6,stroke:#6b7280,color:#000
+      </pre>
+    </div>
+
+    <div class="diagram">
+      <div class="cap">How it gets built — freeze contracts serially, implement in parallel TDD tracks, adversarially verify, then integrate &amp; tag V1.</div>
+      <pre class="mermaid">
+flowchart LR
+    P0["Phase 0<br/>Freeze contracts<br/>(serial)"]:::p0 --> G0{"Human<br/>gate"}
+    G0 --> P1["Phase 1<br/>Implement — 4 parallel<br/>tracks, TDD"]
+    P1 --> P2["Phase 2<br/>Adversarial<br/>verify"]
+    P2 --> G1{"All in-scope<br/>done?"}
+    G1 -->|gaps| P1
+    G1 -->|clean| P3["Phase 3<br/>Integrate +<br/>tag V1"]:::p3
+    classDef p0 fill:#fef3c7,stroke:#b45309,color:#000
+    classDef p3 fill:#dcfce7,stroke:#15803d,color:#000
+      </pre>
+    </div>
+
+    <div class="note warn"><b>Where the effort sits:</b> the freeze-now contract work dominates (~23–26 days at the original-set sizing — A2/A5/A8 at L, A1/A3/A6/A7/A10 at M, A4/A11 at S). Correctness defects add ~12–14 days (but B3 reuses A2); live blockers C1/C2 add ~4 days but are deferred. The locked-scope total lands at <b>~18–26 dev-days</b>.</div>
+  </section>
+
+  <!-- ============================== 6 · DEFINITION OF DONE ============================== -->
+  <section id="dod">
+    <h2><span class="num">6</span>Definition of done for V1</h2>
+    <p class="sec-sub">The exit gate before mailflow can be tagged V1. Every box must be checked.</p>
+    <div class="dod">
+      <div class="ck"><div class="box">✓</div><div><b>Full test suite green</b><span>all in-scope behaviors covered by passing tests</span></div></div>
+      <div class="ck"><div class="box">✓</div><div><b><code>mypy --strict</code> clean</b><span>the whole importable tree type-checks</span></div></div>
+      <div class="ck"><div class="box">✓</div><div><b>Every in-scope item verified with quoted proof</b><span>adversarial re-audit passes; no item left at "missing"</span></div></div>
+      <div class="ck"><div class="box">✓</div><div><b>Live Gmail run end-to-end</b><span>push wakes → poll from cursor → clean → emit with idempotency_key</span></div></div>
+      <div class="ck"><div class="box">✓</div><div><b>Forged push rejected</b><span>Gmail OIDC-JWT verification blocks an unauthenticated ping</span></div></div>
+      <div class="ck"><div class="box">✓</div><div><b>Oversized / unknown-size mail DLQ'd pre-download</b><span>size guard fails closed (B1)</span></div></div>
+      <div class="ck"><div class="box">✓</div><div><b>429-storm survives</b><span>exhausted-retry storm is contained, never aborts the run (B4)</span></div></div>
+      <div class="ck"><div class="box">✓</div><div><b>Docs say at-least-once</b><span>exactly-once claims removed; idempotency_key documented on the wire (A4)</span></div></div>
+    </div>
+
+    <div class="note">
+      <b>Bottom line.</b> mailflow is a genuinely usable <b>Gmail polling library</b> today (injectable
+      filters &amp; cleaners, 11 passing tests, a real second-provider proof in D1). It is <b>not yet V1</b>
+      because the freeze-now contract surface is only ~32% done — shipping without it forces painful
+      rewrites on consumers later. Recommended path: land <b>A2</b> first, then <b>B4 + B1</b> for live
+      safety, then freeze <b>A4 · A5 · A7 · A8 · A11</b> before declaring V1.
+    </div>
+  </section>
+
+  <footer>
+    Generated from the adversarially-verified V1 Readiness Report (workflow <code>wf_5f3e0be7-0e8</code>).
+    All figures sourced from <code>v1-readiness-report.md</code> · scope buckets from <code>features.md</code> · 2026-06-29.
+  </footer>
+
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    flowchart:{useMaxWidth:true,htmlLabels:true,curve:'basis'},
+    themeVariables:{
+      fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif',
+      primaryColor:'#f1ecff', primaryBorderColor:'#7c3aed', primaryTextColor:'#15202e',
+      lineColor:'#9aa6b6', fontSize:'13px'
+    }
+  });
+</script>
+</body>
+</html>

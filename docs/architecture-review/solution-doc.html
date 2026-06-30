@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>mailflow — Solution Overview</title>
+<script src="./mermaid.min.js"></script>
+<style>
+  :root{
+    --bg:#f7f8fa; --panel:#ffffff; --ink:#1d2530; --muted:#5a6675; --line:#e3e7ee;
+    --accent:#2f6df0; --accent-soft:#eaf1ff;
+    --ok:#15803d; --ok-bg:#dcfce7; --partial:#b45309; --partial-bg:#fef3c7;
+    --miss:#b91c1c; --miss-bg:#fee2e2; --defer:#5b6472; --defer-bg:#e9edf3;
+    --code:#0b3b8c; --shadow:0 1px 2px rgba(16,24,40,.06),0 4px 14px rgba(16,24,40,.05);
+    --nav-w:248px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  code,.mono{font-family:"SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86em}
+  code{background:#eef1f6;color:var(--code);padding:1px 5px;border-radius:5px}
+
+  /* layout */
+  .wrap{display:flex;align-items:flex-start;max-width:1240px;margin:0 auto}
+  nav{position:sticky;top:0;width:var(--nav-w);flex:0 0 var(--nav-w);height:100vh;overflow:auto;
+    padding:22px 16px 40px;border-right:1px solid var(--line);background:var(--panel)}
+  nav .brand{font-weight:700;font-size:18px;letter-spacing:-.01em;margin:0 0 2px}
+  nav .brand .dot{color:var(--accent)}
+  nav .tag{color:var(--muted);font-size:12px;margin:0 0 18px}
+  nav a{display:block;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:7px;
+    font-size:13.5px;border-left:2px solid transparent}
+  nav a:hover{background:var(--accent-soft);color:var(--ink)}
+  nav a.sub{padding-left:22px;font-size:12.8px}
+  nav a.active{color:var(--accent);background:var(--accent-soft);border-left-color:var(--accent);font-weight:600}
+  nav .grp{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#97a1b0;margin:16px 0 4px;padding:0 10px}
+
+  main{flex:1 1 auto;min-width:0;padding:40px 48px 120px;max-width:920px}
+  section{scroll-margin-top:20px;padding-top:14px;margin-bottom:38px}
+  h1{font-size:30px;line-height:1.2;letter-spacing:-.02em;margin:.1em 0 .15em}
+  h2{font-size:22px;letter-spacing:-.01em;margin:1.4em 0 .5em;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  h3{font-size:16px;margin:1.4em 0 .4em}
+  p{margin:.5em 0}
+  .lede{font-size:17px;color:#33404f}
+  .muted{color:var(--muted)}
+  ul{margin:.4em 0 .6em;padding-left:1.25em}
+  li{margin:.25em 0}
+
+  /* hero / kpi */
+  .hero{background:linear-gradient(180deg,#ffffff, #fbfcff);border:1px solid var(--line);
+    border-radius:14px;padding:22px 24px;box-shadow:var(--shadow)}
+  .oneliner{font-size:18px;font-weight:600;color:#22303f;margin:.2em 0 .1em}
+  .kpis{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px}
+  .kpi{flex:1 1 150px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .kpi b{display:block;font-size:20px;letter-spacing:-.01em}
+  .kpi span{font-size:12px;color:var(--muted)}
+
+  /* cards */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;
+    margin:14px 0;box-shadow:var(--shadow)}
+  .card .head{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:2px}
+  .card .head h3{margin:0;font-size:16.5px}
+  .card .sub{color:var(--muted);font-style:italic;font-size:14px}
+  .row{display:grid;grid-template-columns:120px 1fr;gap:6px 14px;margin:10px 0 2px;font-size:14px}
+  .row .k{color:var(--muted);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;padding-top:1px}
+
+  /* chips */
+  .chip{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;
+    white-space:nowrap;vertical-align:middle}
+  .c-ok{background:var(--ok-bg);color:var(--ok)}
+  .c-partial{background:var(--partial-bg);color:var(--partial)}
+  .c-miss{background:var(--miss-bg);color:var(--miss)}
+  .c-defer{background:var(--defer-bg);color:var(--defer)}
+  .id{display:inline-block;font:600 11px ui-monospace,monospace;background:#eef1f6;color:#3a475a;
+    padding:1px 6px;border-radius:5px;margin-right:3px}
+
+  /* diagrams */
+  .diagram{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;
+    margin:16px 0;overflow:auto;box-shadow:var(--shadow)}
+  .diagram .cap{font-size:12.5px;color:var(--muted);margin:2px 4px 8px;text-align:center}
+  .mermaid{display:flex;justify-content:center}
+
+  /* callouts */
+  .note{border-left:3px solid var(--accent);background:var(--accent-soft);padding:10px 14px;border-radius:0 8px 8px 0;margin:14px 0}
+  .note.warn{border-color:var(--partial);background:var(--partial-bg)}
+  .note b{color:inherit}
+
+  /* tables */
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.6px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:#fafbfd}
+  tr:last-child td{border-bottom:none}
+
+  /* bars */
+  .bars{display:grid;gap:10px;margin:14px 0}
+  .bar{display:grid;grid-template-columns:170px 1fr 44px;align-items:center;gap:12px;font-size:13.5px}
+  .bar .track{height:14px;background:#eef1f6;border-radius:8px;overflow:hidden}
+  .bar .fill{height:100%;border-radius:8px;background:linear-gradient(90deg,#3b82f6,#2f6df0)}
+  .bar .pct{text-align:right;font-weight:700;color:var(--muted);font-size:12.5px}
+
+  details.adv{margin-top:8px}
+  details.adv summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:600;outline:none}
+  details.adv[open] summary{margin-bottom:6px}
+
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:6px 0 0}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  hr.sep{border:none;border-top:1px solid var(--line);margin:30px 0}
+  @media(max-width:880px){
+    nav{display:none} main{padding:26px 18px 90px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav id="nav">
+  <p class="brand">mail<span class="dot">flow</span></p>
+  <p class="tag">Solution overview · V1 · 2026-06-29</p>
+  <a href="#frame">The 60-second frame</a>
+  <a href="#arch">Architecture at a glance</a>
+  <div class="grp">Pipeline, stage by stage</div>
+  <a class="sub" href="#s-wake">1 · Wake &amp; verify</a>
+  <a class="sub" href="#s-fetch">2 · Fetch &amp; cursor</a>
+  <a class="sub" href="#s-size">3 · Size guard</a>
+  <a class="sub" href="#s-extract">4 · Extract &amp; thread</a>
+  <a class="sub" href="#s-clean">5 · Clean</a>
+  <a class="sub" href="#s-filter">6 · Filter</a>
+  <a class="sub" href="#s-emit">7 · Emit &amp; idempotency</a>
+  <div class="grp">Cross-cutting</div>
+  <a class="sub" href="#x-errors">Error taxonomy</a>
+  <a class="sub" href="#x-reliability">Reliability</a>
+  <a class="sub" href="#x-extend">Extensibility</a>
+  <a class="sub" href="#x-observe">Observability</a>
+  <div class="grp">Direction</div>
+  <a href="#roadmap">Scope &amp; roadmap</a>
+  <a href="#status">Where it stands</a>
+</nav>
+
+<main>
+  <!-- ============================== FRAME ============================== -->
+  <section id="frame">
+    <h1>mailflow</h1>
+    <p class="lede muted">A reusable library that turns a live email inbox into clean, structured, de-duplicatable events for the app that plugs into it.</p>
+
+    <div class="hero">
+      <p class="oneliner">One sentence: mailflow watches an inbox, and on every new email it fetches, opens, cleans, and hands a tidy structured record to your app — reliably, exactly once you'd want it, with the messy parts (auth, throttling, duplicates, broken mail) handled for you.</p>
+      <p class="muted" style="margin:.6em 0 0">Mental model — an <b>automated mailroom</b>: a letter arrives → the clerk is pinged → the clerk fetches the letter using a bookmark (not the ping) → opens it, pulls out the useful parts, discards junk → hands a summary card to the department that asked. Everything below is how that mailroom is built.</p>
+      <div class="kpis">
+        <div class="kpi"><b>Gmail</b><span>live provider in V1 (Outlook adapter present, fast-follow)</span></div>
+        <div class="kpi"><b>Poll-authoritative</b><span>push only <i>wakes</i> the poller</span></div>
+        <div class="kpi"><b>Single-tenant</b><span>single worker, synchronous</span></div>
+        <div class="kpi"><b>At-least-once</b><span>dedupe via idempotency_key</span></div>
+      </div>
+    </div>
+
+    <div class="diagram">
+      <div class="cap">The journey every email takes — each step maps to a section below (feature IDs in parentheses).</div>
+      <pre class="mermaid">
+flowchart LR
+    A["📨 Inbox<br/>Gmail"] -->|"push ping<br/>(Pub/Sub)"| B{"Ping<br/>genuine?<br/>(A5)"}
+    B -->|forged| X["🗑️ Reject"]
+    B -->|genuine| C["Wake →<br/>poll from cursor<br/>(A1/A3)"]
+    C --> D["Fetch changed<br/>page-atomic<br/>(B6)"]
+    D --> E{"Size OK?<br/>(B1)"}
+    E -->|"unknown /<br/>too big"| DLQ[("Problem pile<br/>DLQ (B2/B3)")]
+    E -->|ok| F["Extract fields<br/>+ thread_key<br/>(A7)"]
+    F --> G["Clean<br/>HTML→text<br/>(A6/B5)"]
+    G --> H["Filters<br/>(A10)"]
+    H --> I["Emit EmailEvent<br/>+ idempotency_key<br/>(A4)"]
+    I --> J["🎯 Consumer<br/>(your app)"]
+    classDef dlq fill:#fee2e2,stroke:#b91c1c,color:#000
+    classDef ok fill:#dcfce7,stroke:#15803d,color:#000
+    class DLQ dlq
+    class J ok
+      </pre>
+    </div>
+    <p class="legend">
+      <span><span class="chip c-ok">✓ done</span> shipped &amp; tested</span>
+      <span><span class="chip c-partial">~ partial</span> present, incomplete/wrong</span>
+      <span><span class="chip c-miss">✗ missing</span> to build for V1</span>
+      <span><span class="chip c-defer">⏸ deferred</span> out of V1 scope</span>
+    </p>
+  </section>
+
+  <!-- ============================== ARCH ============================== -->
+  <section id="arch">
+    <h2>Architecture at a glance</h2>
+    <p>The one idea that explains everything else: <b>mailflow is a small core of frozen <i>contracts</i> (ports) surrounded by swappable implementations.</b> The core knows the <i>shape</i> of a mailbox provider, a webhook verifier, a content cleaner, a store — but never a specific vendor. Gmail and Outlook are just two implementations of the same ports.</p>
+    <p>That is also the build philosophy: <b>freeze the contracts first, then build behind them in parallel.</b> A contract is a method signature or a model field that, once V1 ships, consumers build against — changing it later breaks them. So the contracts are locked before any parallel implementation work begins.</p>
+
+    <div class="diagram">
+      <div class="cap">Core defines the ports; adapters &amp; stores implement them; the facade wires it together for the consumer.</div>
+      <pre class="mermaid">
+flowchart TB
+    APP["Your app — the consumer"]
+    subgraph FAC["Library facade — connect() / builder"]
+      F1["overrides= · as_filter · as_cleaner&nbsp;(A10)"]
+    end
+    subgraph CORE["Core — frozen contracts (sync, single-worker)"]
+      PIPE["Pipeline"]
+      P["Ports / Protocols:<br/>MailboxProvider · WebhookVerifier · ContentCleaner<br/>SecretProvider · BlobStore · CursorStore · DedupeStore"]
+      M["Models: CleanEmail · EmailEvent · Envelope<br/>Errors: Auth / Permanent / Transient (A2)"]
+    end
+    subgraph IMPL["Swappable implementations"]
+      GM["Gmail adapter<br/>(live in V1)"]
+      GR["Graph / Outlook adapter<br/>(fast-follow)"]
+      ST["Stores:<br/>memory · sqlite · local blob"]
+    end
+    APP --> FAC --> PIPE
+    PIPE --> P
+    PIPE --> M
+    P -. implemented by .-> GM
+    P -. implemented by .-> GR
+    P -. implemented by .-> ST
+    classDef core fill:#eaf1ff,stroke:#2f6df0,color:#000
+    class CORE core
+      </pre>
+    </div>
+
+    <div class="note"><b>Why a lead should care:</b> the risk in a library isn't the code that works today — it's the <i>promises</i>. Get the ports right and a new provider, store, or cleaner slots in without touching the core or breaking a single consumer. Get them wrong and every consumer pays for the rewrite. V1's whole job is to lock the right promises.</div>
+  </section>
+
+  <!-- ============================== PIPELINE ============================== -->
+  <h2 style="margin-top:6px">The pipeline, stage by stage</h2>
+  <p class="muted">Each card: what the stage does · the contract it freezes · why it matters (the failure it prevents) · V1 status.</p>
+
+  <section id="s-wake">
+    <div class="card">
+      <div class="head"><h3>1 · Wake signal &amp; webhook verification</h3><span class="id">A5</span><span class="chip c-partial">~ reduced to Gmail OIDC-JWT</span></div>
+      <p class="sub">"A new-mail ping arrived — but is it really from Google, and is it safe to act on?"</p>
+      <div class="row"><div class="k">Contract</div><div><code>WebhookVerifier</code> port → returns <b>identity only</b> (verified subscription/mailbox), never payload trust.</div></div>
+      <div class="row"><div class="k">V1 impl</div><div>Gmail Pub/Sub <b>OIDC-JWT</b> verification — signature via JWKS, audience, issuer. (Outlook <code>validationToken</code> handshake deferred.)</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>Push ingestion is internet-facing. Without verification, anyone can forge a "you have mail" ping. A verified ping still only earns a <i>wake</i> — never "fetch this exact ID."</div></div>
+    </div>
+  </section>
+
+  <section id="s-fetch">
+    <div class="card">
+      <div class="head"><h3>2 · Fetch &amp; cursor (the golden rule)</h3><span class="id">A1</span><span class="id">A3</span><span class="id">B6</span><span class="chip c-partial">~ Gmail compliant</span></div>
+      <p class="sub">"On wake, re-derive what changed from a durable bookmark — never trust the ID inside a ping."</p>
+      <div class="row"><div class="k">Contract</div><div>Cursor is <b>durable</b>, <b>strictly monotonic</b> (<code>commit_if_ahead</code>), and advances on <i>every</i> terminal disposition. Gmail = <code>historyId</code>; Outlook = <code>deltaLink</code>.</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>Pings can be forged, duplicated, or arrive out of order. The bookmark is the only trustworthy source of "where I stopped," so a crash resumes exactly where it left off — no gaps, no re-scans.</div></div>
+      <div class="row"><div class="k">V1 status</div><div>Gmail already obeys this (re-derives from <code>historyId</code>) and commits one cursor per page (B6 ✓). The Outlook wake-rewire is deferred.</div></div>
+    </div>
+  </section>
+
+  <section id="s-size">
+    <div class="card">
+      <div class="head"><h3>3 · Size guard — fail closed</h3><span class="id">B1</span><span class="chip c-partial">~ to fix</span></div>
+      <p class="sub">"If we can't tell how big an email is, assume it's too big and set it aside — before downloading."</p>
+      <div class="row"><div class="k">Behavior</div><div>Unknown / omitted size ⇒ treat as over-limit ⇒ DLQ <b>before</b> fetch. (Today an unknown size becomes 0 and sneaks under the ceiling — the bug.)</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>"Fail open" on size means an unbounded or unknown payload can be pulled into memory and crash the run. Safe default is to reject, not guess.</div></div>
+    </div>
+  </section>
+
+  <section id="s-extract">
+    <div class="card">
+      <div class="head"><h3>4 · Extract fields &amp; thread key</h3><span class="id">A7</span><span class="chip c-miss">✗ to build</span></div>
+      <p class="sub">"Open the envelope, pull out sender/subject/body/attachments — and the ID that groups a conversation."</p>
+      <div class="row"><div class="k">Contract</div><div>New <code>thread_key</code> field on <code>CleanEmail</code>; maps Gmail <code>threadId</code> / Outlook <code>conversationId</code>, with a subject-normalized fallback.</div></div>
+      <div class="row"><div class="k">Seam</div><div>Extraction sits behind a port. <code>MimeExtractor.extract_bytes(...)</code> for raw RFC822 (Gmail); other providers implement <code>extract(msg, env)</code> directly (Outlook/Graph).</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>Without a provider-native thread key, consumers can't reliably tie a reply back to its original — conversation grouping breaks.</div></div>
+    </div>
+  </section>
+
+  <section id="s-clean">
+    <div class="card">
+      <div class="head"><h3>5 · Clean — HTML → text</h3><span class="id">A6</span><span class="id">B5</span><span class="chip c-miss">✗ to build</span></div>
+      <p class="sub">"Turn an email's HTML into readable plain text — gently by default, aggressively only if asked."</p>
+      <div class="row"><div class="k">Contract</div><div><code>ContentCleaner</code> port (<code>clean(CleanEmail) -&gt; CleanEmail</code>), wired as a real pipeline stage — not a post-emit afterthought.</div></div>
+      <div class="row"><div class="k">Parity (B5)</div><div>A shared HTML→text converter runs in <b>both</b> extractors, so an HTML-only email yields non-empty <code>body_text</code> the same way regardless of provider.</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>V1 is plain-text-only (no HTML sanitizer / renderer). So if HTML-only mail produced blank text, the product would look empty. This stage is what makes the output usable.</div></div>
+    </div>
+  </section>
+
+  <section id="s-filter">
+    <div class="card">
+      <div class="head"><h3>6 · Filter</h3><span class="id">A10</span><span class="chip c-partial">~ functions work</span></div>
+      <p class="sub">"Only hand the consumer the emails they actually want."</p>
+      <div class="row"><div class="k">Built-in</div><div>To / CC / subject matching incl. regex; consumers can inject their own filters.</div></div>
+      <div class="row"><div class="k">Today</div><div>Filters/cleaners inject as plain callables via the facade (<code>connect(filters=[...], clean_fn=...)</code>). What's left is the generic <code>overrides=</code> seam + named <code>as_filter</code>/<code>as_cleaner</code> decorators (see Extensibility).</div></div>
+    </div>
+  </section>
+
+  <section id="s-emit">
+    <div class="card">
+      <div class="head"><h3>7 · Emit event &amp; idempotency</h3><span class="id">A4</span><span class="chip c-partial">~ key not on wire</span></div>
+      <p class="sub">"Hand the consumer a clean event stamped with a fingerprint so they can spot duplicates."</p>
+      <div class="row"><div class="k">Contract</div><div><code>idempotency_key</code> surfaced on <code>EmailEvent</code> = <code>(tenant, mailbox, provider_message_id)</code>. Wire schema bumps <code>1.0 → 1.1</code> (additive).</div></div>
+      <div class="row"><div class="k">Delivery</div><div><b>At-least-once</b>, documented honestly. Exactly-once is not promised; duplicates are expected and handled by the key. (Docs that claimed exactly-once are being corrected.)</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>The emitted event <i>is</i> the public contract. The fingerprint is computed internally already — V1 simply exposes it so consumers don't have to rebuild it.</div></div>
+    </div>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- ============================== CROSS-CUTTING ============================== -->
+  <h2 style="margin-top:6px">Cross-cutting concerns</h2>
+
+  <section id="x-errors">
+    <div class="card">
+      <div class="head"><h3>Error taxonomy &amp; routing</h3><span class="id">A2</span><span class="id">B3</span><span class="chip c-miss">✗ foundational</span></div>
+      <p class="sub">"Sort every failure into Auth / Permanent / Transient, and react differently to each."</p>
+      <div class="row"><div class="k">Contract</div><div><code>AuthError</code> · <code>PermanentError</code> · <code>TransientError</code> (subclasses of <code>MailflowError</code>); provider errors re-parented onto them.</div></div>
+      <div class="row"><div class="k">Routing</div><div>Auth (401) → refresh once, retry · Permanent (403/404/410/decode) → DLQ, no retry · Transient (429/5xx/network) → bounded backoff, then DLQ.</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>Today a single bare <code>except</code> retries everything by attempt count — so "message gone" (410) and "garbled data" retry forever (a poison loop). This is the keystone: B3 and B4 both depend on it.</div></div>
+    </div>
+    <div class="diagram">
+      <div class="cap">The routing this taxonomy unlocks.</div>
+      <pre class="mermaid">
+flowchart TD
+    E["Failure at provider boundary"] --> Q{"What kind? (A2)"}
+    Q -->|"401 — login expired"| R["🔄 Refresh token,<br/>retry once"]
+    Q -->|"403/404/410/decode<br/>Permanent (B3)"| D[("🗑️ DLQ — never retry")]
+    Q -->|"429/5xx/network<br/>Transient (B4)"| T["⏳ Backoff + jitter,<br/>honor Retry-After, bounded"]
+    R -->|still failing| D
+    T -->|retries exhausted| D
+    classDef dlq fill:#fee2e2,stroke:#b91c1c,color:#000
+    class D dlq
+      </pre>
+    </div>
+  </section>
+
+  <section id="x-reliability">
+    <div class="card">
+      <div class="head"><h3>Reliability — isolation, backoff, storm containment</h3><span class="id">B2</span><span class="id">B4</span><span class="chip c-partial">~ partial</span></div>
+      <div class="row"><div class="k">DLQ isolation (B2)</div><div>One broken/oversized message is set aside <b>alone</b> — it must never crash the batch. Counted exactly once (<code>add_dead_letter()</code> + paired trace). Gap: the <i>fetch</i> stage still lacks per-record isolation.</div></div>
+      <div class="row"><div class="k">Backoff + storm (B4)</div><div>Retry 5xx; exponential backoff + jitter honoring <code>Retry-After</code>; bounded concurrency cap; and crucially <b>contain an exhausted-retry storm</b> so it can't abort the whole run.</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>These are the difference between "one bad email" and "the run dies." Today a 429 storm propagates uncaught and takes everything down.</div></div>
+    </div>
+  </section>
+
+  <section id="x-extend">
+    <div class="card">
+      <div class="head"><h3>Extensibility &amp; stability policy</h3><span class="id">A8</span><span class="id">A10</span><span class="id">A11</span><span class="chip c-partial">~ partial</span></div>
+      <div class="row"><div class="k">Overrides (A10)</div><div>Generic <code>overrides=</code> mapping to inject any component instance, plus <code>as_filter</code>/<code>as_cleaner</code> decorator sugar — so the features above wire up without hand-building internals.</div></div>
+      <div class="row"><div class="k">Token rotation (A8)</div><div><code>SecretProvider</code> gains an <b>on-refresh persistence callback</b>: a rotated OAuth refresh token is <i>saved</i>, or the next run silently breaks. (Multi-tenant/DWD intentionally out of V1.)</div></div>
+      <div class="row"><div class="k">Versioning (A11)</div><div>Explicit <b>sync-only</b> declaration, provisional/stable port markers, and a <code>version</code> field on config — so a future async family is an <i>addition</i>, not a breaking change.</div></div>
+    </div>
+  </section>
+
+  <section id="x-observe">
+    <div class="card">
+      <div class="head"><h3>Observability</h3><span class="chip c-partial">~ light in V1</span></div>
+      <p class="sub">Structured logs, counters, run reports, health checks — enough to operate it.</p>
+      <div class="row"><div class="k">In V1</div><div>Basic structured logs + run-report counters (emitted / dropped / duplicate / dead-lettered).</div></div>
+      <div class="row"><div class="k">Deferred</div><div>PII redaction (scrubbing bodies from logs) is post-V1; for now, full bodies simply aren't logged by default.</div></div>
+    </div>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- ============================== ROADMAP ============================== -->
+  <section id="roadmap">
+    <h2>Scope &amp; roadmap</h2>
+    <p>V1 was deliberately narrowed (11 scope decisions, locked 2026-06-29) to a coherent, shippable slice. Everything else is sequenced behind it with the seams already designed.</p>
+
+    <div class="note"><b>V1 in one line:</b> a <b>Gmail-only</b>, <b>single-tenant</b>, <b>poll-authoritative</b> library (Gmail push only <i>wakes</i> the poller), cleaning each email to plain text and emitting a clean, de-duplicatable event.</div>
+
+    <table>
+      <thead><tr><th>Tier</th><th>Meaning</th><th>Highlights</th></tr></thead>
+      <tbody>
+        <tr><td><b>P0 · V1</b></td><td>Release blockers — the frozen contracts + correctness defects</td><td>Error taxonomy (A2), idempotency_key (A4), Gmail webhook verify (A5), cleaner (A6), thread key (A7), overrides (A10), sync/version policy (A11); size fail-closed (B1), DLQ isolation (B2), permanent-classify (B3), backoff/storm (B4), HTML→text parity (B5)</td></tr>
+        <tr><td><b>P1</b></td><td>Should-have — sturdier, fast-follow</td><td>Subscription renewal driver, missed-email backfill, attachment streaming + dedup, replayable DLQ, reference blob store, config validation, fuller observability</td></tr>
+        <tr><td><b>P2</b></td><td>Post-V1 — design the seam now, build later</td><td>Rich cleaning heuristics, HTML sanitizer, malware scanner, KMS encryption-at-rest, S3 stores, async inbound buffer, persistent dedupe store, GDPR DSAR tooling, bounce/OOO engine</td></tr>
+        <tr><td><b>P3</b></td><td>Future / optional</td><td>Plugin kind registry, iCalendar parsing, TNEF decode, encrypted Graph resource-data, more providers (IMAP, SES)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Deliberately out of V1</h3>
+    <ul>
+      <li><span class="chip c-defer">⏸ deferred</span> &nbsp;<b>Outlook live</b> — subscription-expiry clamp (C1) &amp; size-probe (C2) &amp; wake-rewire (A1). The adapter stays in the tree; Gmail is the live proof of provider-agnosticism (D1 ✓).</li>
+      <li><span class="chip c-defer">⏸ deferred</span> &nbsp;<b>GDPR erase / encryption-at-rest</b> (A9) — team owns all stores, so addable later without breaking implementors.</li>
+      <li><span class="chip c-defer">⏸ deferred</span> &nbsp;<b>PII redaction in logs</b>, multi-tenant, multi-worker concurrency, strict ordering, HTML sanitizer.</li>
+    </ul>
+  </section>
+
+  <!-- ============================== STATUS ============================== -->
+  <section id="status">
+    <h2>Where it stands &amp; path to done</h2>
+    <p>Today mailflow is a genuinely usable <b>Gmail polling library</b> (injectable filters/cleaners, 11 passing tests). What's unfinished are the <b>frozen-forever contracts</b> — exactly the part that's expensive to change after release.</p>
+
+    <div class="bars">
+      <div class="bar"><span>A — contracts</span><div class="track"><div class="fill" style="width:32%"></div></div><span class="pct">32%</span></div>
+      <div class="bar"><span>B — correctness defects</span><div class="track"><div class="fill" style="width:39%"></div></div><span class="pct">39%</span></div>
+      <div class="bar"><span>C — live blockers</span><div class="track"><div class="fill" style="width:18%"></div></div><span class="pct">18%</span></div>
+      <div class="bar"><span>D — provider proof</span><div class="track"><div class="fill" style="width:80%"></div></div><span class="pct">80%</span></div>
+    </div>
+    <p class="muted" style="font-size:13px">Percentages are the original P0 snapshot; in-scope completeness is meaningfully higher since the least-finished items (Outlook live, GDPR) were deferred.</p>
+
+    <div class="kpis" style="margin-top:18px">
+      <div class="kpi"><b>~18–26 dev-days</b><span>locked-scope effort (≈4–5 wks, 1 eng)</span></div>
+      <div class="kpi"><b>A2 first</b><span>keystone — unblocks B3 &amp; B4</span></div>
+      <div class="kpi"><b>11 tests ✓</b><span>Gmail e2e + reliability green today</span></div>
+    </div>
+
+    <h3>How it gets built</h3>
+    <div class="diagram">
+      <div class="cap">Freeze contracts serially → implement in parallel tracks (TDD) → adversarially verify → integrate &amp; tag.</div>
+      <pre class="mermaid">
+flowchart LR
+    P0["Phase 0<br/>Freeze contracts<br/>(serial)"] --> G0{"Human<br/>gate"}
+    G0 --> P1["Phase 1<br/>Implement — 4 parallel<br/>tracks, TDD"]
+    P1 --> P2["Phase 2<br/>Adversarial<br/>verify"]
+    P2 --> G1{"All in-scope<br/>done?"}
+    G1 -->|gaps| P1
+    G1 -->|clean| P3["Phase 3<br/>Integrate +<br/>tag V1"]
+    classDef p0 fill:#fef3c7,stroke:#b45309,color:#000
+    classDef p3 fill:#dcfce7,stroke:#15803d,color:#000
+    class P0 p0
+    class P3 p3
+      </pre>
+    </div>
+    <p><b>Definition of done:</b> full suite green · <code>mypy --strict</code> clean · every in-scope item verified with quoted proof · a live Gmail run (push wakes → poll from cursor → clean → emit with <code>idempotency_key</code>; forged push rejected; oversized/unknown DLQ'd pre-download; 429-storm survives) · docs say at-least-once.</p>
+
+    <details class="adv">
+      <summary>Speaker notes — anticipated questions</summary>
+      <ul style="margin-top:8px">
+        <li><b>"Why Gmail-only?"</b> — One provider proves the provider-agnostic design end-to-end (D1). Outlook is an adapter on the same ports; its remaining work is live-API quirks (expiry clamp, size probe), not architecture.</li>
+        <li><b>"Why not exactly-once?"</b> — Exactly-once across networks is impractical; we choose availability-first and make duplicates cheap to detect with <code>idempotency_key</code>. Honest contract beats a false promise.</li>
+        <li><b>"Why poll if there's push?"</b> — Push pings can be forged, dropped, or reordered. Poll/delta from a durable cursor is the reliable engine; push just shortens latency by waking it.</li>
+        <li><b>"Biggest risk?"</b> — The contract surface (Category A). Once published it can't change without breaking consumers, which is exactly why Phase 0 freezes it before any parallel build.</li>
+      </ul>
+    </details>
+  </section>
+
+</main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    flowchart:{useMaxWidth:true,htmlLabels:true,curve:'basis'},
+    themeVariables:{
+      fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif',
+      primaryColor:'#eaf1ff', primaryBorderColor:'#2f6df0', primaryTextColor:'#1d2530',
+      lineColor:'#8a97a8', fontSize:'13px'
+    }
+  });
+  // scroll-spy nav highlight
+  const links=[...document.querySelectorAll('nav a')];
+  const map=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+  const obs=new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting){
+      links.forEach(l=>l.classList.remove('active'));
+      const a=map.get(e.target.id); if(a)a.classList.add('active');
+    }});
+  },{rootMargin:'-10% 0px -75% 0px'});
+  document.querySelectorAll('section[id]').forEach(s=>obs.observe(s));
+</script>
+</body>
+</html>

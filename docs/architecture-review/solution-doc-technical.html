@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>mailflow — Technical Architecture Review</title>
+<script src="./mermaid.min.js"></script>
+<style>
+  :root{
+    --bg:#eef1f4; --panel:#ffffff; --ink:#11161d; --muted:#5b6b7b; --faint:#8a98a6;
+    --line:#dde3ea; --rule:#e7ecf1;
+    --accent:#0e7490;        /* deep teal */
+    --accent2:#b45309;       /* amber */
+    --accent-soft:#e3f1f3;
+    --ok:#15803d; --ok-bg:#dcfce7; --partial:#b45309; --partial-bg:#fdf0d5;
+    --miss:#b91c1c; --miss-bg:#fde2e2; --defer:#475569; --defer-bg:#e6ebf1;
+    /* code surface (IDE dark) */
+    --code-bg:#0d1320; --code-bg2:#111a2b; --code-line:#1d2840; --code-ink:#cdd6e4;
+    --c-kw:#f0883e;   /* keyword/orange */
+    --c-ty:#56b6c2;   /* type/cyan */
+    --c-fn:#e5c07b;   /* function/yellow */
+    --c-st:#98c379;   /* string/green */
+    --c-cm:#5c6b7e;   /* comment/slate */
+    --c-dec:#c678dd;  /* decorator/violet */
+    --c-pn:#8aa0b6;   /* punctuation */
+    --shadow:0 1px 2px rgba(13,19,32,.05),0 6px 18px rgba(13,19,32,.06);
+    --nav-w:264px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.62 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .mono,code,kbd{font-family:"JetBrains Mono","SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  code{background:#e7edf3;color:#0b3a44;padding:1px 5px;border-radius:4px;font-size:.84em;border:1px solid #d6dfe8}
+
+  /* layout */
+  .wrap{display:flex;align-items:flex-start;max-width:1280px;margin:0 auto}
+  nav{position:sticky;top:0;width:var(--nav-w);flex:0 0 var(--nav-w);height:100vh;overflow:auto;
+    padding:22px 14px 50px;background:#0f1722;color:#aebccb;border-right:1px solid #0a1019}
+  nav .brand{font-weight:800;font-size:19px;letter-spacing:-.02em;margin:0 0 1px;color:#eef4fa;font-family:"JetBrains Mono",ui-monospace,monospace}
+  nav .brand .dot{color:#38bdf8}
+  nav .tag{color:#6f8093;font-size:11.5px;margin:0 0 16px;font-family:"JetBrains Mono",ui-monospace,monospace}
+  nav a{display:block;color:#9fb0c0;text-decoration:none;padding:5px 10px;border-radius:6px;
+    font-size:13px;border-left:2px solid transparent}
+  nav a:hover{background:#16202e;color:#eaf2f8}
+  nav a.sub{padding-left:20px;font-size:12.4px;color:#8294a6}
+  nav a.active{color:#38bdf8;background:#13202e;border-left-color:#38bdf8;font-weight:600}
+  nav .grp{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:#5a6a7c;margin:18px 0 4px;padding:0 10px}
+
+  main{flex:1 1 auto;min-width:0;padding:38px 52px 130px;max-width:960px}
+  section{scroll-margin-top:18px;padding-top:12px;margin-bottom:40px}
+  h1{font-size:31px;line-height:1.16;letter-spacing:-.025em;margin:.1em 0 .12em}
+  h1 .mono{font-weight:800}
+  h2{font-size:21px;letter-spacing:-.012em;margin:1.5em 0 .5em;padding-bottom:7px;border-bottom:2px solid var(--rule)}
+  h2 .num{color:var(--accent);font-family:"JetBrains Mono",ui-monospace,monospace;font-size:16px;margin-right:8px}
+  h3{font-size:15.5px;margin:1.4em 0 .4em;letter-spacing:-.005em}
+  p{margin:.5em 0}
+  .lede{font-size:16.5px;color:#2c3947}
+  .muted{color:var(--muted)}
+  .faint{color:var(--faint)}
+  ul{margin:.4em 0 .6em;padding-left:1.2em}
+  li{margin:.28em 0}
+  b,strong{color:#0b1118}
+
+  /* hero */
+  .hero{background:linear-gradient(180deg,#ffffff,#f6f9fb);border:1px solid var(--line);
+    border-left:4px solid var(--accent);border-radius:10px;padding:20px 22px;box-shadow:var(--shadow)}
+  .oneliner{font-size:16px;color:#1d2733;margin:.1em 0 .5em}
+  .kpis{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+  .kpi{flex:1 1 160px;background:#0f1722;color:#cdd9e5;border-radius:8px;padding:11px 13px}
+  .kpi b{display:block;font-size:15px;letter-spacing:-.01em;color:#7fdcff;font-family:"JetBrains Mono",ui-monospace,monospace}
+  .kpi span{font-size:11.5px;color:#90a2b3}
+
+  /* code / signature blocks */
+  pre.sig{background:var(--code-bg);color:var(--code-ink);border:1px solid var(--code-line);
+    border-radius:9px;padding:14px 16px;margin:12px 0;overflow:auto;font-size:12.9px;line-height:1.62;
+    font-family:"JetBrains Mono","SF Mono",ui-monospace,monospace;box-shadow:inset 0 0 0 1px rgba(255,255,255,.02)}
+  pre.sig .bar{display:block;color:#64748b;font-size:11px;letter-spacing:.04em;margin:-2px 0 8px;
+    border-bottom:1px dashed #243149;padding-bottom:6px}
+  .kw{color:var(--c-kw)} .ty{color:var(--c-ty)} .fn{color:var(--c-fn)} .st{color:var(--c-st)}
+  .cm{color:var(--c-cm);font-style:italic} .dec{color:var(--c-dec)} .pn{color:var(--c-pn)}
+  .nm{color:#d7e0ec}
+
+  /* cards */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:15px 17px;
+    margin:14px 0;box-shadow:var(--shadow)}
+  .card .head{display:flex;align-items:baseline;flex-wrap:wrap;gap:9px;margin-bottom:3px}
+  .card .head h3{margin:0;font-size:15.5px}
+  .card .sub{color:var(--muted);font-style:italic;font-size:13.5px;margin:.2em 0 .4em}
+  .row{display:grid;grid-template-columns:128px 1fr;gap:5px 14px;margin:9px 0 2px;font-size:13.8px}
+  .row .k{color:var(--accent);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding-top:2px;font-family:"JetBrains Mono",ui-monospace,monospace}
+
+  /* chips / ids */
+  .chip{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;vertical-align:middle}
+  .c-ok{background:var(--ok-bg);color:var(--ok)} .c-partial{background:var(--partial-bg);color:var(--partial)}
+  .c-miss{background:var(--miss-bg);color:var(--miss)} .c-defer{background:var(--defer-bg);color:var(--defer)}
+  .c-frozen{background:#dbeafe;color:#1d4ed8}
+  .id{display:inline-block;font:600 10.5px "JetBrains Mono",ui-monospace,monospace;background:#0f1722;color:#7fdcff;
+    padding:1px 6px;border-radius:4px;margin-right:2px}
+  .stab{display:inline-block;font:700 10px "JetBrains Mono",ui-monospace,monospace;padding:1px 6px;border-radius:4px;vertical-align:middle}
+  .stab.s{background:#dbeafe;color:#1d4ed8} .stab.p{background:#fef3c7;color:#92400e}
+
+  /* diagrams */
+  .diagram{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin:16px 0;overflow:auto;box-shadow:var(--shadow)}
+  .diagram .cap{font-size:12px;color:var(--muted);margin:2px 4px 8px;text-align:center;font-family:"JetBrains Mono",ui-monospace,monospace}
+  .mermaid{display:flex;justify-content:center}
+
+  /* callouts */
+  .note{border-left:3px solid var(--accent);background:var(--accent-soft);padding:10px 14px;border-radius:0 7px 7px 0;margin:14px 0;font-size:14px}
+  .note.warn{border-color:var(--accent2);background:var(--partial-bg)}
+  .note.code{border-color:#38bdf8;background:#0f1722;color:#c6d3e0;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.6px;line-height:1.6}
+  .note.code b{color:#7fdcff}
+
+  /* tables */
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:#f3f6f9;font-family:"JetBrains Mono",ui-monospace,monospace}
+  tr:last-child td{border-bottom:none}
+  td code{font-size:.92em}
+  .ctable td:first-child{white-space:nowrap}
+
+  hr.sep{border:none;border-top:1px solid var(--line);margin:30px 0}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:8px 0 0;font-family:"JetBrains Mono",ui-monospace,monospace}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  @media(max-width:900px){ nav{display:none} main{padding:24px 16px 90px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav id="nav">
+  <p class="brand">mail<span class="dot">flow</span></p>
+  <p class="tag">// technical review · V1 · 2026-06-29</p>
+  <a href="#overview">1 · System &amp; data flow</a>
+  <a href="#ports">2 · The port surface</a>
+  <a href="#contracts">3 · Frozen contracts</a>
+  <a href="#errors">4 · Error taxonomy &amp; routing</a>
+  <a href="#reliability">5 · Reliability &amp; isolation</a>
+  <a href="#extract">6 · Extraction &amp; cleaning seam</a>
+  <a href="#harness">7 · Build harness &amp; discipline</a>
+  <div class="grp">Reference</div>
+  <a class="sub" href="#ports">Protocol signatures</a>
+  <a class="sub" href="#contracts">Contract table</a>
+  <a class="sub" href="#errors">Raise / route map</a>
+  <a class="sub" href="#harness">Ownership tracks</a>
+</nav>
+
+<main>
+  <!-- ============================== OVERVIEW ============================== -->
+  <section id="overview">
+    <h1>mailflow — <span class="mono">technical architecture review</span></h1>
+    <p class="lede muted">A reusable library that watches one inbox and, per new email, runs a synchronous single-worker pipeline behind a frozen set of ports. This document goes to the implementation substance: the Protocol surface, the contracts that cannot move after 1.0, and how data and failures route through the spine.</p>
+
+    <div class="hero">
+      <p class="oneliner"><b>Locked V1:</b> Gmail-only · single-tenant · poll-authoritative (push only <i>wakes</i> the poller) · at-least-once delivery with consumer-side dedupe via <code>idempotency_key</code>. One synchronous worker; no internal concurrency (<code>SYNC_ONLY = True</code>).</p>
+      <p class="muted" style="margin:.4em 0 0;font-size:13.5px">The pipeline spine per message: <span class="mono">wake → verify → fetch-from-cursor → size-guard → claim → extract → clean → filter → emit → commit</span>. Each stage is a method on <code>Pipeline</code>; each external dependency is a <code>@runtime_checkable Protocol</code>. The core imports <b>no vendor SDK</b>.</p>
+      <div class="kpis">
+        <div class="kpi"><b>14 ports</b><span>11 @stable · 3 @provisional</span></div>
+        <div class="kpi"><b>3 error classes</b><span>Auth / Permanent / Transient</span></div>
+        <div class="kpi"><b>4 dispositions</b><span>emitted·dropped·duplicate·dead_lettered</span></div>
+        <div class="kpi"><b>schema 1.1</b><span>idempotency_key on the wire</span></div>
+      </div>
+    </div>
+
+    <h2><span class="num">1.1</span>The pipeline data flow</h2>
+    <p>A push notification is a <b>wake-signal only</b>: it is verified for identity, then discarded as a content source. The worker re-derives <i>what changed</i> from the durable cursor (<code>historyId</code>), never from the ID inside the ping. Every terminal disposition (emitted / dropped / duplicate / dead_lettered) advances the cursor; non-terminal transient failures do not.</p>
+
+    <div class="diagram">
+      <div class="cap">per-message spine — solid edges are the happy path; bracket nodes are terminal sinks</div>
+      <pre class="mermaid">
+flowchart LR
+    W["push wake<br/>Gmail Pub/Sub"] --> V{"WebhookVerifier.verify()<br/>OIDC-JWT, identity-only"}
+    V -->|"forged"| RJ["reject"]
+    V -->|"verified"| CUR["CursorStore.get()<br/>historyId"]
+    CUR --> FE["provider.fetch(stream, cursor)<br/>re-derive changed page"]
+    FE --> SZ{"message_size(msg)<br/>known and under cap?"}
+    SZ -->|"unknown / over"| DLQ[("DLQ<br/>add_dead_letter()")]
+    SZ -->|"ok"| CL{"DedupeStore.try_claim(key)"}
+    CL -->|"already claimed"| DUP["duplicate"]
+    CL -->|"claimed"| EX["_extract(msg, env)"]
+    EX --> CLEAN["ContentCleaner.clean()"]
+    CLEAN --> FIL{"filters"}
+    FIL -->|"drop"| DROP["dropped"]
+    FIL -->|"keep"| EMIT["Emitter.emit(EmailEvent)<br/>+ idempotency_key"]
+    EMIT --> COMMIT["commit_if_ahead(cursor)<br/>mark_done(key)"]
+    classDef sink fill:#fde2e2,stroke:#b91c1c,color:#000
+    classDef good fill:#dcfce7,stroke:#15803d,color:#000
+    class DLQ,RJ,DROP,DUP sink
+    class COMMIT good
+      </pre>
+    </div>
+    <p class="legend">
+      <span><span class="chip c-frozen">frozen</span> contract locked for 1.0</span>
+      <span><span class="stab s">@stable</span> port frozen</span>
+      <span><span class="stab p">@provisional</span> may evolve</span>
+      <span><span class="chip c-ok">done</span></span>
+      <span><span class="chip c-partial">partial</span></span>
+      <span><span class="chip c-defer">deferred</span></span>
+    </p>
+  </section>
+
+  <!-- ============================== PORTS ============================== -->
+  <section id="ports">
+    <h2><span class="num">2</span>The port surface — ports as the seam</h2>
+    <p>The whole architecture is one idea: <b>a small core of structural contracts surrounded by swappable implementations.</b> The core depends only on <code>typing.Protocol</code> shapes — Gmail, the in-memory stores, the SQLite cursor store are all just things that happen to satisfy a shape. From <code>core/ports.py</code>: <i>"<code>@runtime_checkable</code> only checks method-name existence and is slow; static typing (mypy strict) is the real conformance gate."</i> The decorators <code>@stable</code> / <code>@provisional</code> stamp <code>__stability__</code> onto each port (A11) so the frozen surface is machine-readable.</p>
+
+    <div class="diagram">
+      <div class="cap">core defines ports; the facade wires them; adapters/stores satisfy them structurally</div>
+      <pre class="mermaid">
+flowchart TB
+    subgraph CONSUMER["consumer app"]
+      FAC["connect() / builder<br/>overrides= · as_filter · as_cleaner"]
+    end
+    subgraph CORE["core — ports + Pipeline (SYNC_ONLY = True)"]
+      PIPE["Pipeline._process"]
+      STABLE["@stable ports:<br/>MailboxProvider · CursorStore · DedupeStore<br/>BlobStore · SecretProvider · Emitter<br/>ContentExtractor · EnvelopeParser · Filter"]
+      PROV["@provisional ports:<br/>WebhookVerifier · ContentCleaner<br/>TokenRotationSink"]
+    end
+    subgraph IMPL["implementations (no core changes to add one)"]
+      GM["Gmail adapter<br/>(live in V1)"]
+      GR["Graph adapter<br/>(fast-follow)"]
+      ST["stores: memory · sqlite · local-blob"]
+    end
+    FAC --> PIPE
+    PIPE --> STABLE
+    PIPE --> PROV
+    STABLE -. structural .-> GM
+    STABLE -. structural .-> GR
+    STABLE -. structural .-> ST
+    PROV -. structural .-> GM
+    classDef core fill:#e3f1f3,stroke:#0e7490,color:#000
+    class CORE core
+      </pre>
+    </div>
+
+    <h3>Conceptual Protocol signatures <span class="faint mono" style="font-size:12px">— verbatim from <code>core/ports.py</code></span></h3>
+    <pre class="sig">
+<span class="bar">core/ports.py — the structural contracts the core depends on (no vendor imports)</span>
+<span class="dec">@stable</span>
+<span class="dec">@runtime_checkable</span>
+<span class="kw">class</span> <span class="ty">MailboxProvider</span><span class="pn">(</span><span class="ty">Protocol</span><span class="pn">):</span>
+    <span class="kw">def</span> <span class="fn">connect</span><span class="pn">(</span><span class="kw">self</span><span class="pn">)</span> -&gt; <span class="ty">None</span><span class="pn">:</span> ...
+    <span class="kw">def</span> <span class="fn">sync_streams</span><span class="pn">(</span><span class="kw">self</span><span class="pn">)</span> -&gt; <span class="ty">Iterable</span><span class="pn">[</span><span class="ty">StreamRef</span><span class="pn">]:</span> ...
+    <span class="kw">def</span> <span class="fn">fetch</span><span class="pn">(</span><span class="kw">self</span>, stream<span class="pn">:</span> <span class="ty">StreamRef</span>, cursor<span class="pn">:</span> <span class="ty">Cursor</span> <span class="pn">|</span> <span class="ty">None</span><span class="pn">)</span> -&gt; <span class="ty">Iterator</span><span class="pn">[</span><span class="ty">RawMessage</span><span class="pn">]:</span> ...
+    <span class="kw">def</span> <span class="fn">message_size</span><span class="pn">(</span><span class="kw">self</span>, msg<span class="pn">:</span> <span class="ty">RawMessage</span><span class="pn">)</span> -&gt; <span class="ty">int</span> <span class="pn">|</span> <span class="ty">None</span><span class="pn">:</span> ...   <span class="cm"># None ⇒ unknown ⇒ fail-closed (B1)</span>
+
+<span class="dec">@stable</span> <span class="dec">@runtime_checkable</span>
+<span class="kw">class</span> <span class="ty">CursorStore</span><span class="pn">(</span><span class="ty">Protocol</span><span class="pn">):</span>
+    <span class="kw">def</span> <span class="fn">get</span><span class="pn">(</span><span class="kw">self</span>, tenant<span class="pn">:</span> <span class="ty">str</span>, stream<span class="pn">:</span> <span class="ty">StreamRef</span><span class="pn">)</span> -&gt; <span class="ty">Cursor</span> <span class="pn">|</span> <span class="ty">None</span><span class="pn">:</span> ...
+    <span class="kw">def</span> <span class="fn">commit_if_ahead</span><span class="pn">(</span><span class="kw">self</span>, tenant<span class="pn">:</span> <span class="ty">str</span>, stream<span class="pn">:</span> <span class="ty">StreamRef</span>, cursor<span class="pn">:</span> <span class="ty">Cursor</span><span class="pn">)</span> -&gt; <span class="ty">bool</span><span class="pn">:</span> ...  <span class="cm"># strictly monotonic</span>
+
+<span class="dec">@stable</span> <span class="dec">@runtime_checkable</span>
+<span class="kw">class</span> <span class="ty">DedupeStore</span><span class="pn">(</span><span class="ty">Protocol</span><span class="pn">):</span>          <span class="cm"># exactly four methods; in-memory does NOT simulate lease expiry</span>
+    <span class="kw">def</span> <span class="fn">try_claim</span><span class="pn">(</span><span class="kw">self</span>, key<span class="pn">:</span> <span class="ty">str</span>, lease_seconds<span class="pn">:</span> <span class="ty">int</span><span class="pn">)</span> -&gt; <span class="ty">bool</span><span class="pn">:</span> ...
+    <span class="kw">def</span> <span class="fn">record_attempt</span><span class="pn">(</span><span class="kw">self</span>, key<span class="pn">:</span> <span class="ty">str</span><span class="pn">)</span> -&gt; <span class="ty">int</span><span class="pn">:</span> ...
+    <span class="kw">def</span> <span class="fn">mark_done</span><span class="pn">(</span><span class="kw">self</span>, key<span class="pn">:</span> <span class="ty">str</span>, ttl_seconds<span class="pn">:</span> <span class="ty">int</span><span class="pn">)</span> -&gt; <span class="ty">None</span><span class="pn">:</span> ...
+    <span class="kw">def</span> <span class="fn">release</span><span class="pn">(</span><span class="kw">self</span>, key<span class="pn">:</span> <span class="ty">str</span><span class="pn">)</span> -&gt; <span class="ty">None</span><span class="pn">:</span> ...
+
+<span class="dec">@stable</span> <span class="dec">@runtime_checkable</span>
+<span class="kw">class</span> <span class="ty">BlobStore</span><span class="pn">(</span><span class="ty">Protocol</span><span class="pn">):</span>
+    <span class="kw">def</span> <span class="fn">put_stream</span><span class="pn">(</span><span class="kw">self</span>, ref<span class="pn">:</span> <span class="ty">str</span>, chunks<span class="pn">:</span> <span class="ty">Iterator</span><span class="pn">[</span><span class="ty">bytes</span><span class="pn">]</span>, content_type<span class="pn">:</span> <span class="ty">str</span><span class="pn">)</span> -&gt; <span class="ty">str</span><span class="pn">:</span> ...
+    <span class="kw">def</span> <span class="fn">open</span><span class="pn">(</span><span class="kw">self</span>, ref<span class="pn">:</span> <span class="ty">str</span><span class="pn">)</span> -&gt; <span class="ty">Iterator</span><span class="pn">[</span><span class="ty">bytes</span><span class="pn">]:</span> ...
+
+<span class="dec">@stable</span> <span class="dec">@runtime_checkable</span>
+<span class="kw">class</span> <span class="ty">SecretProvider</span><span class="pn">(</span><span class="ty">Protocol</span><span class="pn">):</span>
+    <span class="kw">def</span> <span class="fn">get</span><span class="pn">(</span><span class="kw">self</span>, ref<span class="pn">:</span> <span class="ty">str</span><span class="pn">)</span> -&gt; <span class="ty">str</span><span class="pn">:</span> ...
+
+<span class="dec">@stable</span> <span class="dec">@runtime_checkable</span>
+<span class="kw">class</span> <span class="ty">ContentExtractor</span><span class="pn">(</span><span class="ty">Protocol</span><span class="pn">):</span>
+    <span class="kw">def</span> <span class="fn">extract</span><span class="pn">(</span><span class="kw">self</span>, msg<span class="pn">:</span> <span class="ty">RawMessage</span>, env<span class="pn">:</span> <span class="ty">Envelope</span><span class="pn">)</span> -&gt; <span class="ty">CleanEmail</span><span class="pn">:</span> ...
+
+<span class="dec">@stable</span> <span class="dec">@runtime_checkable</span>
+<span class="kw">class</span> <span class="ty">Emitter</span><span class="pn">(</span><span class="ty">Protocol</span><span class="pn">):</span>
+    <span class="kw">def</span> <span class="fn">emit</span><span class="pn">(</span><span class="kw">self</span>, event<span class="pn">:</span> <span class="ty">EmailEvent</span><span class="pn">)</span> -&gt; <span class="ty">object</span><span class="pn">:</span> ...   <span class="cm"># the DLQ is just another Emitter sink</span>
+
+<span class="cm"># ─── provisional surface: shipped in V1, may still evolve ───</span>
+<span class="dec">@provisional</span> <span class="dec">@runtime_checkable</span>
+<span class="kw">class</span> <span class="ty">WebhookVerifier</span><span class="pn">(</span><span class="ty">Protocol</span><span class="pn">):</span>   <span class="cm"># A5 — identity only, never payload trust</span>
+    <span class="kw">def</span> <span class="fn">verify</span><span class="pn">(</span><span class="kw">self</span>, <span class="pn">*</span>, headers<span class="pn">:</span> <span class="ty">Mapping</span><span class="pn">[</span><span class="ty">str</span>, <span class="ty">str</span><span class="pn">]</span>, body<span class="pn">:</span> <span class="ty">bytes</span><span class="pn">)</span> -&gt; <span class="ty">WebhookIdentity</span><span class="pn">:</span> ...
+
+<span class="dec">@provisional</span> <span class="dec">@runtime_checkable</span>
+<span class="kw">class</span> <span class="ty">ContentCleaner</span><span class="pn">(</span><span class="ty">Protocol</span><span class="pn">):</span>    <span class="cm"># A6 — gentle HTML→text by default</span>
+    <span class="kw">def</span> <span class="fn">clean</span><span class="pn">(</span><span class="kw">self</span>, email<span class="pn">:</span> <span class="ty">CleanEmail</span><span class="pn">)</span> -&gt; <span class="ty">CleanEmail</span><span class="pn">:</span> ...
+
+<span class="dec">@provisional</span> <span class="dec">@runtime_checkable</span>
+<span class="kw">class</span> <span class="ty">TokenRotationSink</span><span class="pn">(</span><span class="ty">Protocol</span><span class="pn">):</span>  <span class="cm"># A8 — persist a rotated refresh token or the next run breaks</span>
+    <span class="kw">def</span> <span class="fn">on_refresh</span><span class="pn">(</span><span class="kw">self</span>, ref<span class="pn">:</span> <span class="ty">str</span>, new_token<span class="pn">:</span> <span class="ty">str</span><span class="pn">)</span> -&gt; <span class="ty">None</span><span class="pn">:</span> ...
+</pre>
+    <p class="muted" style="font-size:13px">Also <code>@stable</code>: <code>SubscriptionManager</code> (<code>ensure_watch</code> / <code>renew_watch</code>), <code>EnvelopeParser</code> (<code>parse_envelope(msg, tenant) -&gt; Envelope</code>), <code>Filter</code> (attr <code>name</code> + <code>evaluate(env, ctx) -&gt; FilterDecision</code>), <code>Classifier</code> (<code>classify(env, ctx) -&gt; Relevance</code>).</p>
+
+    <div class="note code"><b>CONTRACT NOTE — A8 shape.</b> The build plan described rotation persistence as an "on-refresh callback on <code>SecretProvider</code>." The frozen tree instead lands it as a <b>separate <code>@provisional</code> port</b>, <code>TokenRotationSink.on_refresh(ref, new_token)</code>, leaving <code>SecretProvider.get(ref) -&gt; str</code> untouched. This keeps the @stable read-path frozen and makes the write-path additive — a cleaner seam than widening the existing port.</div>
+  </section>
+
+  <!-- ============================== CONTRACTS ============================== -->
+  <section id="contracts">
+    <h2><span class="num">3</span>Frozen contracts reference</h2>
+    <p>These are the shapes and invariants that <b>cannot change after 1.0 without breaking consumers or the persistence layer.</b> Every row is enforced today in the tree and load-bearing for a downstream module. "Spelled identically everywhere" is a hard rule — the type-consistency anchor in <code>CLAUDE.md</code>.</p>
+
+    <table class="ctable">
+      <thead><tr><th>Contract</th><th>Frozen shape</th><th>Why it is immutable</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Identity</b></td>
+          <td><code>idempotency_key = "\|".join((tenant, mailbox, provider_message_id))</code></td>
+          <td>The dedupe key. <code>(tenant, mailbox)</code> is included so the same mail in two watched inboxes counts as two arrivals. Change the tuple and every stored claim + every consumer's dedupe table is invalidated.</td>
+        </tr>
+        <tr>
+          <td><b>canonical_id</b></td>
+          <td>trusted <code>&lt;local@domain&gt;</code> Message-ID, else <code>stable_hash(provider, provider_message_id, mailbox)</code></td>
+          <td>Always-present surrogate id. The "trusted" test (<code>startswith('&lt;')</code>, <code>endswith('&gt;')</code>, contains <code>@</code>) decides which branch — flipping it silently re-ids historical mail.</td>
+        </tr>
+        <tr>
+          <td><b>Wire event</b></td>
+          <td><code>EmailEvent(schema_version, tenant, ordering_key, idempotency_key, email)</code> · <code>SCHEMA_VERSION = "1.1"</code></td>
+          <td>The public output. Adding <code>idempotency_key</code> was a minor bump (1.0→1.1, additive). Consumers are tolerant readers: refuse an unknown major, ignore unknown fields. Removing/retyping a field is a breaking major.</td>
+        </tr>
+        <tr>
+          <td><b>Extractor seam</b></td>
+          <td><code>MimeExtractor.extract_bytes(raw, *, provider, provider_message_id, stream_id, watched_mailbox, …)</code> vs port <code>extract(msg, env)</code></td>
+          <td><code>Pipeline._extract</code> dispatches on type: a <code>MimeExtractor</code> → <code>extract_bytes</code>; any other extractor → the port. The Graph adapter implements <code>extract(msg, env)</code> directly — the seam is why it never touches the orchestrator.</td>
+        </tr>
+        <tr>
+          <td><b>Cursor</b></td>
+          <td><code>Cursor(value, order)</code>; <code>commit_if_ahead</code> rejects <code>order ≤ stored</code></td>
+          <td>Strictly monotonic resume token. Advances on <i>every</i> terminal disposition, not only emit. The real Firestore/Redis adapter must preserve this or replays go backward.</td>
+        </tr>
+        <tr>
+          <td><b>Dedupe API</b></td>
+          <td>exactly <code>try_claim / record_attempt / mark_done / release</code></td>
+          <td>The in-memory store deliberately does <b>not</b> simulate lease expiry — the shape is kept exact so a persistent adapter can add expiry <i>without changing callers</i>.</td>
+        </tr>
+        <tr>
+          <td><b>DLQ counting</b></td>
+          <td><code>RunReport.dead_lettered</code> incremented <b>only</b> by <code>add_dead_letter()</code></td>
+          <td><code>record()</code> does not count dead-letters; <code>_dead_letter</code> calls both as a paired unit. One poison/oversized message ⇒ exactly one count. A standalone <code>dead_lettered</code> trace anywhere would double-count.</td>
+        </tr>
+        <tr>
+          <td><b>from_ alias</b></td>
+          <td><code>from_: Recipient = Field(alias="from")</code> on <code>Envelope</code> &amp; <code>CleanEmail</code></td>
+          <td><code>from</code> is a Python keyword; the wire spells it <code>from</code>, the model spells it <code>from_</code>. <code>populate_by_name=True</code> bridges both. Must be spelled identically in every model.</td>
+        </tr>
+        <tr>
+          <td><b>thread_key</b></td>
+          <td><code>CleanEmail.thread_key: str</code> ← Gmail <code>threadId</code> / Graph <code>conversationId</code></td>
+          <td>Carried from <code>RawMessage.thread_key</code> through extraction; subject-normalized fallback. Consumers group conversations on it — adding it later would be a breaking field on the emitted email.</td>
+        </tr>
+        <tr>
+          <td><b>Sync-only</b></td>
+          <td><code>SYNC_ONLY = True</code>; ports marked <code>@stable</code> / <code>@provisional</code>; config <code>version</code></td>
+          <td>Declares V1 single-worker. A future async family is an <i>additive</i> set of ports, never a breaking change to these. The stability stamp makes the frozen surface introspectable.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note warn"><b>Why a reviewer should care:</b> in a library, the risk is not the code that works today — it is the promises. Get these shapes right and a new provider, store, or cleaner slots in without touching the core or breaking a consumer. Get them wrong and every consumer pays for the rewrite. Phase 0 freezes exactly this surface before any parallel build begins.</div>
+  </section>
+
+  <!-- ============================== ERRORS ============================== -->
+  <section id="errors">
+    <h2><span class="num">4</span>Error taxonomy &amp; routing</h2>
+    <p>Every mailflow error subclasses <code>MailflowError</code>. V1 adds the three-way operational split (A2) that the pipeline routes on. Provider errors (Gmail/Graph) are re-parented onto these so the orchestrator routes by <i>type</i>, never by HTTP status or attempt-count.</p>
+
+    <pre class="sig">
+<span class="bar">core/errors.py — the operational taxonomy (A2)</span>
+<span class="kw">class</span> <span class="ty">MailflowError</span><span class="pn">(</span><span class="ty">Exception</span><span class="pn">):</span> ...                  <span class="cm"># base for everything</span>
+
+<span class="kw">class</span> <span class="ty">AuthError</span><span class="pn">(</span><span class="ty">MailflowError</span><span class="pn">):</span>      <span class="cm"># 401  → refresh-and-retry-once</span>
+<span class="kw">class</span> <span class="ty">PermanentError</span><span class="pn">(</span><span class="ty">MailflowError</span><span class="pn">):</span> <span class="cm"># 403/404/410, invalid base64 → DLQ, no retry</span>
+<span class="kw">class</span> <span class="ty">TransientError</span><span class="pn">(</span><span class="ty">MailflowError</span><span class="pn">):</span> <span class="cm"># 429/5xx/network → bounded backoff retry</span>
+
+<span class="cm"># pre-existing, retained:</span>
+<span class="kw">class</span> <span class="ty">ExtractionError</span><span class="pn">(</span><span class="ty">MailflowError</span><span class="pn">):</span> ...
+<span class="kw">class</span> <span class="ty">OversizedMessageError</span><span class="pn">(</span><span class="ty">MailflowError</span><span class="pn">):</span>   <span class="cm"># carries .actual / .limit</span>
+<span class="kw">class</span> <span class="ty">ConfigError</span><span class="pn">(</span><span class="ty">MailflowError</span><span class="pn">):</span> ...
+<span class="kw">class</span> <span class="ty">UnknownKindError</span><span class="pn">(</span><span class="ty">ConfigError</span><span class="pn">):</span> ...
+</pre>
+
+    <div class="diagram">
+      <div class="cap">classification happens at the provider boundary; routing happens in Pipeline._process</div>
+      <pre class="mermaid">
+flowchart TD
+    RAISE["raise at provider boundary<br/>(Gmail client / extractor)"] --> K{"exception type"}
+    K -->|"AuthError (401)"| A["refresh token via TokenRotationSink<br/>retry once"]
+    K -->|"PermanentError<br/>(403 / 404 / 410 / decode)"| P[("DLQ — no retry<br/>add_dead_letter() + trace")]
+    K -->|"TransientError<br/>(429 / 5xx / network)"| T["backoff + jitter<br/>honor Retry-After, bounded"]
+    A -->|"still 401"| P
+    T -->|"retries exhausted"| P
+    A -->|"refreshed OK"| OK["resume"]
+    T -->|"succeeds"| OK
+    classDef dlq fill:#fde2e2,stroke:#b91c1c,color:#000
+    classDef good fill:#dcfce7,stroke:#15803d,color:#000
+    class P dlq
+    class OK good
+      </pre>
+    </div>
+
+    <h3>Raise / route map</h3>
+    <table class="ctable">
+      <thead><tr><th>Condition at boundary</th><th>Raised as</th><th>Pipeline routing</th></tr></thead>
+      <tbody>
+        <tr><td>401 Unauthorized</td><td><code>AuthError</code></td><td>refresh token → <b>retry once</b>; persist rotated token via <code>TokenRotationSink</code>; still failing → DLQ</td></tr>
+        <tr><td>403 Forbidden</td><td><code>PermanentError</code></td><td>DLQ — no retry (a permission wall won't clear by retrying)</td></tr>
+        <tr><td>404 Not Found / 410 Gone</td><td><code>PermanentError</code></td><td>DLQ — no retry. Fixes the old poison loop: 404 was silently skipped, 410 retried forever</td></tr>
+        <tr><td>invalid base64 / decode</td><td><code>PermanentError</code></td><td>DLQ — garbled bytes never decode on a re-read</td></tr>
+        <tr><td>429 Too Many Requests</td><td><code>TransientError</code></td><td>backoff honoring <code>Retry-After</code> + jitter, bounded by max retries, then DLQ</td></tr>
+        <tr><td>5xx / network blip</td><td><code>TransientError</code></td><td>exponential backoff + jitter, bounded; storm-contained so exhaustion can't abort the run</td></tr>
+        <tr><td>size unknown / over cap</td><td><code>OversizedMessageError</code></td><td>DLQ <b>before download</b> (B1 fail-closed); never enters the retry path</td></tr>
+      </tbody>
+    </table>
+    <p class="muted" style="font-size:13px">A2 is the keystone of Phase 1: both B3 (permanent-classify) and B4 (backoff/storm) depend on the taxonomy existing first, so the typed-raise lands before either.</p>
+  </section>
+
+  <!-- ============================== RELIABILITY ============================== -->
+  <section id="reliability">
+    <h2><span class="num">5</span>Reliability &amp; failure isolation</h2>
+
+    <h3>5.1 · DLQ counting — the paired-unit invariant</h3>
+    <p>The single most error-prone spot in the spine. <code>RunReport</code> holds four counters: <code>emitted</code>, <code>dropped</code>, <code>duplicates</code>, <code>dead_lettered</code>. The <code>dead_lettered</code> counter is owned <b>solely</b> by <code>add_dead_letter()</code>; <code>record()</code> deliberately does not count it. So <code>_dead_letter</code> must call both — and only it may.</p>
+    <pre class="sig">
+<span class="bar">core/pipeline.py — _dead_letter: emit + count + trace as one indivisible unit</span>
+<span class="kw">def</span> <span class="fn">_dead_letter</span><span class="pn">(</span><span class="kw">self</span>, canonical_id, msg, key, report, <span class="pn">*</span>, reason<span class="pn">)</span> -&gt; <span class="ty">Disposition</span><span class="pn">:</span>
+    <span class="kw">self</span>.dlq_emitter.<span class="fn">emit</span><span class="pn">(</span><span class="ty">EmailEvent</span><span class="pn">(</span>...stub email...<span class="pn">))</span>      <span class="cm"># DLQ is just another Emitter sink</span>
+    <span class="kw">self</span>.dedupe_store.<span class="fn">mark_done</span><span class="pn">(</span>key, <span class="kw">self</span>.config.done_ttl_seconds<span class="pn">)</span>
+    report.<span class="fn">add_dead_letter</span><span class="pn">(</span><span class="ty">DeadLetter</span><span class="pn">(</span>canonical_id<span class="pn">=</span>canonical_id, reason<span class="pn">=</span>reason, ...<span class="pn">))</span>  <span class="cm"># ← the ONLY +1</span>
+    report.<span class="fn">record</span><span class="pn">(</span><span class="kw">self</span>.<span class="fn">_trace</span><span class="pn">(</span>canonical_id, msg, <span class="ty">Disposition</span>.dead_lettered, <span class="st">"dlq"</span>, reason<span class="pn">=</span>reason<span class="pn">))</span>
+    <span class="kw">return</span> <span class="ty">Disposition</span>.dead_lettered
+</pre>
+    <div class="note code"><b>Invariant:</b> one poison / oversized message ⇒ exactly one <code>dead_lettered</code> count. Never emit a standalone <code>dead_lettered</code> trace elsewhere — <code>record()</code> would not count it, but a future change to <code>record()</code> could, double-counting. The pairing is the contract.</div>
+
+    <h3>5.2 · Per-message isolation — and the known gap</h3>
+    <p>The <b>process</b> stage is isolated: <code>_process</code> wraps each message in try/except and DLQs one bad message at <code>max_attempts</code> without touching its neighbors (tested). The <b>fetch</b> stage is the open gap (B2): a single malformed page/delta record currently aborts the whole stream because the fetch iteration has no per-record try/except. The V1 fix wraps the fetch iterator so a malformed record is DLQ'd individually and the stream continues.</p>
+
+    <h3>5.3 · Backoff &amp; storm containment (B4)</h3>
+    <table class="ctable">
+      <thead><tr><th>Mechanism</th><th>Behavior</th></tr></thead>
+      <tbody>
+        <tr><td><b>Retry-After honor</b></td><td>429 responses wait the server-specified interval before retry</td></tr>
+        <tr><td><b>Exponential backoff + jitter</b></td><td>each transient retry waits longer, randomized to avoid thundering-herd alignment</td></tr>
+        <tr><td><b>Bounded retries</b></td><td>capped attempt count; exhaustion routes to DLQ, never an infinite loop</td></tr>
+        <tr><td><b>Concurrency cap</b></td><td>a bounded in-flight semaphore limits simultaneous provider calls</td></tr>
+        <tr><td><b>Storm containment</b></td><td>an exhausted-retry <i>storm</i> is caught at the run loop — the offending record is handled, others continue, the run survives (today an uncaught 429 storm aborts everything)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============================== EXTRACT ============================== -->
+  <section id="extract">
+    <h2><span class="num">6</span>Extraction &amp; cleaning seam</h2>
+
+    <h3>6.1 · The extractor dispatch</h3>
+    <p>Extraction is the one place the port shape is deliberately <i>not</i> uniform. The raw-RFC822 path (Gmail) needs the raw bytes plus provider context; the generic port (<code>extract(msg, env)</code>) is what other providers implement. <code>Pipeline._extract</code> dispatches on concrete type — a richer-than-port signature that mypy strict accepts via the <code>ContentExtractor | MimeExtractor</code> union annotation and an <code>isinstance</code> branch.</p>
+    <pre class="sig">
+<span class="bar">core/pipeline.py — _extract: type-dispatched seam (richer signature vs the port)</span>
+<span class="kw">def</span> <span class="fn">_extract</span><span class="pn">(</span><span class="kw">self</span>, msg<span class="pn">:</span> <span class="ty">RawMessage</span>, env<span class="pn">:</span> <span class="ty">Envelope</span><span class="pn">)</span> -&gt; <span class="ty">CleanEmail</span><span class="pn">:</span>
+    <span class="kw">if</span> <span class="fn">isinstance</span><span class="pn">(</span><span class="kw">self</span>.extractor, <span class="ty">MimeExtractor</span><span class="pn">):</span>
+        email <span class="pn">=</span> <span class="kw">self</span>.extractor.<span class="fn">extract_bytes</span><span class="pn">(</span>
+            msg.raw_bytes,
+            provider<span class="pn">=</span>msg.provider,
+            provider_message_id<span class="pn">=</span>msg.provider_message_id,
+            stream_id<span class="pn">=</span>msg.stream.key,
+            watched_mailbox<span class="pn">=</span>msg.stream.mailbox,
+            blob_store<span class="pn">=</span><span class="kw">self</span>.blob_store,
+            thread_key<span class="pn">=</span>msg.thread_key,          <span class="cm"># A7: carried from the adapter</span>
+        <span class="pn">)</span>
+    <span class="kw">else</span><span class="pn">:</span>
+        email <span class="pn">=</span> <span class="kw">self</span>.extractor.<span class="fn">extract</span><span class="pn">(</span>msg, env<span class="pn">)</span>      <span class="cm"># the port — Graph implements this</span>
+    <span class="kw">if</span> <span class="kw">self</span>.cleaner <span class="kw">is</span> <span class="kw">not</span> <span class="ty">None</span><span class="pn">:</span>
+        email <span class="pn">=</span> <span class="kw">self</span>.cleaner.<span class="fn">clean</span><span class="pn">(</span>email<span class="pn">)</span>           <span class="cm"># A6: ContentCleaner as a real stage</span>
+    <span class="kw">return</span> email
+</pre>
+    <p class="muted" style="font-size:13px">Note the cleaner runs <i>inside</i> <code>_extract</code> as a pipeline stage — not a post-emit hook. That placement is the A6 contract: cleaning is part of producing the <code>CleanEmail</code>, so the emitted event and the DLQ stub share the same cleaned shape.</p>
+
+    <h3>6.2 · thread_key mapping (A7)</h3>
+    <p><code>RawMessage.thread_key</code> is populated by the adapter (Gmail <code>threadId</code> / Graph <code>conversationId</code>) and threaded onto <code>CleanEmail.thread_key</code> during extraction. When the provider gives no thread id, a <b>subject-normalized fallback</b> groups a conversation by its normalized subject line. Consumers group replies on this single field regardless of provider.</p>
+
+    <h3>6.3 · body_text parity (B5)</h3>
+    <p>V1 is plain-text-only (no HTML sanitizer / renderer in scope), which makes the HTML→text converter <i>load-bearing</i>: an HTML-only email must still yield non-empty <code>body_text</code>, or the product looks empty. The fix is a <b>shared</b> HTML→text converter called from both extractor body-paths, so an HTML-only message produces identical <code>body_text</code> whether it arrived via Gmail's MIME walk or Graph's <code>body</code> field. Today neither path does this — both leave <code>body_text=""</code> for HTML-only mail.</p>
+
+    <div class="note"><b>Parity is the point.</b> "Provider-agnostic" is only true if the same email yields the same <code>CleanEmail</code> on either adapter. The shared converter (not two per-provider implementations) is what guarantees that — and is what the golden corpus, authored independently of the extractor, cross-checks.</div>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- ============================== HARNESS ============================== -->
+  <section id="harness">
+    <h2><span class="num">7</span>Build harness &amp; engineering discipline</h2>
+    <p>The build mirrors the architecture: <b>freeze the contracts serially, then implement behind them in file-disjoint parallel tracks.</b> If parallel work invented the shapes independently the pieces wouldn't fit — so Phase 0 locks signatures and model fields (no behavior), mypy-clean and committed, before anyone fans out.</p>
+
+    <div class="diagram">
+      <div class="cap">serial freeze → parallel TDD tracks → adversarial verify → integrate &amp; tag</div>
+      <pre class="mermaid">
+flowchart LR
+    P0["Phase 0 · freeze contracts<br/>(serial · mypy-clean · committed)"] --> G0{"human gate<br/>approve frozen surface"}
+    G0 --> P1
+    subgraph P1["Phase 1 · implement (file-disjoint, TDD)"]
+      direction TB
+      T1["core-foundation"]
+      T2["extract-filter"]
+      T3["adapters"]
+      T4["pipeline"]
+    end
+    P1 --> P2["Phase 2 · adversarial verify<br/>re-run audit, quote file:line proof"]
+    P2 --> G1{"every in-scope item<br/>strong-evidence done?"}
+    G1 -->|"gaps"| P1
+    G1 -->|"clean"| P3["Phase 3 · integrate<br/>full pytest + mypy strict · e2e · tag V1"]
+    classDef p0 fill:#fdf0d5,stroke:#b45309,color:#000
+    classDef p3 fill:#dcfce7,stroke:#15803d,color:#000
+    class P0 p0
+    class P3 p3
+      </pre>
+    </div>
+
+    <h3>The five guardrails (every task obeys)</h3>
+    <ul>
+      <li><b>TDD, one behavior per cycle:</b> failing test → confirm it fails for the stated reason → minimal impl → green → <code>mypy --strict</code> clean → commit.</li>
+      <li><b>File-disjoint ownership:</b> each track edits only its own files (table below). Cross-track needs are flagged to the lead, never patched into someone else's file.</li>
+      <li><b>Bisectability:</b> every commit leaves the whole tree importable and mypy-clean. If module A imports B, B is committed first — even if the plan lists them the other way.</li>
+      <li><b>Evidence or it's not done:</b> a task is done only when its test passes and a verifier can quote the proof. No green test ⇒ not done.</li>
+      <li><b>Serialized shared repo:</b> subagents share one <code>.git/index</code> and one <code>.mypy_cache</code>; the lead serializes file-disjoint tracks rather than assuming concurrent commits.</li>
+    </ul>
+
+    <h3>Ownership tracks</h3>
+    <table>
+      <thead><tr><th>Track</th><th>Owns (files)</th><th>In-scope items</th></tr></thead>
+      <tbody>
+        <tr><td><b>core-foundation</b></td><td><code>core/{errors,models,identity,events,ports,filtering,observability}.py</code></td><td>A2 base · A4 field · A5/A6/A8 ports · A7 field · A11 markers · light observability</td></tr>
+        <tr><td><b>extract-filter</b></td><td><code>extract/</code>, <code>filters/</code></td><td>A6 default cleaner · B5 HTML→text parity · A7 Gmail thread_key + fallback</td></tr>
+        <tr><td><b>adapters</b></td><td><code>adapters/</code> (gmail, graph), <code>stores/</code>, <code>providers/</code>, <code>emit/</code></td><td>A2 typed-raise · A5 OIDC-JWT · A8 rotation persist · B2 fetch isolation · B3 permanent · B4 backoff/storm</td></tr>
+        <tr><td><b>pipeline</b></td><td><code>core/pipeline.py</code>, <code>config/</code>, <code>registry.py</code>, <code>builder.py</code>, <code>__init__.py</code></td><td>A2 routing · A4 emit key · B1 size fail-closed · A6 wire cleaner · A10 overrides · A11 config version · B3 routing</td></tr>
+        <tr><td><b>fixtures/docs</b></td><td><code>tests/fixtures/</code>, golden + e2e tests, <code>README.md</code></td><td>A4 docs fix (at-least-once) · A12 conformance test · A11 sync-only note</td></tr>
+        <tr><td><b>plan-conformance-verifier</b></td><td><i>read-only auditor</i></td><td>Phase 2 — one verifier per item, quotes <code>file:line</code> or marks <code>missing</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>mypy --strict gotchas baked into the discipline</h3>
+    <p class="muted" style="font-size:13.5px">The tree is checked whole (<code>packages = ["mailflow"]</code>, strict), so every commit must stay importable. Recurring fixes the team applies proactively: hoist <code>**{"from": x}</code> splats to an explicit <code>dict[str, Any]</code> before unpacking; narrow <code>email…get_payload(decode=True)</code> with <code>isinstance(payload, bytes)</code> before hashing; write <code>xs[0] if xs else None</code> rather than <code>(xs or [None])[0]</code>; widen richer-than-port signatures to a union and <code>isinstance</code>-dispatch (exactly the <code>ContentExtractor | MimeExtractor</code> seam above).</p>
+
+    <div class="note"><b>Definition of done for V1:</b> full <code>pytest</code> green · <code>mypy --strict</code> clean on the whole tree · every in-scope item (A2, A4, A5-Gmail, A6, A7, A8-reduced, A10, A11, B1–B5) verified with quoted proof · a live Gmail run (push wakes → poll from cursor → clean → emit with <code>idempotency_key</code>; forged push rejected; oversized/unknown DLQ'd pre-download; 429-storm survives) · docs say <b>at-least-once</b>, no exactly-once claims anywhere.</div>
+  </section>
+
+</main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true,
+    theme:'base',
+    securityLevel:'loose',
+    flowchart:{useMaxWidth:true,htmlLabels:true,curve:'basis'},
+    themeVariables:{
+      fontFamily:'JetBrains Mono, SF Mono, ui-monospace, monospace',
+      primaryColor:'#e3f1f3', primaryBorderColor:'#0e7490', primaryTextColor:'#11161d',
+      lineColor:'#7c8a99', fontSize:'12.5px'
+    }
+  });
+  // scroll-spy nav highlight
+  const links=[...document.querySelectorAll('nav a')];
+  const map=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+  const obs=new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting){
+      links.forEach(l=>l.classList.remove('active'));
+      const a=map.get(e.target.id); if(a)a.classList.add('active');
+    }});
+  },{rootMargin:'-8% 0px -78% 0px'});
+  document.querySelectorAll('section[id]').forEach(s=>obs.observe(s));
+</script>
+</body>
+</html>

@@ -44,7 +44,6 @@ from mailflow.stores.sqlite import (
 PROVIDER_KINDS = {"memory", "graph", "gmail"}
 EMITTER_KINDS = {"memory", "stdout", "pubsub"}
 STORE_KINDS = {"memory", "sqlite", "local"}
-DEADLETTER_KINDS = {"memory", "sqlite"}
 FILTER_KINDS = {
     "whitelist", "blacklist", "internal_domain", "subject", "list_mail", "no_personal",
     "only_domain", "only_sender", "block_sender",
