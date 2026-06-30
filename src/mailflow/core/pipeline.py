@@ -220,6 +220,17 @@ class Pipeline:
             email.relevance = relevance
         email.matched_filter = decision.filter_name
 
+        for sa in email.stripped_attachments:
+            self._record_stripped(report, DecisionTrace(
+                canonical_id=email.canonical_id,
+                tenant=tenant,
+                stream=msg.stream.key,
+                disposition=Disposition.dropped,
+                stage="attachment_strip",
+                reason=sa.reason.value,
+                is_inline=sa.is_inline,
+            ))
+
         event = EmailEvent(
             schema_version=SCHEMA_VERSION,
             tenant=tenant,
@@ -363,6 +374,19 @@ class Pipeline:
             "matched_filter=%s reason=%s",
             trace.disposition.value, trace.stage, trace.canonical_id,
             trace.stream, trace.matched_filter, trace.reason,
+        )
+
+    def _record_stripped(self, report: RunReport, trace: DecisionTrace) -> None:
+        """Record one stripped-attachment trace via RunReport.record_stripped().
+
+        Bypasses the disposition-counter logic in record() so that
+        emitted/dropped/duplicates/dead_lettered are not perturbed by strips."""
+        report.record_stripped(trace)
+        _log.info(
+            "disposition=%s stage=%s canonical_id=%s stream=%s "
+            "reason=%s is_inline=%s",
+            trace.disposition.value, trace.stage, trace.canonical_id,
+            trace.stream, trace.reason, trace.is_inline,
         )
 
     def health(self) -> HealthReport:

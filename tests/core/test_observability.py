@@ -55,4 +55,5 @@ def test_counters_exposes_disposition_metrics() -> None:
     assert report.counters() == {
         "fetched": 5, "emitted": 1, "dropped": 0,
         "duplicate": 0, "dead_lettered": 1,
+        "attachments_stripped": 0,
     }

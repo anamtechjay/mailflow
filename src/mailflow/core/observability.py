@@ -28,6 +28,7 @@ class DecisionTrace(BaseModel):
     matched_filter: str = ""
     reason: str = ""
     relevance_score: float | None = None
+    is_inline: bool = False
 
 
 class DeadLetter(BaseModel):
@@ -70,6 +71,7 @@ class RunReport(BaseModel):
     dropped: int = 0
     duplicates: int = 0
     dead_lettered: int = 0
+    attachments_stripped: int = 0
     traces: list[DecisionTrace] = Field(default_factory=list)
     dlq: list[DeadLetter] = Field(default_factory=list)
 
@@ -86,6 +88,16 @@ class RunReport(BaseModel):
         # the pipeline calls both add_dead_letter() and record(dead_lettered) for
         # a single poison message, and counting in both would double it.
 
+    def record_stripped(self, trace: DecisionTrace) -> None:
+        """Record one stripped-attachment trace.
+
+        Appends the trace for operator visibility and increments
+        `attachments_stripped` only — the four message-disposition counters
+        (emitted/dropped/duplicates/dead_lettered) are intentionally untouched:
+        a message that had parts stripped is still emitted exactly once."""
+        self.traces.append(trace)
+        self.attachments_stripped += 1
+
     def add_dead_letter(self, dead_letter: DeadLetter) -> None:
         self.dlq.append(dead_letter)
         self.dead_lettered += 1
@@ -99,6 +111,7 @@ class RunReport(BaseModel):
             "dropped": self.dropped,
             "duplicate": self.duplicates,
             "dead_lettered": self.dead_lettered,
+            "attachments_stripped": self.attachments_stripped,
         }
 
 
