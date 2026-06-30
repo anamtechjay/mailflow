@@ -240,7 +240,7 @@
     <span class="chip" title="exponential backoff w/ jitter + bounded concurrency (load-shed)">storm&nbsp;containment</span>
     <span class="chip" title="Gmail fetch-time 401 forces ONE token refresh + one retry before dead-lettering">401&nbsp;→&nbsp;refresh-once</span>
     <span class="chip" title="poison / over-cap messages persist to a DeadLetterStore — redrive() re-submits them through a fresh pipeline">durable&nbsp;DLQ&nbsp;+&nbsp;redrive</span>
-    <span class="chip" title="per-attachment byte cap (default 25 MB), fail-closed; over-cap streams straight to the DLQ before buffering — see Configuring attachments below">attachment&nbsp;cap</span>
+    <span class="chip" title="default (no policy): 25 MB per-attachment cap, fail-closed → DLQ; with connect(attachments=…): over-cap / not-allowlisted / scanner-blocked / unreadable parts are stripped and recorded on email.stripped_attachments (strip-and-deliver) — see Configuring attachments below">attachment&nbsp;cap</span>
     <span class="chip" title="content-addressed: the same attachment across two messages is stored exactly once">blob&nbsp;dedupe</span>
   </div>
 
@@ -293,26 +293,49 @@
   </div>
 
   <section class="cfg">
-    <div class="col-h"><h2>Configuring attachments</h2><span class="hint">// MimeExtractor — types · sizes · scanning</span></div>
-    <p class="cfg-lead">Attachments stream through a per-attachment byte cap, are content-addressed (identical bytes are stored once), and pass a safety seam <i>before</i> they're persisted. Out of the box nothing is restricted — the policy lives in three knobs on <code>MimeExtractor</code>:</p>
+    <div class="col-h"><h2>Configuring attachments</h2><span class="hint">// connect(attachments=…) — types · sizes · scanning</span></div>
+    <p class="cfg-lead">Attachments stream through a per-class byte cap, are content-addressed (identical bytes are stored once), and pass a safety seam <i>before</i> they're persisted. Pass <code>attachments=</code> to <code>connect()</code> to activate <b>strip-and-deliver</b>: offending parts are removed, recorded on <code>email.stripped_attachments</code>, and the message is still delivered. Without a policy the default remains fail-closed — a single blocked or over-cap part dead-letters the entire message.</p>
 
     <div class="cfg-grid">
       <div class="knob">
-        <div class="knob-h"><code>max_attachment_bytes</code><span class="dflt">default 25&nbsp;MB</span></div>
-        <p>Hard per-attachment cap, enforced while streaming. Over-cap raises <code>AttachmentTooLargeError</code> and the message is dead-lettered — nothing partial is stored. Tighter than the 50&nbsp;MB whole-message ceiling.</p>
+        <div class="knob-h"><code>max_bytes</code><span class="dflt">default 25&nbsp;MB</span></div>
+        <p>Hard per-attachment cap, enforced while streaming. With a policy: over-cap parts are stripped and recorded (<code>reason="oversize"</code>). Without a policy: a single over-cap part dead-letters the entire message — nothing partial is stored.</p>
       </div>
       <div class="knob">
         <div class="knob-h"><code>allowlist</code><span class="dflt">default ∅ = allow all</span></div>
-        <p>A <code>frozenset</code> of permitted content-types <i>or</i> lowercased file extensions — e.g. <code>"application/pdf"</code> or <code>"pdf"</code>. Either one matching admits the part. Empty means no restriction.</p>
+        <p>A <code>frozenset</code> of permitted content-types <i>or</i> lowercased file extensions — e.g. <code>"application/pdf"</code> or <code>"pdf"</code>. Either one matching admits the part. Non-matching parts are stripped with <code>reason="not_allowlisted"</code>.</p>
       </div>
       <div class="knob">
         <div class="knob-h"><code>scanner</code><span class="dflt">default no-op</span></div>
-        <p>A swappable <code>AttachmentScanner</code> port — your <code>.scan(attachment)</code> returns a <code>ScanResult</code> (allow / block). The default allows everything; drop in an AV / CDR check here.</p>
+        <p>A swappable <code>AttachmentScanner</code> port — your <code>.scan(attachment)</code> returns a <code>ScanResult</code> (allow / block). The default allows everything; drop in an AV / CDR check here. Blocked parts are stripped with <code>reason="scanner"</code>.</p>
       </div>
     </div>
 
-    <pre class="cfg-code"><span class="c-kw">from</span> mailflow.extract.mime <span class="c-kw">import</span> <span class="c-fn">MimeExtractor</span>
-<span class="c-kw">from</span> mailflow.core.models <span class="c-kw">import</span> ScanResult, ScanVerdict
+    <p class="note2"><b>Two attachment classes — real vs. inline.</b> <code>AttachmentPolicy</code> has two slots: <code>real</code> (parts with <code>Content-Disposition: attachment</code>, or with a filename and no inline disposition) and <code>inline</code> (parts with <code>Content-Disposition: inline</code> <i>or</i> a <code>Content-ID</code> header that are not explicitly dispositioned as attachment — CID-referenced logos, tracking pixels, and embedded images). Pass a bare <code>dict</code> or <code>AttachmentRule</code> to apply the same policy to both classes at once.</p>
+
+    <pre class="cfg-code"><span class="c-kw">from</span> mailflow <span class="c-kw">import</span> <span class="c-fn">connect</span>, <span class="c-fn">AttachmentPolicy</span>, <span class="c-fn">AttachmentRule</span>
+
+<span class="c-com"># Simple: a bare dict applies to BOTH classes (real + inline)</span>
+mf = <span class="c-fn">connect</span>(<span class="c-str">"gmail"</span>, credentials=creds,
+    attachments={<span class="c-str">"max_bytes"</span>: <span class="c-num">10_000_000</span>, <span class="c-str">"allowlist"</span>: [<span class="c-str">"application/pdf"</span>]},
+)
+
+<span class="c-com"># Per-class: different rules for real vs. inline parts</span>
+mf = <span class="c-fn">connect</span>(<span class="c-str">"gmail"</span>, credentials=creds,
+    attachments=<span class="c-fn">AttachmentPolicy</span>(
+        real=<span class="c-fn">AttachmentRule</span>(max_bytes=<span class="c-num">10_000_000</span>,
+                           allowlist=[<span class="c-str">"application/pdf"</span>, <span class="c-str">"image/png"</span>]),
+        inline=<span class="c-fn">AttachmentRule</span>(max_bytes=<span class="c-num">2_000_000</span>),  <span class="c-com"># size-cap only</span>
+    ),
+)
+
+<span class="c-com"># Stripped parts are recorded on the delivered CleanEmail:</span>
+<span class="c-kw">for</span> email <span class="c-kw">in</span> mf.<span class="c-fn">stream</span>():
+    <span class="c-kw">for</span> s <span class="c-kw">in</span> email.stripped_attachments:
+        print(s.filename, s.content_type, s.size_bytes, s.reason)
+        <span class="c-com"># reason: "not_allowlisted" | "oversize" | "unreadable" | "scanner"</span></pre>
+
+    <pre class="cfg-code"><span class="c-kw">from</span> mailflow.core.models <span class="c-kw">import</span> <span class="c-fn">ScanResult</span>, <span class="c-fn">ScanVerdict</span>
 
 <span class="c-kw">class</span> <span class="c-fn">PdfOnlyScanner</span>:                       <span class="c-com"># optional AV / CDR hook</span>
     <span class="c-kw">def</span> <span class="c-fn">scan</span>(self, attachment):
@@ -320,15 +343,15 @@
             <span class="c-kw">return</span> <span class="c-fn">ScanResult</span>()                 <span class="c-com"># verdict defaults to allow</span>
         <span class="c-kw">return</span> <span class="c-fn">ScanResult</span>(verdict=ScanVerdict.block, reason=<span class="c-str">"not a pdf"</span>)
 
-extractor = <span class="c-fn">MimeExtractor</span>(
-    max_attachment_bytes=<span class="c-num">10_000_000</span>,                      <span class="c-com"># 10 MB (default 25 MB)</span>
-    allowlist=<span class="c-fn">frozenset</span>({<span class="c-str">"application/pdf"</span>, <span class="c-str">"image/png"</span>}),  <span class="c-com"># types OR extensions</span>
-    scanner=<span class="c-fn">PdfOnlyScanner</span>(),                          <span class="c-com"># omit for allow-all</span>
+mf = <span class="c-fn">connect</span>(<span class="c-str">"gmail"</span>, credentials=creds,
+    attachments=<span class="c-fn">AttachmentRule</span>(
+        max_bytes=<span class="c-num">10_000_000</span>,
+        allowlist=[<span class="c-str">"application/pdf"</span>],
+        scanner=<span class="c-fn">PdfOnlyScanner</span>(),
+    ),
 )</pre>
 
-    <div class="warn"><b>Fail-closed, and it also covers inline media.</b> The allowlist and scanner run on <i>every</i> non-body part — real attachments <i>and</i> inline images (logos, tracking pixels, CID-referenced media). A non-empty allowlist must therefore include the inline types you expect in ordinary mail (e.g. <code>image/png</code>, <code>image/jpeg</code>), or a routine logo will be blocked. And a single blocked or over-cap part dead-letters the <i>entire</i> message — it is quarantined, not dropped per-part.</div>
-
-    <p class="note2"><b>Wiring it in:</b> <code>connect()</code> currently builds a default <code>MimeExtractor</code> (allow-all, 25&nbsp;MB), so these knobs aren't yet exposed as <code>connect()</code> arguments. To apply a custom cap / allowlist / scanner today you construct the <code>MimeExtractor</code> above and pass it to a <code>Pipeline(extractor=…)</code> directly; a <code>connect()</code> passthrough is the natural next step.</p>
+    <div class="warn"><b>Strip-and-deliver is opt-in; the default remains fail-closed.</b> Without an <code>attachments=</code> policy, a single over-cap, scanner-blocked, or unreadable part dead-letters the <i>entire</i> message — it is quarantined, not dropped per-part. With a policy, the offending part is stripped and its metadata appended to <code>email.stripped_attachments</code>; the message is then delivered normally. A non-empty <code>allowlist</code> runs on <i>every</i> non-body part (real <i>and</i> inline) — include the inline types you expect in ordinary mail (e.g. <code>image/png</code>, <code>image/jpeg</code>), or a routine logo will be stripped.</div>
   </section>
 
   <footer>
@@ -340,7 +363,7 @@ extractor = <span class="c-fn">MimeExtractor</span>(
       <li><b>State:</b> <code>"memory"</code> is stateless (dedupe on <code>canonical_id</code> yourself); <code>"sqlite:///…"</code> persists cursor + dedupe and durably stores attachments, and resumes after a restart.</li>
       <li><b>The "always on" row is not optional — it's the point.</b> Dedupe, ordered cursor, size guard, retry→DLQ, durable dead-lettering + redrive, 401→refresh-once, and streamed/capped/deduped attachments run automatically. You don't wire reliability; the pipeline guarantees it. That's why those are guarantees up top, not toggles down here.</li>
     </ul>
-    <p class="note">Generated for sharing — a single self-contained HTML file, no build step. Code shown reflects the current <code>feature/library</code> build — wire event schema 1.2.</p>
+    <p class="note">Generated for sharing — a single self-contained HTML file, no build step. Code shown reflects the current <code>feature/library</code> build — wire event schema 1.3.</p>
   </footer>
 </div>
 
