@@ -66,6 +66,12 @@ resolved, the message will simply dead-letter again and stay in the store.
      tooling (e.g. a since-fixed extractor bug).
    - `AuthError` (persisted after refresh+retry) / `TransientError` → fix credentials or
      wait out the downstream outage, then redrive.
+
+   > **Note on provider subclasses:** the names above are the error *families*. A
+   > provider-raised failure persists its concrete subclass name, e.g. `GmailPermanentError`
+   > or `GmailAuthError` (core-raised failures use the bare `PermanentError`/`AuthError`).
+   > When filtering by `error_class`, match by substring/suffix (`...PermanentError`) rather
+   > than exact equality so provider variants are included.
 3. Run the redrive:
 
 ```python
