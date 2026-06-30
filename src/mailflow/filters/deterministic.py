@@ -7,11 +7,28 @@ import re
 from typing import Callable
 
 from mailflow.core.filtering import FilterContext, FilterDecision
-from mailflow.core.models import Envelope
+from mailflow.core.models import Envelope, Recipient
 
 
 def _domain(address: str) -> str:
     return address.rsplit("@", 1)[-1].lower() if "@" in address else ""
+
+
+def _recipient_match(
+    recipients: list[Recipient],
+    addresses: set[str],
+    patterns: list[re.Pattern[str]],
+) -> str | None:
+    """Reason string if any recipient matches an exact address (case-insensitive) or a
+    regex, else None. Shared by ToFilter/CcFilter; mirrors SubjectFilter's regex search."""
+    for r in recipients:
+        addr = r.address.lower()
+        if addr in addresses:
+            return f"address {addr}"
+        for pat in patterns:
+            if pat.search(r.address):
+                return f"~ {pat.pattern}"
+    return None
 
 
 # Consumer/personal mail domains blocked by the no_personal filter (spec §3.2).
@@ -119,6 +136,47 @@ class SubjectFilter:
         for pat in self.patterns:
             if pat.search(env.subject):
                 return FilterDecision.drop(self.name, f"subject ~ {pat.pattern}")
+        return FilterDecision.uncertain()
+
+
+class ToFilter:
+    """Drops mail addressed TO a matching recipient — exact address (case-insensitive)
+    or regex pattern, mirroring SubjectFilter's regex style. Empty config = no-op (safe)."""
+
+    name = "to"
+
+    def __init__(
+        self, addresses: set[str] | None = None, patterns: list[str] | None = None
+    ) -> None:
+        self.addresses = {a.lower() for a in (addresses or set())}
+        self.patterns = [re.compile(p) for p in (patterns or [])]
+
+    def evaluate(self, env: Envelope, ctx: FilterContext) -> FilterDecision:
+        if not self.addresses and not self.patterns:
+            return FilterDecision.uncertain()
+        reason = _recipient_match(env.to, self.addresses, self.patterns)
+        if reason is not None:
+            return FilterDecision.drop(self.name, reason)
+        return FilterDecision.uncertain()
+
+
+class CcFilter:
+    """Cc counterpart of ToFilter — matches against the Cc list. Empty config = no-op (safe)."""
+
+    name = "cc"
+
+    def __init__(
+        self, addresses: set[str] | None = None, patterns: list[str] | None = None
+    ) -> None:
+        self.addresses = {a.lower() for a in (addresses or set())}
+        self.patterns = [re.compile(p) for p in (patterns or [])]
+
+    def evaluate(self, env: Envelope, ctx: FilterContext) -> FilterDecision:
+        if not self.addresses and not self.patterns:
+            return FilterDecision.uncertain()
+        reason = _recipient_match(env.cc, self.addresses, self.patterns)
+        if reason is not None:
+            return FilterDecision.drop(self.name, reason)
         return FilterDecision.uncertain()
 
 
