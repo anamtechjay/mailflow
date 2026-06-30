@@ -242,6 +242,8 @@
     <span class="chip" title="poison / over-cap messages persist to a DeadLetterStore — redrive() re-submits them through a fresh pipeline">durable&nbsp;DLQ&nbsp;+&nbsp;redrive</span>
     <span class="chip" title="default (no policy): 25 MB per-attachment cap, fail-closed → DLQ; with connect(attachments=…): over-cap / not-allowlisted / scanner-blocked / unreadable parts are stripped and recorded on email.stripped_attachments (strip-and-deliver) — see Configuring attachments below">attachment&nbsp;cap</span>
     <span class="chip" title="content-addressed: the same attachment across two messages is stored exactly once">blob&nbsp;dedupe</span>
+    <span class="chip" title="Gmail OAuth scope verified at startup (default on) — fails fast if gmail.readonly is missing; opt out with connect(verify_scope_on_startup=False)">scope&nbsp;check</span>
+    <span class="chip" title="structured logging + a dependency-free metrics seam (RunReport.counters()) + a health() probe">metrics&nbsp;+&nbsp;health</span>
   </div>
 
   <div class="grid">
@@ -395,6 +397,21 @@ const FEATURES = [
    desc:"Allow-list at the individual address level.",
    example:`filters=[{"kind": "only_sender", "addresses": ["boss@acme.com"]}]
 # anyone NOT in the list is dropped (person-level, not domain)`},
+
+  {id:"only_domain", group:"Filtering", name:"Allow only domains", code:'"kind":"only_domain"', stage:"filter",
+   desc:"Keep ONLY these sender domains — drop everything else.",
+   example:`filters=[{"kind": "only_domain", "domains": ["acme.com", "partner.com"]}]
+# domain-level allow-list: unlike whitelist (keep + fall through), this DROPS non-matches`},
+
+  {id:"block_sender", group:"Filtering", name:"Block senders", code:'"kind":"block_sender"', stage:"filter",
+   desc:"Drop specific sender addresses (person-level block).",
+   example:`filters=[{"kind": "block_sender", "addresses": ["spammer@acme.com"]}]
+# the address-level counterpart of blacklist — block one person, not their whole domain`},
+
+  {id:"internal_domain", group:"Filtering", name:"Drop internal domains", code:'"kind":"internal_domain"', stage:"filter",
+   desc:"Drop mail FROM your own internal domains (skip self-sent / internal noise).",
+   example:`filters=[{"kind": "internal_domain", "domains": ["mycompany.com"]}]
+# drops any sender whose domain is internal — keep only external mail`},
 
   {id:"subject", group:"Filtering", name:"Subject regex", code:'"kind":"subject"', stage:"filter",
    desc:"Drop subjects matching any regex.",
@@ -598,6 +615,9 @@ function genLines(){
   if(has("whitelist"))        filt.push(['{"kind": "whitelist", "domains": ["partner.com"]},',"whitelist"]);
   if(has("no_personal"))      filt.push(['{"kind": "no_personal"},',"no_personal"]);
   if(has("only_sender"))      filt.push(['{"kind": "only_sender", "addresses": ["boss@acme.com"]},',"only_sender"]);
+  if(has("only_domain"))      filt.push(['{"kind": "only_domain", "domains": ["acme.com", "partner.com"]},',"only_domain"]);
+  if(has("block_sender"))     filt.push(['{"kind": "block_sender", "addresses": ["spammer@acme.com"]},',"block_sender"]);
+  if(has("internal_domain"))  filt.push(['{"kind": "internal_domain", "domains": ["mycompany.com"]},',"internal_domain"]);
   if(has("subject"))          filt.push(['{"kind": "subject", "patterns": ["(?i)invoice"]},',"subject"]);
   if(has("to_filter"))        filt.push(['{"kind": "to", "addresses": ["alerts@acme.com"], "patterns": ["(?i)^ops-"]},',"to_filter"]);
   if(has("cc_filter"))        filt.push(['{"kind": "cc", "patterns": ["(?i)@vendor\\\\.example$"]},',"cc_filter"]);
