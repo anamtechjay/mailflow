@@ -71,3 +71,23 @@ def test_clean_email_auto_submitted_seam() -> None:
     )
     assert ce.is_auto_submitted is True
     assert ce.auto_submitted == "auto-generated"   # legacy string preserved
+
+
+from mailflow.core.events import EmailEvent  # noqa: E402
+
+
+def test_classification_seam_survives_onto_emitted_wire_event() -> None:
+    # A bounce (delivery-status report) extracted, then wrapped + serialized as
+    # the wire EmailEvent — proves the booleans are stored wire fields, not
+    # dropped between the extractor boundary and the emitted payload.
+    raw = (b"Message-ID: <a@x>\r\nFrom: bounce-handler@mailer.acme.com\r\n"
+           b"To: ops@acme.com\r\nSubject: Delivery Status\r\n"
+           b'Content-Type: multipart/report; report-type=delivery-status; boundary="b"\r\n'
+           b"\r\n--b\r\nContent-Type: text/plain\r\n\r\nfailed\r\n--b--\r\n")
+    ce = MimeExtractor().extract_bytes(
+        raw, provider="memory", provider_message_id="m1",
+        stream_id="ops@acme.com", watched_mailbox="ops@acme.com",
+    )
+    dumped = EmailEvent(tenant="t", ordering_key="ops@acme.com", email=ce).model_dump()
+    assert dumped["email"]["is_bounce"] is True
+    assert dumped["email"]["is_auto_submitted"] is False
