@@ -15,8 +15,8 @@ def _email() -> CleanEmail:
     )
 
 
-def test_schema_version_minor_bumped_to_1_2() -> None:
-    assert SCHEMA_VERSION == "1.2"
+def test_schema_version_minor_bumped_to_1_3() -> None:
+    assert SCHEMA_VERSION == "1.3"
 
 
 def test_email_event_carries_idempotency_key_default_empty() -> None:

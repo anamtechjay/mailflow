@@ -45,11 +45,30 @@ class ScanVerdict(str, Enum):
     block = "block"
 
 
+class StripReason(str, Enum):
+    """Why an attachment was stripped rather than delivered or rejected."""
+
+    not_allowlisted = "not_allowlisted"
+    oversize = "oversize"
+    unreadable = "unreadable"
+    scanner = "scanner"
+
+
 class ScanResult(BaseModel):
     """An AttachmentScanner / allowlist verdict. Allow by default (no-op posture)."""
 
     verdict: ScanVerdict = ScanVerdict.allow
     reason: str = ""
+
+
+class StrippedAttachment(BaseModel):
+    """Record of an attachment that was stripped before delivery (schema 1.3)."""
+
+    filename: str = ""
+    content_type: str = ""
+    size_bytes: int = 0
+    is_inline: bool = False
+    reason: StripReason
 
 
 class Recipient(BaseModel):
@@ -188,6 +207,7 @@ class CleanEmail(BaseModel):
     body_html: str = ""
     body_truncated: bool = False
     attachments: list[Attachment] = Field(default_factory=list)
+    stripped_attachments: list[StrippedAttachment] = Field(default_factory=list)
 
     labels: list[str] = Field(default_factory=list)
     categories: list[str] = Field(default_factory=list)
