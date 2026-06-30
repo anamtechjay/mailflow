@@ -38,6 +38,20 @@ class Verdict(str, Enum):
     unknown = "unknown"
 
 
+class ScanVerdict(str, Enum):
+    """Outcome of an attachment safety scan (V1 fast-follow)."""
+
+    allow = "allow"
+    block = "block"
+
+
+class ScanResult(BaseModel):
+    """An AttachmentScanner / allowlist verdict. Allow by default (no-op posture)."""
+
+    verdict: ScanVerdict = ScanVerdict.allow
+    reason: str = ""
+
+
 class Recipient(BaseModel):
     name: str = ""
     address: str = ""

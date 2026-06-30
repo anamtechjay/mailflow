@@ -12,11 +12,13 @@ from typing import Iterable, Iterator, Mapping, Protocol, TypeVar, runtime_check
 from mailflow.core.events import EmailEvent
 from mailflow.core.filtering import FilterContext, FilterDecision
 from mailflow.core.models import (
+    Attachment,
     CleanEmail,
     Cursor,
     Envelope,
     RawMessage,
     Relevance,
+    ScanResult,
     StreamRef,
     WebhookIdentity,
 )
@@ -160,3 +162,12 @@ class TokenRotationSink(Protocol):
     """Persists a rotated OAuth refresh token so the next run survives (A8)."""
 
     def on_refresh(self, ref: str, new_token: str) -> None: ...
+
+
+@provisional
+@runtime_checkable
+class AttachmentScanner(Protocol):
+    """Safety hook run on each attachment BEFORE its bytes are persisted. The V1
+    default is a no-op (allow-all); a real AV/CDR scanner is a P2 concern."""
+
+    def scan(self, attachment: Attachment) -> ScanResult: ...
