@@ -17,6 +17,10 @@ class LocalBlobStore:
         path = os.path.join(self.directory, ref)
         if os.path.exists(path):
             return ref  # content-addressed dedupe: identical bytes already stored, skip
+        # NOTE: writes are non-atomic (direct to the final path). If a prior put_stream
+        # crashed mid-stream, a truncated blob sits at `path` and the dedupe guard above
+        # makes a retry skip it rather than self-heal — reads are not hash-verified. The
+        # production GCS/S3 adapter should write-to-temp-then-rename (and may verify hash).
         with open(path, "wb") as f:
             for chunk in chunks:
                 f.write(chunk)
