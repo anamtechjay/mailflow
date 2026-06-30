@@ -25,6 +25,7 @@ from mailflow.core.models import (
 )
 from mailflow.core.observability import DeadLetter, DecisionTrace, RunReport
 from mailflow.core.ports import (
+    AuthRefresher,
     BlobStore,
     Classifier,
     ContentCleaner,
@@ -63,6 +64,7 @@ class Pipeline:
         config: PipelineConfig,
         classifier: Classifier | None = None,
         cleaner: ContentCleaner | None = None,
+        auth_refresher: AuthRefresher | None = None,
     ) -> None:
         self.provider = provider
         self.parser = parser
@@ -76,6 +78,7 @@ class Pipeline:
         self.config = config
         self.classifier = classifier
         self.cleaner = cleaner
+        self.auth_refresher = auth_refresher
 
     def run_once(self) -> RunReport:
         report = RunReport()
@@ -126,55 +129,75 @@ class Pipeline:
             )
 
         try:
-            env = self.parser.parse_envelope(msg, tenant)
-            decision = self.filters.run(env, FilterContext(tenant=tenant))
-
-            if decision.decision is Decision.drop:
-                self.dedupe_store.mark_done(key, self.config.done_ttl_seconds)
-                report.record(self._trace(
-                    env.canonical_id, msg, Disposition.dropped, "filter",
-                    matched_filter=decision.filter_name, reason=decision.reason,
-                ))
-                return Disposition.dropped
-
-            relevance = None
-            if self.classifier is not None and decision.decision is Decision.uncertain:
-                relevance = self.classifier.classify(env, FilterContext(tenant=tenant))
-
-            email = self._extract(msg, env)
-            if relevance is not None:
-                email.relevance = relevance
-            email.matched_filter = decision.filter_name
-
-            event = EmailEvent(
-                schema_version=SCHEMA_VERSION,
-                tenant=tenant,
-                ordering_key=msg.stream.mailbox,
-                idempotency_key=key,  # §A4: (tenant, mailbox, provider_message_id) on the wire
-                email=email,
-            )
-            self.emitter.emit(event)
-            self.dedupe_store.mark_done(key, self.config.done_ttl_seconds)
-            report.record(self._trace(
-                email.canonical_id, msg, Disposition.emitted, "emit",
-                relevance_score=(relevance.score if relevance else None),
-            ))
-            return Disposition.emitted
-
+            return self._do_work(msg, key, report)
         except PermanentError as exc:
             # §A2: will never succeed (403/404/410, invalid base64) -> DLQ, no retry.
             return self._dead_letter(
                 canonical_id, msg, key, report, reason=f"{type(exc).__name__}: {exc}"
             )
         except AuthError as exc:
-            # §A2: refresh-and-retry — release so the next attempt re-auths (adapter refreshes
-            # the token); DLQ only once the attempt budget is spent.
-            return self._retry_or_dead_letter(canonical_id, msg, key, report, attempts, exc)
+            # §A2: 401 -> force ONE refresh and retry the body exactly once; not the loop.
+            return self._handle_auth_error(canonical_id, msg, key, report, attempts, exc)
         except TransientError as exc:
             # §A2: temporary (429/5xx/network) -> bounded retry, else DLQ.
             return self._retry_or_dead_letter(canonical_id, msg, key, report, attempts, exc)
         except Exception as exc:  # noqa: BLE001 - unknown failures are treated as transient
             return self._retry_or_dead_letter(canonical_id, msg, key, report, attempts, exc)
+
+    def _do_work(self, msg: RawMessage, key: str, report: RunReport) -> Disposition:
+        tenant = self.config.tenant
+        env = self.parser.parse_envelope(msg, tenant)
+        decision = self.filters.run(env, FilterContext(tenant=tenant))
+
+        if decision.decision is Decision.drop:
+            self.dedupe_store.mark_done(key, self.config.done_ttl_seconds)
+            report.record(self._trace(
+                env.canonical_id, msg, Disposition.dropped, "filter",
+                matched_filter=decision.filter_name, reason=decision.reason,
+            ))
+            return Disposition.dropped
+
+        relevance = None
+        if self.classifier is not None and decision.decision is Decision.uncertain:
+            relevance = self.classifier.classify(env, FilterContext(tenant=tenant))
+
+        email = self._extract(msg, env)
+        if relevance is not None:
+            email.relevance = relevance
+        email.matched_filter = decision.filter_name
+
+        event = EmailEvent(
+            schema_version=SCHEMA_VERSION,
+            tenant=tenant,
+            ordering_key=msg.stream.mailbox,
+            idempotency_key=key,  # §A4: (tenant, mailbox, provider_message_id) on the wire
+            email=email,
+        )
+        self.emitter.emit(event)
+        self.dedupe_store.mark_done(key, self.config.done_ttl_seconds)
+        report.record(self._trace(
+            email.canonical_id, msg, Disposition.emitted, "emit",
+            relevance_score=(relevance.score if relevance else None),
+        ))
+        return Disposition.emitted
+
+    def _handle_auth_error(
+        self, canonical_id: str, msg: RawMessage, key: str, report: RunReport,
+        attempts: int, exc: Exception,
+    ) -> Disposition:
+        # §A2 refresh-and-retry-ONCE: force one credential refresh, then retry the work
+        # body a single time in THIS call. Bounded by straight-line control flow (not a
+        # counter), so it can never loop on max_attempts. A second failure dead-letters.
+        if self.auth_refresher is not None:
+            self.auth_refresher.force_refresh()
+        try:
+            return self._do_work(msg, key, report)
+        except Exception as retry_exc:  # noqa: BLE001 - one shot only; any failure -> DLQ
+            return self._dead_letter(
+                canonical_id, msg, key, report,
+                reason=f"auth retry failed after refresh: "
+                       f"{type(retry_exc).__name__}: {retry_exc}",
+            )
 
     def _retry_or_dead_letter(
         self, canonical_id: str, msg: RawMessage, key: str, report: RunReport,

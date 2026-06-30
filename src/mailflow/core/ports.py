@@ -51,6 +51,15 @@ class MailboxProvider(Protocol):
 
 @stable
 @runtime_checkable
+class AuthRefresher(Protocol):
+    """Forces a credential refresh after a 401 so the in-process AuthError retry
+    re-authenticates with a fresh token (A2)."""
+
+    def force_refresh(self) -> None: ...
+
+
+@stable
+@runtime_checkable
 class SubscriptionManager(Protocol):
     def ensure_watch(self, stream: StreamRef) -> object: ...
     def renew_watch(self, handle: object) -> object: ...

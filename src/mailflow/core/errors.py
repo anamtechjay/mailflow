@@ -27,7 +27,8 @@ class UnknownKindError(ConfigError):
 
 
 class AuthError(MailflowError):
-    """Login/permission failure (e.g. 401). Routing: refresh-and-retry-once (A2)."""
+    """Login/permission failure (e.g. 401). Routing: force one token refresh, retry the
+    message exactly once, else DLQ — never a max_attempts loop (A2)."""
 
 
 class PermanentError(MailflowError):
