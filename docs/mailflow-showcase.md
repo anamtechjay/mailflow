@@ -242,7 +242,7 @@ The raw RFC822 is parsed into the flat, predictable `CleanEmail`. Real output:
 
 ```json
 {
-  "schema_version": "1.2",
+  "schema_version": "1.3",
   "tenant": "me",
   "email": {
     "canonical_id": "<CAF3Ow7RkEa7MH1F9PXTfNuEYsdXm6-gAw+...@mail.gmail.com>",
@@ -351,7 +351,7 @@ connect("gmail", credentials=..., filters=[
                is_inline · storage_ref(pointer, NOT bytes)
   CLASSIFY     direction(inbound/outbound) · is_draft · labels · categories · folder
   HEADERS      list_id · list_unsubscribe · auto_submitted · raw_headers(full map)
-  META         date_utc · received_at · message_size_bytes · schema_version("1.2")
+  META         date_utc · received_at · message_size_bytes · schema_version("1.3")
 ```
 
 One contract, same shape from Gmail or Outlook — write your app once.

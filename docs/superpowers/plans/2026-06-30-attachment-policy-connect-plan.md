@@ -32,7 +32,7 @@ stays importable + mypy-clean + green at every commit.
 ## Task 1 — Core models + schema bump
 
 **Files:** `src/mailflow/core/models.py`, `src/mailflow/core/events.py` (+ tests; + any existing
-test/docstring asserting `schema_version == "1.2"`).
+test/docstring asserting `schema_version == "1.3"`).
 
 Add to `core/models.py`:
 - `class StripReason(str, Enum)` with members `not_allowlisted`, `oversize`, `unreadable`,

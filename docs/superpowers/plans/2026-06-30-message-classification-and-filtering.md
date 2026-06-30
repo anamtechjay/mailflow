@@ -398,7 +398,7 @@ def derive_is_bounce(
 
 **Files:**
 - `src/mailflow/core/models.py` (owner: core-foundation-engineer) — add `is_auto_submitted: bool = False` and `is_bounce: bool = False` to `Envelope` (after line 138, `auto_submitted`) and to `CleanEmail` (after line 181, `auto_submitted`).
-- `src/mailflow/core/events.py` (owner: core-foundation-engineer) — `SCHEMA_VERSION = "1.2"` (line 14).
+- `src/mailflow/core/events.py` (owner: core-foundation-engineer) — `SCHEMA_VERSION = "1.3"` (line 14).
 - `tests/core/test_event_contract.py` — update the version assertion (line 18–19).
 - `tests/core/test_models_contract.py` (extend with default-value assertions).
 
@@ -447,7 +447,7 @@ def test_envelope_classification_seam_defaults_false() -> None:
   In `src/mailflow/core/events.py`:
 
 ```python
-SCHEMA_VERSION = "1.2"
+SCHEMA_VERSION = "1.3"
 ```
 
 - [ ] **Step 4: Green + types + full suite.**
