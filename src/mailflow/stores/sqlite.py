@@ -15,6 +15,7 @@ import sqlite3
 import threading
 
 from mailflow.core.models import Cursor, StreamRef
+from mailflow.core.observability import DeadLetterRecord
 
 _CURSOR_SCHEMA = """
 CREATE TABLE IF NOT EXISTS cursors (
@@ -31,6 +32,14 @@ CREATE TABLE IF NOT EXISTS claims (
   key TEXT PRIMARY KEY,
   done INTEGER NOT NULL DEFAULT 0,
   attempts INTEGER NOT NULL DEFAULT 0
+);
+"""
+
+
+_DEADLETTER_SCHEMA = """
+CREATE TABLE IF NOT EXISTS dead_letters (
+  record_id TEXT PRIMARY KEY,
+  payload   TEXT NOT NULL
 );
 """
 
@@ -116,4 +125,42 @@ class SqliteDedupeStore:
     def release(self, key: str) -> None:
         with self._lock:
             self._conn.execute("DELETE FROM claims WHERE key=? AND done=0", (key,))
+            self._conn.commit()
+
+
+class SqliteDeadLetterStore:
+    """Durable, replayable DLQ records in a single SQLite table (one JSON payload per
+    record_id). Mirrors the in-memory store method-for-method (DeadLetterStore port)."""
+
+    def __init__(self, db_path: str = "mailflow.db") -> None:
+        self.db_path = db_path
+        self._conn = sqlite3.connect(db_path, check_same_thread=False)
+        self._conn.execute(_DEADLETTER_SCHEMA)
+        self._conn.commit()
+        self._lock = threading.Lock()
+
+    def put(self, record: DeadLetterRecord) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO dead_letters (record_id, payload) VALUES (?, ?) "
+                "ON CONFLICT(record_id) DO UPDATE SET payload=excluded.payload",
+                (record.record_id, record.model_dump_json()),
+            )
+            self._conn.commit()
+
+    def list_pending(self, *, limit: int | None = None) -> list[DeadLetterRecord]:
+        sql = "SELECT payload FROM dead_letters ORDER BY rowid"
+        params: tuple[object, ...] = ()
+        if limit is not None:
+            sql += " LIMIT ?"
+            params = (limit,)
+        with self._lock:
+            rows = self._conn.execute(sql, params).fetchall()
+        return [DeadLetterRecord.model_validate_json(str(row[0])) for row in rows]
+
+    def delete(self, record_id: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                "DELETE FROM dead_letters WHERE record_id=?", (record_id,)
+            )
             self._conn.commit()

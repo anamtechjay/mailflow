@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Iterator
 
 from mailflow.core.models import Cursor, StreamRef
+from mailflow.core.observability import DeadLetterRecord
 
 
 class InMemoryCursorStore:
@@ -65,6 +66,24 @@ class InMemoryDedupeStore:
         rec = self._claims.get(key)
         if rec is not None and not rec.done:
             del self._claims[key]
+
+
+class InMemoryDeadLetterStore:
+    """Durable-shape DLQ store for tests + the zero-setup path. Keyed by record_id
+    (insertion-ordered) so put overwrites and list_pending is deterministic."""
+
+    def __init__(self) -> None:
+        self._records: dict[str, DeadLetterRecord] = {}
+
+    def put(self, record: DeadLetterRecord) -> None:
+        self._records[record.record_id] = record
+
+    def list_pending(self, *, limit: int | None = None) -> list[DeadLetterRecord]:
+        records = list(self._records.values())
+        return records if limit is None else records[:limit]
+
+    def delete(self, record_id: str) -> None:
+        self._records.pop(record_id, None)
 
 
 @dataclass
