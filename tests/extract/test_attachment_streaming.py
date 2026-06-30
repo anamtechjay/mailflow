@@ -55,6 +55,28 @@ def test_over_cap_attachment_fails_closed() -> None:
         digest_and_size(part, cap=1024)
 
 
+def test_iter_decoded_8bit_binary_high_bytes_round_trip() -> None:
+    body = bytes(range(256))  # includes bytes >= 0x80
+    raw = (
+        b"Message-ID: <bin.1@example.com>\r\n"
+        b"From: alice@partner.com\r\n"
+        b"To: ops@acme.com\r\n"
+        b"Subject: bin\r\n"
+        b"Content-Type: application/octet-stream\r\n"
+        b'Content-Disposition: attachment; filename="x.bin"\r\n'
+        b"Content-Transfer-Encoding: binary\r\n"
+        b"\r\n"
+    ) + body
+    parsed = message_from_bytes(raw, policy=default_policy)
+    assert isinstance(parsed, EmailMessage)
+    part = next(p for p in parsed.walk() if p.get_filename() == "x.bin")
+    chunks = list(iter_decoded(part, chunk_size=64))
+    assert b"".join(chunks) == body  # lossless, no U+FFFD corruption
+    digest, size = digest_and_size(part, cap=10_000_000)
+    assert size == len(body)
+    assert digest == hashlib.sha256(body).hexdigest()
+
+
 def test_invalid_base64_is_unreadable_fail_closed() -> None:
     raw = (
         b"Message-ID: <bad.1@example.com>\r\n"

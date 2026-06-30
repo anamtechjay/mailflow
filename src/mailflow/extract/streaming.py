@@ -1,11 +1,12 @@
 """Chunked, fail-closed attachment streaming (V1 fast-follow).
 
 The legacy path decoded a whole attachment into memory then wrapped it in
-`iter([payload])` — no cap, fully buffered. This module decodes a leaf MIME part
-incrementally and enforces a hard per-attachment byte cap that fails CLOSED:
-an over-cap or undecodable attachment raises a PermanentError, so the pipeline
-dead-letters the message (parallels the B1 message-level size guard) — it is
-never fully buffered nor persisted.
+`iter([payload])` — no cap, and the decoded copy held whole in memory. This
+module streams the decode of a leaf MIME part in chunks (avoiding a second full
+copy of the decoded bytes) and enforces a hard per-attachment byte cap that fails
+CLOSED: an over-cap or undecodable attachment raises a PermanentError, so the
+pipeline dead-letters the message (parallels the B1 message-level size guard)
+rather than persisting an over-cap blob.
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ class AttachmentTooLargeError(PermanentError):
     def __init__(self, cap: int, seen: int) -> None:
         self.cap = cap
         self.seen = seen
-        super().__init__(f"attachment exceeds the {cap}-byte cap (saw > {seen} bytes)")
+        super().__init__(f"attachment exceeds the {cap}-byte cap (saw {seen} bytes)")
 
 
 class AttachmentUnreadableError(PermanentError):
@@ -59,9 +60,14 @@ def iter_decoded(part: EmailMessage, chunk_size: int = 65536) -> Iterator[bytes]
         # Decoded QP is never larger than its encoded form -> fail closed pre-decode.
         encoded = raw.encode("latin-1", "surrogateescape")
         yield quopri.decodestring(encoded)
-    else:  # 7bit / 8bit / binary / identity
-        for i in range(0, len(raw), chunk_size):
-            yield raw[i : i + chunk_size].encode("latin-1", "surrogateescape")
+    else:  # 7bit / 8bit / binary / identity — get true bytes, not the policy-mangled str
+        decoded = part.get_payload(decode=True)
+        if not isinstance(decoded, bytes):
+            raise AttachmentUnreadableError(
+                f"payload is {type(decoded).__name__}, not bytes"
+            )
+        for i in range(0, len(decoded), chunk_size):
+            yield decoded[i : i + chunk_size]
 
 
 def digest_and_size(part: EmailMessage, *, cap: int, chunk_size: int = 65536) -> tuple[str, int]:

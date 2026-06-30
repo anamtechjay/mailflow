@@ -156,8 +156,9 @@ class MimeExtractor:
                     part, cap=self.max_attachment_bytes
                 )
                 storage_ref = ""
-                # Stream the bytes into the blob store (chunked, not buffered) so
-                # downstream apps can download the file (else metadata only).
+                # Stream the decoded bytes into the blob store in chunks (avoids a
+                # second full copy of the decoded payload) so downstream apps can
+                # download the file (else metadata only).
                 if blob_store is not None and size_bytes:
                     storage_ref = blob_store.put_stream(
                         content_hash, iter_decoded(part), ctype
