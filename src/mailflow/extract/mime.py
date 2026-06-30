@@ -166,27 +166,33 @@ class MimeExtractor:
                 continue
 
             if is_attachment or is_inline_media:
-                content_hash, size_bytes = digest_and_size(
-                    part, cap=self.max_attachment_bytes
-                )
                 meta = Attachment(
                     filename=filename or "",
                     content_type=ctype,
-                    size_bytes=size_bytes,
-                    content_hash=content_hash,
                     content_id=str(cid) if cid else "",
                     is_inline=bool(is_inline_media and not is_attachment),
                 )
-                # Safety seam: allowlist first, then the scanner hook. Runs BEFORE any
-                # blob is persisted; a block fails closed -> DLQ. NOTE: this block sits
-                # under `is_attachment or is_inline_media`, so it intentionally governs
-                # inline media (logos, tracking pixels) too — one blocked part DLQs the
-                # whole message (a non-empty allowlist must include expected inline types).
-                result = check_allowlist(meta, self.allowlist)
-                if result.verdict is ScanVerdict.allow:
-                    result = self.scanner.scan(meta)
-                if result.verdict is ScanVerdict.block:
-                    raise AttachmentBlockedError(meta.filename, result.reason)
+                # Safety seam — cheap allowlist check on metadata FIRST, before any decode,
+                # so a disallowed type is rejected without streaming/hashing the payload
+                # (avoids wasting a full decode on a blocked huge attachment).
+                # NOTE: this block sits under `is_attachment or is_inline_media`, so it
+                # intentionally governs inline media (logos, tracking pixels) too — one
+                # blocked part DLQs the whole message (a non-empty allowlist must include
+                # expected inline types).
+                if check_allowlist(meta, self.allowlist).verdict is ScanVerdict.block:
+                    raise AttachmentBlockedError(
+                        meta.filename, f"type not allowlisted: {ctype}"
+                    )
+                # Decode + fail-closed cap now that the type is permitted.
+                content_hash, size_bytes = digest_and_size(
+                    part, cap=self.max_attachment_bytes
+                )
+                meta = meta.model_copy(
+                    update={"content_hash": content_hash, "size_bytes": size_bytes}
+                )
+                # Scanner hook gets full metadata (incl. size/hash); a block fails closed -> DLQ.
+                if self.scanner.scan(meta).verdict is ScanVerdict.block:
+                    raise AttachmentBlockedError(meta.filename, "blocked by scanner")
                 storage_ref = ""
                 # Stream the decoded bytes into the blob store in chunks (avoids a
                 # second full copy of the decoded payload) so downstream apps can

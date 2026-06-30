@@ -76,3 +76,21 @@ def test_extractor_with_blocking_scanner_blocks_message() -> None:
     ext = MimeExtractor(scanner=_BlockAll())
     with pytest.raises(AttachmentBlockedError):
         _extract(ext, _raw_with_pdf())
+
+
+def test_allowlist_rejects_before_cap_decode() -> None:
+    # report.pdf is over this tiny cap AND not in the allowlist. Allowlist runs first,
+    # so we get AttachmentBlockedError (not AttachmentTooLargeError) — proving the
+    # disallowed type is rejected without paying for the full decode.
+    from mailflow.extract.streaming import AttachmentTooLargeError
+
+    ext = MimeExtractor(allowlist=frozenset({"text/plain"}), max_attachment_bytes=4)
+    with pytest.raises(AttachmentBlockedError):
+        _extract(ext, _raw_with_pdf())
+    # and definitively NOT the cap error:
+    try:
+        _extract(ext, _raw_with_pdf())
+    except AttachmentTooLargeError:
+        raise AssertionError("cap ran before allowlist — reorder regressed")
+    except AttachmentBlockedError:
+        pass
