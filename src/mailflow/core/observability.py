@@ -73,6 +73,7 @@ class RunReport(BaseModel):
     dead_lettered: int = 0
     attachments_stripped: int = 0
     traces: list[DecisionTrace] = Field(default_factory=list)
+    stripped: list[DecisionTrace] = Field(default_factory=list)
     dlq: list[DeadLetter] = Field(default_factory=list)
 
     def record(self, trace: DecisionTrace) -> None:
@@ -91,11 +92,12 @@ class RunReport(BaseModel):
     def record_stripped(self, trace: DecisionTrace) -> None:
         """Record one stripped-attachment trace.
 
-        Appends the trace for operator visibility and increments
+        Appends the trace to `self.stripped` (NOT `self.traces`) so that
+        `traces` contains only message-disposition events. Increments
         `attachments_stripped` only — the four message-disposition counters
         (emitted/dropped/duplicates/dead_lettered) are intentionally untouched:
         a message that had parts stripped is still emitted exactly once."""
-        self.traces.append(trace)
+        self.stripped.append(trace)
         self.attachments_stripped += 1
 
     def add_dead_letter(self, dead_letter: DeadLetter) -> None:

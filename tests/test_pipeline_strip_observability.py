@@ -150,11 +150,13 @@ def test_per_strip_trace_carries_reason_and_is_inline() -> None:
 
     report = pipe.run_once()
 
-    # Find the strip trace (stage == "attachment_strip")
-    strip_traces = [t for t in report.traces if t.stage == "attachment_strip"]
-    assert len(strip_traces) == 1
+    # Strip traces live in report.stripped, NOT report.traces
+    assert len(report.stripped) == 1, "per-strip trace must land in report.stripped"
+    # report.traces must contain only the message-disposition trace
+    strip_in_traces = [t for t in report.traces if t.stage == "attachment_strip"]
+    assert strip_in_traces == [], "strip traces must NOT appear in report.traces"
 
-    st = strip_traces[0]
+    st = report.stripped[0]
     assert st.reason == StripReason.oversize.value, "reason must be the StripReason name"
     assert st.is_inline is True, "inline attachment must be flagged is_inline=True"
 
@@ -214,5 +216,5 @@ def test_emitted_count_unchanged_with_multiple_stripped_parts() -> None:
     assert len(emit.events) == 1
     assert not dlq.events
 
-    strip_traces = [t for t in report.traces if t.stage == "attachment_strip"]
+    strip_traces = report.stripped
     assert len(strip_traces) == 2
