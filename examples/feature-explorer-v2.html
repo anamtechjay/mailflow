@@ -361,7 +361,7 @@ mf = <span class="c-fn">connect</span>(<span class="c-str">"gmail"</span>, crede
       <li><b>The four knobs compose:</b> <code>filters</code> (which emails) · <code>fields</code> (which data) · <code>stages</code> + <code>clean_fn</code> (process each). They run in pipeline order shown above.</li>
       <li><b>Filters</b> see the cheap <code>Envelope</code> before the body is parsed; <b>stages</b> see the full <code>CleanEmail</code> and can drop it by returning <code>None</code>.</li>
       <li><b>State:</b> <code>"memory"</code> is stateless (dedupe on <code>canonical_id</code> yourself); <code>"sqlite:///…"</code> persists cursor + dedupe and durably stores attachments, and resumes after a restart.</li>
-      <li><b>The "always on" row is not optional — it's the point.</b> Dedupe, ordered cursor, size guard, retry→DLQ, durable dead-lettering + redrive, 401→refresh-once, and streamed/capped/deduped attachments run automatically. You don't wire reliability; the pipeline guarantees it. That's why those are guarantees up top, not toggles down here.</li>
+      <li><b>The "always on" row is not optional — it's the point.</b> Dedupe, ordered cursor, size guard, retry→DLQ, durable dead-lettering + redrive, and 401→refresh-once run automatically — you don't wire reliability, the pipeline guarantees it. Attachments stream, cap, and dedupe automatically too; what you <i>can</i> tune is the attachment <b>policy</b> (per-class size / type / scanning, and strip-vs-dead-letter) via the <code>Attachment policy</code> toggle — i.e. <code>connect(attachments=…)</code>. See <b>Configuring attachments</b> below.</li>
     </ul>
     <p class="note">Generated for sharing — a single self-contained HTML file, no build step. Code shown reflects the current <code>feature/library</code> build — wire event schema 1.3.</p>
   </footer>
@@ -456,7 +456,17 @@ mf = connect("memory", seed=seed, tenant="acme", stages=[enrich, drop_bots])
 
 mf = connect("memory", seed=seed, tenant="acme", stages=[route])
 # both flags are set at extract (MIME + Graph) and ride the wire
-# event — EmailEvent(schema_version="1.2"). new on feature/library.`},
+# event — EmailEvent(schema_version="1.3"). new on feature/library.`},
+
+  // ---- Attachments ----
+  {id:"attachments", group:"Attachments", name:"Attachment policy", code:"attachments=…", stage:"extract",
+   desc:"Cap size / allowlist types; strip offending parts instead of dead-lettering the message.",
+   example:`mf = connect("gmail", credentials=creds,
+    attachments={"max_bytes": 10_000_000, "allowlist": ["application/pdf"]})
+# a bare dict applies to BOTH real + inline parts. over-cap / not-allowlisted parts
+# are STRIPPED (not DLQ'd) and recorded on email.stripped_attachments.
+# per-class: attachments=AttachmentPolicy(real=AttachmentRule(…), inline=AttachmentRule(…)).
+# new on feature/library.`},
 
   // ---- State ----
   {id:"state_sqlite", group:"State", name:"Persistent SQLite state", code:'state="sqlite:///…"', stage:"deliver",
@@ -482,7 +492,7 @@ body  = mf.get_body("<message_id>")       # str
 files = mf.get_attachments("<message_id>")  # list[Attachment]`},
 ];
 
-const GROUPS = ["Filtering","Processing","Classification","State","Live · Gmail"];
+const GROUPS = ["Filtering","Processing","Classification","Attachments","State","Live · Gmail"];
 
 /* ---- state ---- */
 const active = new Set();
@@ -605,6 +615,7 @@ function genLines(){
   if(has("stages"))   stageNames.push("enrich","drop_noreply");
   if(has("classify")) stageNames.push("route");
   if(stageNames.length)   add("    stages=["+stageNames.join(", ")+"],", has("stages")?"stages":"classify");
+  if(has("attachments"))  add('    attachments={"max_bytes": 10_000_000, "allowlist": ["application/pdf"]},',"attachments");
   if(has("state_sqlite")) add('    state="sqlite:///mailflow.db",',"state_sqlite");
   if(consume==="push")    add("    on_email=handle,","consume");
   if(has("rotation_sink"))add('    overrides={"rotation_sink": FileTokenRotationSink("tokens.json")},',"rotation_sink");
