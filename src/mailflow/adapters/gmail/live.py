@@ -111,10 +111,18 @@ class OAuthTokenProvider:
 
     def verify_scopes(self, required: list[str]) -> None:
         """A9/§9: fail fast if the granted OAuth scopes do not cover `required`.
-        Forces a token refresh (so google-auth populates granted_scopes), then checks
-        the granted set. Falls back to the requested scopes only when the provider does
-        not report granted scopes (older google-auth); a missing required scope raises
-        AuthError so a mis-scoped credential never silently under-delivers mail."""
+
+        Triggers a token refresh when the token is not yet valid (via get_token), so
+        google-auth can populate `granted_scopes`, then checks the granted set and
+        raises AuthError naming any missing scope — so a mis-scoped credential fails
+        at startup instead of silently under-delivering mail.
+
+        Fail-open caveat: on older google-auth that does not report `granted_scopes`
+        (the value is None), this degrades to a NO-OP — it falls back to the requested
+        scopes (which trivially satisfy `required`) rather than rejecting. Modern
+        google-auth reports granted_scopes, so the check is real there; a hardened
+        independent-confirmation path for legacy clients is deferred.
+        """
         self.get_token()  # forces refresh when the token is not yet valid
         raw = getattr(self._creds, "granted_scopes", None)
         granted: set[str]

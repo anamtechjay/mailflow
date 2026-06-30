@@ -355,7 +355,7 @@ def _build_gmail_live(
     filters: list[Filter],
     cleaner: Any = None,
     rotation_sink: Any = None,
-    verify_scope_on_startup: bool = True,
+    verify_scope_on_startup: bool = _DEFAULT_VERIFY_SCOPE,
 ) -> Callable[[], None]:
     """Return a blocking callable that runs the live Gmail consume loop. The Gmail SDK is
     imported lazily inside run_service, so importing this module needs no `gmail` extra."""
