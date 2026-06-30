@@ -72,3 +72,11 @@ class HttpTransport(Protocol):
 @runtime_checkable
 class TokenProvider(Protocol):
     def get_token(self) -> str: ...
+
+
+@runtime_checkable
+class RefreshableTokenProvider(Protocol):
+    """A TokenProvider that can force a credential refresh after a 401 (A2)."""
+
+    def get_token(self) -> str: ...
+    def force_refresh(self) -> None: ...

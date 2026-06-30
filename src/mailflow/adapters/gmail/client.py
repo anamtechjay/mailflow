@@ -13,6 +13,7 @@ from mailflow.adapters.gmail.transport import (
     GmailError,
     HttpResponse,
     HttpTransport,
+    RefreshableTokenProvider,
     StaleHistoryError,
     TokenProvider,
     gmail_error_for,
@@ -55,6 +56,7 @@ class GmailClient:
 
     def _request_inner(self, method: str, url: str, *, json: Any | None) -> HttpResponse:
         attempt = 0
+        auth_retried = False
         while True:
             headers = {
                 "Authorization": f"Bearer {self.tokens.get_token()}",
@@ -74,6 +76,17 @@ class GmailClient:
             if (status == 429 or status >= 500) and attempt < self.max_retries:
                 self._backoff_sleep(attempt, resp.headers.get("Retry-After"))
                 attempt += 1
+                continue
+            # A2: a 401 means the access token was rejected. Force ONE refresh and retry
+            # the request a single time with a fresh bearer token (bounded by auth_retried,
+            # independent of max_retries); a second 401 propagates as GmailAuthError.
+            if (
+                status == 401
+                and not auth_retried
+                and isinstance(self.tokens, RefreshableTokenProvider)
+            ):
+                self.tokens.force_refresh()
+                auth_retried = True
                 continue
             if status >= 400:
                 message = ""

@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from mailflow.adapters.gmail.client import GmailClient
-from mailflow.adapters.gmail.transport import GmailError, StaleHistoryError
+from mailflow.adapters.gmail.transport import GmailAuthError, GmailError, StaleHistoryError
 from mailflow.core.errors import AuthError, PermanentError, TransientError
 
 
@@ -82,3 +82,51 @@ def test_history_404_still_reseeds_via_stale_history_error() -> None:
     client = _client(_Resp(404))
     with pytest.raises(StaleHistoryError):
         client.history_message_ids("me", "100")
+
+
+# A2: adapter-local refresh-once on a fetch-time 401. The pipeline-level AuthError handler
+# never sees a 401 raised inside provider.fetch(), so the HTTP client refreshes the token
+# and retries the request exactly once; a second 401 propagates as GmailAuthError.
+class _SeqTransport:
+    def __init__(self, statuses: list[int]) -> None:
+        self._statuses = list(statuses)
+        self.auth_headers: list[str] = []
+
+    def request(self, method: str, url: str, *, headers: dict[str, str], json: Any) -> _Resp:
+        self.auth_headers.append(headers["Authorization"])
+        return _Resp(self._statuses.pop(0), {"ok": True})
+
+
+class _RefreshableTokens:
+    def __init__(self) -> None:
+        self.token = "t0"
+        self.refreshes = 0
+
+    def get_token(self) -> str:
+        return self.token
+
+    def force_refresh(self) -> None:
+        self.refreshes += 1
+        self.token = f"t{self.refreshes}"
+
+
+def test_client_refreshes_and_retries_once_on_401() -> None:
+    tokens = _RefreshableTokens()
+    transport = _SeqTransport([401, 200])
+    client = GmailClient(
+        base_url="https://g", token_provider=tokens, transport=transport, max_retries=0,
+    )
+    client.get_profile("me@x")
+    assert tokens.refreshes == 1
+    assert transport.auth_headers == ["Bearer t0", "Bearer t1"]  # retried with fresh token
+
+
+def test_client_raises_auth_error_after_second_401_no_loop() -> None:
+    tokens = _RefreshableTokens()
+    client = GmailClient(
+        base_url="https://g", token_provider=tokens,
+        transport=_SeqTransport([401, 401]), max_retries=0,
+    )
+    with pytest.raises(GmailAuthError):
+        client.get_profile("me@x")
+    assert tokens.refreshes == 1  # exactly one refresh, no loop
