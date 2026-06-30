@@ -9,6 +9,7 @@ from email.policy import default as default_policy
 from email.utils import getaddresses, parsedate_to_datetime
 from typing import Any
 
+from mailflow.core.classification import derive_auto_submitted, derive_is_bounce
 from mailflow.core.events import SCHEMA_VERSION
 from mailflow.core.identity import derive_canonical_id
 from mailflow.core.models import Attachment, CleanEmail, Direction, Recipient, ScanVerdict
@@ -109,6 +110,10 @@ class MimeExtractor:
         # by a case-insensitive Re:/Fwd:-stripped subject so a reply joins its root.
         effective_thread_key = thread_key or normalize_subject(subject).lower()
 
+        auto_sub = str(msg["auto-submitted"]) if msg["auto-submitted"] else None
+        content_type = str(msg["content-type"]) if msg["content-type"] is not None else None
+        return_path = str(msg["return-path"]) if msg["return-path"] is not None else None
+
         return CleanEmail(
             canonical_id=canonical_id,
             message_id=message_id,
@@ -132,7 +137,11 @@ class MimeExtractor:
             body_text=body_text,
             body_html=body_html,
             attachments=attachments,
-            auto_submitted=str(msg["auto-submitted"]) if msg["auto-submitted"] else None,
+            auto_submitted=auto_sub,
+            is_auto_submitted=derive_auto_submitted(auto_sub),
+            is_bounce=derive_is_bounce(
+                from_address=from_.address, return_path=return_path, content_type=content_type
+            ),
             list_id=str(msg["list-id"]) if msg["list-id"] else None,
             list_unsubscribe=str(msg["list-unsubscribe"]) if msg["list-unsubscribe"] else None,
             message_size_bytes=len(raw),

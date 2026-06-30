@@ -37,3 +37,16 @@ def test_graph_envelope_ordinary_mail_not_classified() -> None:
     env = GraphEnvelopeParser().parse_envelope(_msg(data), "t")
     assert env.is_auto_submitted is False
     assert env.is_bounce is False
+
+
+def test_graph_extractor_copies_seam_from_envelope() -> None:
+    from mailflow.adapters.graph.extractor import GraphExtractor
+    data = {
+        "from": {"emailAddress": {"address": "mailer-daemon@mx.example"}},
+        "internetMessageHeaders": [{"name": "Auto-Submitted", "value": "auto-replied"}],
+    }
+    msg = _msg(data)
+    env = GraphEnvelopeParser().parse_envelope(msg, "t")
+    ce = GraphExtractor().extract(msg, env)
+    assert ce.is_auto_submitted is True
+    assert ce.is_bounce is True

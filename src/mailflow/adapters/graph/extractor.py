@@ -97,6 +97,8 @@ class GraphExtractor:
             "list_id": env.list_id,
             "list_unsubscribe": env.list_unsubscribe,
             "auto_submitted": env.auto_submitted,
+            "is_auto_submitted": env.is_auto_submitted,
+            "is_bounce": env.is_bounce,
             "message_size_bytes": msg.size_bytes,
             "raw_headers": headers,
             "schema_version": SCHEMA_VERSION,

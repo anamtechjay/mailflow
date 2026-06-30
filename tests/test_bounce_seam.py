@@ -44,3 +44,30 @@ def test_list_mail_filter_uses_boolean_seam() -> None:
                         stream=STREAM, is_auto_submitted=False)
     assert ListMailFilter().evaluate(drop_env, CTX).decision is Decision.drop
     assert ListMailFilter().evaluate(keep_env, CTX).decision is Decision.uncertain
+
+
+from mailflow.extract.mime import MimeExtractor  # noqa: E402
+
+
+def test_clean_email_bounce_delivery_status_report() -> None:
+    raw = (b"Message-ID: <a@x>\r\nFrom: bounce-handler@mailer.acme.com\r\n"
+           b"To: ops@acme.com\r\nSubject: Delivery Status\r\n"
+           b'Content-Type: multipart/report; report-type=delivery-status; boundary="b"\r\n'
+           b"\r\n--b\r\nContent-Type: text/plain\r\n\r\nfailed\r\n--b--\r\n")
+    ce = MimeExtractor().extract_bytes(
+        raw, provider="memory", provider_message_id="m1",
+        stream_id="ops@acme.com", watched_mailbox="ops@acme.com",
+    )
+    assert ce.is_bounce is True            # via the delivery-status content-type
+    assert ce.is_auto_submitted is False
+
+
+def test_clean_email_auto_submitted_seam() -> None:
+    raw = (b"Message-ID: <a@x>\r\nFrom: s@x.com\r\nTo: ops@acme.com\r\n"
+           b"Auto-Submitted: auto-generated\r\nSubject: hi\r\n\r\nbody")
+    ce = MimeExtractor().extract_bytes(
+        raw, provider="memory", provider_message_id="m1",
+        stream_id="ops@acme.com", watched_mailbox="ops@acme.com",
+    )
+    assert ce.is_auto_submitted is True
+    assert ce.auto_submitted == "auto-generated"   # legacy string preserved
