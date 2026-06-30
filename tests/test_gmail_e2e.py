@@ -188,6 +188,32 @@ def test_e2e_sweep_catches_mail() -> None:
     assert [e.email.subject for e in emit.events] == ["swept"]
 
 
+# ---- reliability: a sweep overlapping the push path is idempotent + cursor-monotonic ----
+
+def test_e2e_sweep_overlapping_push_is_idempotent_and_monotonic() -> None:
+    routes = [
+        ("/profile", _Resp(200, {"emailAddress": MBX, "historyId": "200"})),
+        ("/messages/m9", _Resp(200, {"raw": _b64url(_raw("m9", "c@p.com", "swept")),
+                                     "sizeEstimate": 30})),
+        ("/history", _Resp(200, {"history": [{"messagesAdded": [{"message": {"id": "m9"}}]}],
+                                 "historyId": "200"})),
+    ]
+    runtime, emit, dlq, cursor, client, _ = _build(routes)        # start_cursor=100
+
+    # 1) push delivers m9 -> emitted once, cursor advances 100 -> 200
+    runtime.process_messages([_Msg({"emailAddress": MBX, "historyId": 200})])
+    assert [e.email.subject for e in emit.events] == ["swept"]
+    after_push = cursor.get("t", STREAM)
+    assert after_push is not None and after_push.order == 200
+
+    # 2) sweep overlaps the SAME mailbox/historyId: m9 is re-seen but already deduped
+    sweep_once(runtime=runtime, client=client, mailboxes=[MBX])
+    assert [e.email.subject for e in emit.events] == ["swept"]    # emitted EXACTLY once
+    assert dlq.events == []
+    after_sweep = cursor.get("t", STREAM)
+    assert after_sweep is not None and after_sweep.order == 200   # never regressed
+
+
 # ---- edge: unparseable Pub/Sub message is acked without processing ----
 
 def test_e2e_unparseable_notification_acked_no_emit() -> None:
