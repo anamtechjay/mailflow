@@ -48,3 +48,16 @@ def test_health_does_not_corrupt_dedupe_state() -> None:
     health(cursor_store=InMemoryCursorStore(), dedupe_store=dedupe,
            blob_store=InMemoryBlobStore())
     assert dedupe.try_claim("__healthcheck__", 1) is True  # probe released it
+
+
+class _FlakyReleaseDedupe(InMemoryDedupeStore):
+    def release(self, key: str) -> None:  # type: ignore[override]
+        raise RuntimeError("release failed")
+
+
+def test_health_dedupe_release_failure_does_not_crash_probe() -> None:
+    # try_claim works; release raises. The probe must not crash and must still report ok
+    # for the claim liveness (release is best-effort cleanup).
+    report = health(cursor_store=InMemoryCursorStore(),
+                    dedupe_store=_FlakyReleaseDedupe(), blob_store=InMemoryBlobStore())
+    assert report.checks["dedupe"] == "ok"  # claim succeeded; release failure is swallowed

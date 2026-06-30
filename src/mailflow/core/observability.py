@@ -121,7 +121,7 @@ def health(
 
     The ports import is function-local: ports.py imports DeadLetterRecord from this
     module, so a top-level `from mailflow.core.ports import ...` would be a cycle."""
-    from mailflow.core.ports import BlobStore  # noqa: F401 - cycle-avoiding deferred import
+    from mailflow.core.ports import BlobStore  # cycle-avoiding deferred import
 
     checks: dict[str, str] = {}
 
@@ -132,11 +132,15 @@ def health(
         checks["cursor"] = f"error: {exc}"
 
     try:
-        if dedupe_store.try_claim(_PROBE_KEY, 1):
-            dedupe_store.release(_PROBE_KEY)  # leave no trace
+        dedupe_store.try_claim(_PROBE_KEY, 1)
         checks["dedupe"] = "ok"
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - any failure means unreachable
         checks["dedupe"] = f"error: {exc}"
+    finally:
+        try:
+            dedupe_store.release(_PROBE_KEY)  # best-effort cleanup; recovers a stuck sentinel
+        except Exception:  # noqa: BLE001 - release failure must not fail the probe
+            pass
 
     checks["blob"] = "ok" if isinstance(blob_store, BlobStore) \
         else "error: does not satisfy BlobStore port"
