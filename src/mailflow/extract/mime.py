@@ -11,9 +11,15 @@ from typing import Any
 
 from mailflow.core.events import SCHEMA_VERSION
 from mailflow.core.identity import derive_canonical_id
-from mailflow.core.models import Attachment, CleanEmail, Direction, Recipient
-from mailflow.core.ports import BlobStore
+from mailflow.core.models import Attachment, CleanEmail, Direction, Recipient, ScanVerdict
+from mailflow.core.ports import AttachmentScanner, BlobStore
 from mailflow.extract.clean import html_to_text, normalize_subject
+from mailflow.extract.safety import (
+    DEFAULT_ALLOWLIST,
+    AttachmentBlockedError,
+    NoOpAttachmentScanner,
+    check_allowlist,
+)
 from mailflow.extract.streaming import (
     MAX_ATTACHMENT_BYTES,
     digest_and_size,
@@ -41,7 +47,15 @@ def _raw_headers(msg: EmailMessage) -> dict[str, list[str]]:
 class MimeExtractor:
     """ContentExtractor implementation for raw RFC822 (Gmail format=raw / memory)."""
 
-    def __init__(self, *, max_attachment_bytes: int = MAX_ATTACHMENT_BYTES) -> None:
+    def __init__(
+        self,
+        *,
+        scanner: AttachmentScanner | None = None,
+        allowlist: frozenset[str] = DEFAULT_ALLOWLIST,
+        max_attachment_bytes: int = MAX_ATTACHMENT_BYTES,
+    ) -> None:
+        self.scanner: AttachmentScanner = scanner or NoOpAttachmentScanner()
+        self.allowlist = allowlist
         self.max_attachment_bytes = max_attachment_bytes
 
     def extract_bytes(
@@ -155,6 +169,21 @@ class MimeExtractor:
                 content_hash, size_bytes = digest_and_size(
                     part, cap=self.max_attachment_bytes
                 )
+                meta = Attachment(
+                    filename=filename or "",
+                    content_type=ctype,
+                    size_bytes=size_bytes,
+                    content_hash=content_hash,
+                    content_id=str(cid) if cid else "",
+                    is_inline=bool(is_inline_media and not is_attachment),
+                )
+                # Safety seam: allowlist first, then the scanner hook. Runs BEFORE any
+                # blob is persisted; a block fails closed -> DLQ.
+                result = check_allowlist(meta, self.allowlist)
+                if result.verdict is ScanVerdict.allow:
+                    result = self.scanner.scan(meta)
+                if result.verdict is ScanVerdict.block:
+                    raise AttachmentBlockedError(meta.filename, result.reason)
                 storage_ref = ""
                 # Stream the decoded bytes into the blob store in chunks (avoids a
                 # second full copy of the decoded payload) so downstream apps can
@@ -163,17 +192,7 @@ class MimeExtractor:
                     storage_ref = blob_store.put_stream(
                         content_hash, iter_decoded(part), ctype
                     )
-                attachments.append(
-                    Attachment(
-                        filename=filename or "",
-                        content_type=ctype,
-                        size_bytes=size_bytes,
-                        content_hash=content_hash,
-                        content_id=str(cid) if cid else "",
-                        is_inline=bool(is_inline_media and not is_attachment),
-                        storage_ref=storage_ref,
-                    )
-                )
+                attachments.append(meta.model_copy(update={"storage_ref": storage_ref}))
 
         # Gentle HTML->text fallback when the part set is HTML-only (B5/A6).
         if not body_text and body_html:
