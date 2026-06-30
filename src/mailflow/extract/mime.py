@@ -3,7 +3,6 @@ policy so headers come back parsed and unfolded."""
 
 from __future__ import annotations
 
-import hashlib
 from email import message_from_bytes
 from email.message import EmailMessage
 from email.policy import default as default_policy
@@ -15,6 +14,11 @@ from mailflow.core.identity import derive_canonical_id
 from mailflow.core.models import Attachment, CleanEmail, Direction, Recipient
 from mailflow.core.ports import BlobStore
 from mailflow.extract.clean import html_to_text, normalize_subject
+from mailflow.extract.streaming import (
+    MAX_ATTACHMENT_BYTES,
+    digest_and_size,
+    iter_decoded,
+)
 
 
 def _recipients(msg: EmailMessage, header: str) -> list[Recipient]:
@@ -36,6 +40,9 @@ def _raw_headers(msg: EmailMessage) -> dict[str, list[str]]:
 
 class MimeExtractor:
     """ContentExtractor implementation for raw RFC822 (Gmail format=raw / memory)."""
+
+    def __init__(self, *, max_attachment_bytes: int = MAX_ATTACHMENT_BYTES) -> None:
+        self.max_attachment_bytes = max_attachment_bytes
 
     def extract_bytes(
         self,
@@ -133,8 +140,6 @@ class MimeExtractor:
             disp = (part.get_content_disposition() or "").lower()
             cid = part.get("content-id")
             filename = part.get_filename()
-            decoded = part.get_payload(decode=True)
-            payload: bytes = decoded if isinstance(decoded, bytes) else b""
 
             is_attachment = disp == "attachment" or (bool(filename) and disp != "inline")
             is_inline_media = disp == "inline" or cid is not None
@@ -147,17 +152,21 @@ class MimeExtractor:
                 continue
 
             if is_attachment or is_inline_media:
-                content_hash = hashlib.sha256(payload).hexdigest() if payload else ""
+                content_hash, size_bytes = digest_and_size(
+                    part, cap=self.max_attachment_bytes
+                )
                 storage_ref = ""
-                # If a blob store is wired, stream the bytes into it and surface a
-                # ref so downstream apps can download the file (else metadata only).
-                if blob_store is not None and payload:
-                    storage_ref = blob_store.put_stream(content_hash, iter([payload]), ctype)
+                # Stream the bytes into the blob store (chunked, not buffered) so
+                # downstream apps can download the file (else metadata only).
+                if blob_store is not None and size_bytes:
+                    storage_ref = blob_store.put_stream(
+                        content_hash, iter_decoded(part), ctype
+                    )
                 attachments.append(
                     Attachment(
                         filename=filename or "",
                         content_type=ctype,
-                        size_bytes=len(payload),
+                        size_bytes=size_bytes,
                         content_hash=content_hash,
                         content_id=str(cid) if cid else "",
                         is_inline=bool(is_inline_media and not is_attachment),
