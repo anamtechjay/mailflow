@@ -137,7 +137,7 @@ class Pipeline:
             )
         except AuthError as exc:
             # §A2: 401 -> force ONE refresh and retry the body exactly once; not the loop.
-            return self._handle_auth_error(canonical_id, msg, key, report, attempts, exc)
+            return self._handle_auth_error(canonical_id, msg, key, report, exc)
         except TransientError as exc:
             # §A2: temporary (429/5xx/network) -> bounded retry, else DLQ.
             return self._retry_or_dead_letter(canonical_id, msg, key, report, attempts, exc)
@@ -183,7 +183,7 @@ class Pipeline:
 
     def _handle_auth_error(
         self, canonical_id: str, msg: RawMessage, key: str, report: RunReport,
-        attempts: int, exc: Exception,
+        exc: Exception,
     ) -> Disposition:
         # §A2 refresh-and-retry-ONCE: force one credential refresh, then retry the work
         # body a single time in THIS call. Bounded by straight-line control flow (not a
@@ -195,8 +195,11 @@ class Pipeline:
         except Exception as retry_exc:  # noqa: BLE001 - one shot only; any failure -> DLQ
             return self._dead_letter(
                 canonical_id, msg, key, report,
-                reason=f"auth retry failed after refresh: "
-                       f"{type(retry_exc).__name__}: {retry_exc}",
+                reason=(
+                    f"auth retry failed after refresh "
+                    f"(original: {type(exc).__name__}: {exc}): "
+                    f"{type(retry_exc).__name__}: {retry_exc}"
+                ),
             )
 
     def _retry_or_dead_letter(
