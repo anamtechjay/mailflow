@@ -8,10 +8,23 @@ from mailflow.config.schema import MailflowConfig
 from mailflow.config.loader import validate
 from mailflow.config.state import resolve_state
 from mailflow.core.errors import ConfigError
-from mailflow.registry import build_blob_store, build_cursor_store, build_dedupe_store
+from mailflow.registry import (
+    build_blob_store,
+    build_cursor_store,
+    build_dead_letter_store,
+    build_dedupe_store,
+)
 from mailflow.stores.local_blob import LocalBlobStore
-from mailflow.stores.memory import InMemoryCursorStore, InMemoryDedupeStore
-from mailflow.stores.sqlite import SqliteCursorStore, SqliteDedupeStore
+from mailflow.stores.memory import (
+    InMemoryCursorStore,
+    InMemoryDeadLetterStore,
+    InMemoryDedupeStore,
+)
+from mailflow.stores.sqlite import (
+    SqliteCursorStore,
+    SqliteDeadLetterStore,
+    SqliteDedupeStore,
+)
 
 
 def test_build_memory_stores() -> None:
@@ -52,3 +65,12 @@ def test_validate_rejects_unknown_store() -> None:
     cfg = MailflowConfig.model_validate({"tenant": "t", "stores": {"cursor": {"kind": "bogus"}}})
     with pytest.raises(ConfigError):
         validate(cfg)
+
+
+def test_build_dead_letter_store_memory() -> None:
+    assert isinstance(build_dead_letter_store("memory", {}), InMemoryDeadLetterStore)
+
+
+def test_build_dead_letter_store_sqlite(tmp_path) -> None:
+    store = build_dead_letter_store("sqlite", {"path": str(tmp_path / "dlq.db")})
+    assert isinstance(store, SqliteDeadLetterStore)

@@ -61,6 +61,24 @@ def test_builder_overrides_cleaner() -> None:
     assert sentinel.events[0].email.subject == "CLEANED"
 
 
+def test_overrides_inject_dlq_store_and_auth_refresher() -> None:
+    from mailflow.stores.memory import InMemoryDeadLetterStore
+
+    class _Refresher:
+        def force_refresh(self) -> None:
+            return None
+
+    dlq_store = InMemoryDeadLetterStore()
+    refresher = _Refresher()
+    pipe = build_from_config(
+        MailflowConfig(tenant="acme"),
+        seed=_seed(),
+        overrides={"dlq_store": dlq_store, "auth_refresher": refresher},
+    )
+    assert pipe.dlq_store is dlq_store
+    assert pipe.auth_refresher is refresher
+
+
 def test_connect_overrides_emitter() -> None:
     sentinel = SentinelEmitter()
     mf = connect("memory", seed=_seed(), tenant="acme", overrides={"emitter": sentinel})

@@ -64,6 +64,8 @@ def build_from_config(
         dedupe_store=dedupe_store,
         blob_store=blob_store,
         cleaner=ov["cleaner"] if "cleaner" in ov else ThinContentCleaner(),
+        auth_refresher=ov["auth_refresher"] if "auth_refresher" in ov else None,
+        dlq_store=ov["dlq_store"] if "dlq_store" in ov else None,
         config=PipelineConfig(
             tenant=cfg.tenant,
             max_message_bytes=cfg.max_message_bytes,

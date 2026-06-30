@@ -24,6 +24,7 @@ from mailflow.core.ports import (
     BlobStore,
     ContentCleaner,
     CursorStore,
+    DeadLetterStore,
     DedupeStore,
     Emitter,
     Filter,
@@ -162,6 +163,7 @@ def run_service(
     filters: list[Filter] | None = None,
     rotation_sink: TokenRotationSink | None = None,
     cleaner: ContentCleaner | None = None,
+    dlq_store: DeadLetterStore | None = None,
 ) -> None:
     """Full live entrypoint: resolve OAuth secrets, build the token provider + httpx
     transport, start the Gmail watch (seeding the cursor), wire the runtime via the
@@ -195,7 +197,7 @@ def run_service(
         token_provider=token_provider, transport=transport,
         emitter=emitter, dlq_emitter=dlq_emitter,
         cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
-        filters=filters, cleaner=cleaner,
+        filters=filters, cleaner=cleaner, dlq_store=dlq_store,
     )
 
     # Reliability: renew the watch (else it expires ~7 days) + a safety-net sweep, both

@@ -9,13 +9,14 @@ from mailflow.adapters.gmail.client import GmailClient
 from mailflow.adapters.gmail.config import GmailConfig, PubSubConfig
 from mailflow.adapters.gmail.provider import GmailProvider
 from mailflow.adapters.gmail.runtime import GmailPubSubRuntime
-from mailflow.adapters.gmail.transport import HttpTransport, TokenProvider
+from mailflow.adapters.gmail.transport import HttpTransport, RefreshableTokenProvider
 from mailflow.core.pipeline import Pipeline, PipelineConfig
 from mailflow.core.ports import (
     BlobStore,
     Classifier,
     ContentCleaner,
     CursorStore,
+    DeadLetterStore,
     DedupeStore,
     Emitter,
     Filter,
@@ -30,7 +31,7 @@ def build_gmail_runtime(
     gmail_cfg: GmailConfig,
     pubsub_cfg: PubSubConfig,
     tenant: str,
-    token_provider: TokenProvider,
+    token_provider: RefreshableTokenProvider,
     transport: HttpTransport,
     emitter: Emitter,
     dlq_emitter: Emitter,
@@ -40,6 +41,7 @@ def build_gmail_runtime(
     filters: list[Filter] | None = None,
     classifier: Classifier | None = None,
     cleaner: ContentCleaner | None = None,
+    dlq_store: DeadLetterStore | None = None,
 ) -> GmailPubSubRuntime:
     client = GmailClient(
         base_url=gmail_cfg.base_url,
@@ -64,5 +66,7 @@ def build_gmail_runtime(
         config=PipelineConfig(tenant=tenant, max_attempts=gmail_cfg.max_attempts),
         classifier=classifier,
         cleaner=cleaner,
+        auth_refresher=token_provider,
+        dlq_store=dlq_store,
     )
     return GmailPubSubRuntime(provider=provider, pipeline=pipeline)

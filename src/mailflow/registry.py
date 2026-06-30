@@ -7,7 +7,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailflow.core.ports import BlobStore, CursorStore, DedupeStore, Emitter, Filter
+from mailflow.core.ports import (
+    BlobStore,
+    CursorStore,
+    DeadLetterStore,
+    DedupeStore,
+    Emitter,
+    Filter,
+)
 from mailflow.emit.memory import MemoryEmitter
 from mailflow.emit.stdout import StdoutEmitter
 from mailflow.filters.deterministic import (
@@ -25,13 +32,19 @@ from mailflow.stores.local_blob import LocalBlobStore
 from mailflow.stores.memory import (
     InMemoryBlobStore,
     InMemoryCursorStore,
+    InMemoryDeadLetterStore,
     InMemoryDedupeStore,
 )
-from mailflow.stores.sqlite import SqliteCursorStore, SqliteDedupeStore
+from mailflow.stores.sqlite import (
+    SqliteCursorStore,
+    SqliteDeadLetterStore,
+    SqliteDedupeStore,
+)
 
 PROVIDER_KINDS = {"memory", "graph", "gmail"}
 EMITTER_KINDS = {"memory", "stdout", "pubsub"}
 STORE_KINDS = {"memory", "sqlite", "local"}
+DEADLETTER_KINDS = {"memory", "sqlite"}
 FILTER_KINDS = {
     "whitelist", "blacklist", "internal_domain", "subject", "list_mail", "no_personal",
     "only_domain", "only_sender", "block_sender",
@@ -90,6 +103,14 @@ def build_dedupe_store(kind: str, params: dict[str, Any]) -> DedupeStore:
     if kind == "sqlite":
         return SqliteDedupeStore(str(params["path"]))
     raise ValueError(f"unknown dedupe store kind {kind!r}")
+
+
+def build_dead_letter_store(kind: str, params: dict[str, Any]) -> DeadLetterStore:
+    if kind == "memory":
+        return InMemoryDeadLetterStore()
+    if kind == "sqlite":
+        return SqliteDeadLetterStore(str(params["path"]))
+    raise ValueError(f"unknown dead-letter store kind {kind!r}")
 
 
 def build_blob_store(kind: str, params: dict[str, Any]) -> BlobStore:
