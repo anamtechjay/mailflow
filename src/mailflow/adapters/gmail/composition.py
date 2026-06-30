@@ -23,6 +23,7 @@ from mailflow.core.ports import (
 )
 from mailflow.extract.envelope import MimeEnvelopeParser
 from mailflow.extract.mime import MimeExtractor
+from mailflow.extract.policy import AttachmentPolicy
 from mailflow.filters.chain import FilterChain
 
 
@@ -42,6 +43,7 @@ def build_gmail_runtime(
     classifier: Classifier | None = None,
     cleaner: ContentCleaner | None = None,
     dlq_store: DeadLetterStore | None = None,
+    attachment_policy: AttachmentPolicy | None = None,
 ) -> GmailPubSubRuntime:
     client = GmailClient(
         base_url=gmail_cfg.base_url,
@@ -57,7 +59,7 @@ def build_gmail_runtime(
         provider=provider,
         parser=MimeEnvelopeParser(),
         filters=FilterChain(filters or []),
-        extractor=MimeExtractor(),
+        extractor=MimeExtractor(attachment_policy=attachment_policy),
         emitter=emitter,
         dlq_emitter=dlq_emitter,
         cursor_store=cursor_store,

@@ -286,6 +286,7 @@ def connect(
             cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
             filters=chain, cleaner=cleaner, rotation_sink=ov.get("rotation_sink"),
             verify_scope_on_startup=verify_scope_on_startup,
+            attachment_policy=pol,
         )
         fetcher = _build_gmail_fetcher(
             credentials=credentials or {}, mailbox=mailbox,
@@ -359,6 +360,7 @@ def _build_gmail_live(
     cleaner: Any = None,
     rotation_sink: Any = None,
     verify_scope_on_startup: bool = _DEFAULT_VERIFY_SCOPE,
+    attachment_policy: AttachmentPolicy | None = None,
 ) -> Callable[[], None]:
     """Return a blocking callable that runs the live Gmail consume loop. The Gmail SDK is
     imported lazily inside run_service, so importing this module needs no `gmail` extra."""
@@ -384,7 +386,7 @@ def _build_gmail_live(
             secret_provider=secret_provider, emitter=emitter, dlq_emitter=MemoryEmitter(),
             cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
             filters=filters, cleaner=cleaner, rotation_sink=rotation_sink,
-            verify_scope=verify_scope_on_startup,
+            verify_scope=verify_scope_on_startup, attachment_policy=attachment_policy,
         )
 
     return live

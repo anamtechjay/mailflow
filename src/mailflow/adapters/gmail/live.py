@@ -37,6 +37,7 @@ from mailflow.core.ports import (
     SecretProvider,
     TokenRotationSink,
 )
+from mailflow.extract.policy import AttachmentPolicy
 
 MessageCallback = Callable[[Any], None]
 
@@ -213,6 +214,7 @@ def run_service(
     rotation_sink: TokenRotationSink | None = None,
     cleaner: ContentCleaner | None = None,
     dlq_store: DeadLetterStore | None = None,
+    attachment_policy: AttachmentPolicy | None = None,
 ) -> None:
     """Full live entrypoint: resolve OAuth secrets, build the token provider + httpx
     transport, start the Gmail watch (seeding the cursor), wire the runtime via the
@@ -249,6 +251,7 @@ def run_service(
         emitter=emitter, dlq_emitter=dlq_emitter,
         cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
         filters=filters, cleaner=cleaner, dlq_store=dlq_store,
+        attachment_policy=attachment_policy,
     )
 
     # Reliability: renew the watch (else it expires ~7 days) + a safety-net sweep, both
