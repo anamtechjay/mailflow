@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import threading
 
-from mailflow.adapters.gmail.bootstrap import sweep_once
+from mailflow.adapters.gmail.bootstrap import renew_watches, sweep_once
+from mailflow.adapters.gmail.watch import WatchHandle
 from mailflow.adapters.gmail.provider import GmailProvider
 from mailflow.adapters.gmail.scheduler import IntervalScheduler
 from mailflow.adapters.gmail.transport import GmailError, StaleHistoryError
@@ -98,3 +99,38 @@ def test_interval_scheduler_fires_and_stops() -> None:
     sched.every(0.01, fired.set, "t")
     assert fired.wait(2.0) is True                             # fn ran at least once
     sched.stop()
+
+
+# ---- A1: renewal driver fires the real renew_watches closure through the scheduler ----
+
+class _RecordingWatchManager:
+    """Duck-typed stand-in for GmailWatchManager: records each renewed mailbox and
+    returns a fresh WatchHandle (mirrors GmailWatchManager.renew_watch)."""
+    def __init__(self) -> None:
+        self.renewed: list[str] = []
+
+    def renew_watch(self, handle: WatchHandle) -> WatchHandle:
+        self.renewed.append(handle.mailbox)
+        return WatchHandle(mailbox=handle.mailbox, history_id="999", expiration="renewed")
+
+
+def test_renewal_driver_fires_renew_for_each_handle_through_scheduler() -> None:
+    fired = threading.Event()
+    watch_manager = _RecordingWatchManager()
+    handles = [
+        WatchHandle(mailbox="a@x.com", history_id="1"),
+        WatchHandle(mailbox="b@x.com", history_id="2"),
+    ]
+
+    def tick() -> None:
+        # mirrors run_service's lambda: renew_watches(watch_manager=..., handles=handles)
+        renew_watches(watch_manager=watch_manager, handles=handles)
+        fired.set()
+
+    sched = IntervalScheduler()
+    sched.every(0.01, tick, "gmail-watch-renew")
+    try:
+        assert fired.wait(2.0) is True                      # the daemon tick ran
+    finally:
+        sched.stop()
+    assert watch_manager.renewed == ["a@x.com", "b@x.com"]  # both mailboxes re-watched on a tick
