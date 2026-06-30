@@ -35,6 +35,7 @@ from mailflow.emit.stages import Stage, StagesEmitter
 from mailflow.extract.clean import ThinContentCleaner
 from mailflow.extract.envelope import MimeEnvelopeParser
 from mailflow.extract.mime import MimeExtractor
+from mailflow.extract.policy import AttachmentPolicy, AttachmentRule, normalize_attachment_policy
 from mailflow.filters.chain import FilterChain
 from mailflow.filters.deterministic import FunctionFilter
 from mailflow.providers.memory import MemoryProvider, SeedEmail
@@ -228,11 +229,13 @@ def connect(
     overrides: Mapping[str, Any] | None = None,
     tenant: str = "default",
     verify_scope_on_startup: bool = _DEFAULT_VERIFY_SCOPE,
+    attachments: AttachmentPolicy | AttachmentRule | dict[str, Any] | None = None,
 ) -> Mailflow:
     """Wire a runnable Mailflow for the given provider. `provider` is "memory" | "gmail"
     (graph is wired but not exposed here yet). `filters` is the unified list (spec §3);
     `fields` selects which data is delivered (spec §4a); `stages`/`clean_fn` post-process
-    each CleanEmail (spec §5-6)."""
+    each CleanEmail (spec §5-6); `attachments` is the per-class strip policy (spec §lib)."""
+    pol = normalize_attachment_policy(attachments)
     stores = resolve_state(state)
     ov = overrides or {}
     # §A10: caller-supplied components replace the defaults for their role, before build.
@@ -261,7 +264,7 @@ def connect(
             provider=ov.get("provider") or MemoryProvider(seed=seed or {}),
             parser=MimeEnvelopeParser(),
             filters=FilterChain(chain),
-            extractor=MimeExtractor(),
+            extractor=MimeExtractor(attachment_policy=pol),
             emitter=pipe_emitter,
             dlq_emitter=MemoryEmitter(),
             cursor_store=cursor_store,
@@ -287,7 +290,7 @@ def connect(
         fetcher = _build_gmail_fetcher(
             credentials=credentials or {}, mailbox=mailbox,
             secret_provider=secret_provider or EnvSecretProvider(), blob_store=blob_store,
-            cleaner=cleaner,
+            cleaner=cleaner, attachment_policy=pol,
         )
         return Mailflow(
             provider_kind="gmail", emitter=emitter, cursor_store=cursor_store,
@@ -300,7 +303,7 @@ def connect(
 
 def _build_gmail_fetcher(
     *, credentials: dict[str, Any], mailbox: str | None, secret_provider: Any, blob_store: Any,
-    cleaner: Any = None,
+    cleaner: Any = None, attachment_policy: AttachmentPolicy | None = None,
 ) -> Callable[[str], CleanEmail]:
     """Build a fetch-by-message-id closure for Gmail (spec §4): messages.get(raw) ->
     MimeExtractor -> CleanEmail. SDK imports are lazy (inside this function)."""
@@ -324,7 +327,7 @@ def _build_gmail_fetcher(
         token_uri=cfg.token_uri, scopes=cfg.scopes,
     )
     client = GmailClient(base_url=cfg.base_url, token_provider=token, transport=HttpxTransport())
-    extractor = MimeExtractor()
+    extractor = MimeExtractor(attachment_policy=attachment_policy)
 
     def fetch(message_id: str) -> CleanEmail:
         data = client.get_message_raw(mbx, message_id)
