@@ -26,11 +26,17 @@ class _FakeCreds:
     """Stand-in for google.oauth2.credentials.Credentials with the granted-scope
     surface google-auth populates after refresh()."""
 
-    def __init__(self, *, granted: str | None, valid: bool = False) -> None:
+    def __init__(
+        self, *, granted: str | None, valid: bool = False,
+        scopes: list[str] | None = None,
+    ) -> None:
         self.token = "access-token"
         self.refresh_token = "rt"
         self.valid = valid
         self.granted_scopes = granted
+        # Real google-auth Credentials are built with the requested `scopes`; the
+        # legacy fail-open path falls back to this attribute when granted_scopes is None.
+        self.scopes = scopes
 
     def refresh(self, request: object) -> None:
         self.valid = True
@@ -46,6 +52,13 @@ def _provider(creds: _FakeCreds) -> OAuthTokenProvider:
 
 def test_verify_scopes_passes_when_granted() -> None:
     _provider(_FakeCreds(granted=GMAIL_READONLY)).verify_scopes([GMAIL_READONLY])
+
+
+def test_verify_scopes_legacy_none_granted_is_fail_open_noop() -> None:
+    # Older google-auth doesn't report granted_scopes (None) -> documented fail-open:
+    # falls back to the requested scopes, which satisfy `required`, so no raise.
+    prov = _provider(_FakeCreds(granted=None, scopes=[GMAIL_READONLY]))
+    prov.verify_scopes([GMAIL_READONLY])  # must NOT raise
 
 
 def test_verify_scopes_raises_when_missing() -> None:
