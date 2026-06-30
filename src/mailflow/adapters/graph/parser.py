@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 from typing import Any
 
+from mailflow.core.classification import derive_auto_submitted, derive_is_bounce
 from mailflow.core.identity import derive_canonical_id
 from mailflow.core.models import Envelope, RawMessage, Recipient
 
@@ -53,6 +54,8 @@ class GraphEnvelopeParser:
         )
         headers = _headers(data)
         reply_to_list = data.get("replyTo") or []
+        from_node = _recipient(data.get("from"))
+        auto_sub = _first(headers, "auto-submitted")
         env_kwargs: dict[str, Any] = {
             "canonical_id": canonical_id,
             "message_id": message_id,
@@ -61,7 +64,7 @@ class GraphEnvelopeParser:
             "provider": msg.provider,
             "provider_message_id": msg.provider_message_id,
             "stream": msg.stream,
-            "from": _recipient(data.get("from")),
+            "from": from_node,
             "sender": _recipient(data.get("sender")) if data.get("sender") else None,
             "reply_to": _recipient(reply_to_list[0]) if reply_to_list else None,
             "to": _recipients(data.get("toRecipients")),
@@ -72,7 +75,13 @@ class GraphEnvelopeParser:
             "snippet": str(data.get("bodyPreview", "")),
             "list_id": _first(headers, "list-id"),
             "list_unsubscribe": _first(headers, "list-unsubscribe"),
-            "auto_submitted": _first(headers, "auto-submitted"),
+            "auto_submitted": auto_sub,
+            "is_auto_submitted": derive_auto_submitted(auto_sub),
+            "is_bounce": derive_is_bounce(
+                from_address=from_node.address,
+                return_path=_first(headers, "return-path"),
+                content_type=_first(headers, "content-type"),
+            ),
             "headers": headers,
         }
         return Envelope.model_validate(env_kwargs)

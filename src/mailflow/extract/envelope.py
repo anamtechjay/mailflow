@@ -8,6 +8,7 @@ from email.policy import default as default_policy
 from email.utils import getaddresses
 from typing import Any
 
+from mailflow.core.classification import derive_auto_submitted, derive_is_bounce
 from mailflow.core.identity import derive_canonical_id
 from mailflow.core.models import Envelope, RawMessage, Recipient
 
@@ -46,6 +47,11 @@ class MimeEnvelopeParser:
         reply_tos = recips("reply-to")
         alias_from: dict[str, Any] = {"from": from_[0] if from_ else Recipient()}
 
+        auto_sub = str(parsed["auto-submitted"]) if parsed["auto-submitted"] else None
+        content_type = str(parsed["content-type"]) if parsed["content-type"] is not None else None
+        return_path = str(parsed["return-path"]) if parsed["return-path"] is not None else None
+        from_addr = from_[0].address if from_ else ""
+
         return Envelope(
             canonical_id=canonical_id,
             message_id=message_id,
@@ -64,7 +70,11 @@ class MimeEnvelopeParser:
             snippet=snippet,
             list_id=str(parsed["list-id"]) if parsed["list-id"] else None,
             list_unsubscribe=str(parsed["list-unsubscribe"]) if parsed["list-unsubscribe"] else None,
-            auto_submitted=str(parsed["auto-submitted"]) if parsed["auto-submitted"] else None,
+            auto_submitted=auto_sub,
+            is_auto_submitted=derive_auto_submitted(auto_sub),
+            is_bounce=derive_is_bounce(
+                from_address=from_addr, return_path=return_path, content_type=content_type
+            ),
             headers=headers,
         )
 

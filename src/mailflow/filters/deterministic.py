@@ -186,7 +186,7 @@ class ListMailFilter:
     name = "list_mail"
 
     def evaluate(self, env: Envelope, ctx: FilterContext) -> FilterDecision:
-        if env.list_id or (env.auto_submitted and env.auto_submitted.lower() != "no"):
+        if env.list_id or env.is_auto_submitted:
             return FilterDecision.drop(self.name, "list/auto-submitted header present")
         return FilterDecision.uncertain()
 
