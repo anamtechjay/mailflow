@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from functools import total_ordering
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -224,6 +225,8 @@ class CleanEmail(BaseModel):
 
     relevance: Relevance = Field(default_factory=Relevance)
     matched_filter: str = ""
+    disposition: Literal["emitted", "filtered"] = "emitted"
+    filter_reason: str = ""
     schema_version: str = ""
 
     model_config = ConfigDict(populate_by_name=True)
