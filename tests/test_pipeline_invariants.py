@@ -36,7 +36,7 @@ class RaisingExtractor:
 
 
 def build(*, seed, filters=None, extractor=None, max_message_bytes=50_000_000,
-          max_attempts=3, cursor_store=None, dedupe_store=None):
+          max_attempts=3, cursor_store=None, dedupe_store=None, on_filtered="tag"):
     emit, dlq = MemoryEmitter(), MemoryEmitter()
     pipe = Pipeline(
         provider=MemoryProvider(seed=seed),
@@ -48,7 +48,7 @@ def build(*, seed, filters=None, extractor=None, max_message_bytes=50_000_000,
         dedupe_store=dedupe_store or InMemoryDedupeStore(),
         blob_store=InMemoryBlobStore(),
         config=PipelineConfig(tenant="acme", max_message_bytes=max_message_bytes,
-                              max_attempts=max_attempts),
+                              max_attempts=max_attempts, on_filtered=on_filtered),
     )
     return pipe, emit, dlq
 
@@ -72,9 +72,11 @@ def test_oversized_dead_lettered_without_extract() -> None:
 
 
 def test_dropped_by_blacklist_filter() -> None:
+    # explicitly request drop mode: the default is now "tag" (on_filtered="tag")
     pipe, emit, dlq = build(
         seed={STREAM: [SeedEmail("m1", raw("m1", "x@spam.com"))]},
         filters=[BlacklistFilter(domains={"spam.com"})],
+        on_filtered="drop",
     )
     r = pipe.run_once()
     assert r.dropped == 1 and r.emitted == 0 and not emit.events

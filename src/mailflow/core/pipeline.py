@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import logging
 from datetime import datetime, timezone
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -61,6 +62,7 @@ class PipelineConfig(BaseModel):
     max_attempts: int = 3
     claim_lease_seconds: int = 300
     done_ttl_seconds: int = 60 * 60 * 24 * 60  # 60 days (spec §11 dedupe ttl)
+    on_filtered: Literal["tag", "drop"] = "tag"
 
 
 def _assert_port(component: object, port: type, role: str) -> None:
@@ -204,12 +206,18 @@ class Pipeline:
         decision = self.filters.run(env, FilterContext(tenant=tenant))
 
         if decision.decision is Decision.drop:
-            self.dedupe_store.mark_done(key, self.config.done_ttl_seconds)
-            self._record(report, self._trace(
-                env.canonical_id, msg, Disposition.dropped, "filter",
-                matched_filter=decision.filter_name, reason=decision.reason,
-            ))
-            return Disposition.dropped
+            if self.config.on_filtered == "drop":
+                self.dedupe_store.mark_done(key, self.config.done_ttl_seconds)
+                self._record(report, self._trace(
+                    env.canonical_id, msg, Disposition.dropped, "filter",
+                    matched_filter=decision.filter_name, reason=decision.reason,
+                ))
+                return Disposition.dropped
+            # on_filtered == "tag": deliver the matched message, tagged. Fall through to
+            # the normal extract -> emit path, but stamp the filter tag on the email below.
+            _tag: tuple[str, str] | None = (decision.filter_name, decision.reason)
+        else:
+            _tag = None
 
         relevance = None
         if self.classifier is not None and decision.decision is Decision.uncertain:
@@ -219,6 +227,9 @@ class Pipeline:
         if relevance is not None:
             email.relevance = relevance
         email.matched_filter = decision.filter_name
+        if _tag is not None:
+            email.disposition = "filtered"
+            email.matched_filter, email.filter_reason = _tag
 
         for sa in email.stripped_attachments:
             self._record_stripped(report, DecisionTrace(

@@ -271,7 +271,7 @@ def connect(
             dedupe_store=dedupe_store,
             blob_store=blob_store,
             cleaner=cleaner,
-            config=PipelineConfig(tenant=tenant),
+            config=PipelineConfig(tenant=tenant, on_filtered="drop"),
         )
         return Mailflow(
             provider_kind="memory", emitter=emitter, cursor_store=cursor_store,
