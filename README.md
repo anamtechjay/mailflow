@@ -90,6 +90,40 @@ mf = connect("gmail", credentials=creds, mailbox="me",
 get the `Envelope` and return `True` (keep) / `False` (drop). Stages get the full
 `CleanEmail` and may modify it or drop it (return falsy).
 
+**What happens to filtered (matched) emails:** By default, a filter match **tags** the email
+and delivers it anyway — no silent drops. Use `on_filtered` to control this:
+
+```python
+mf = connect("gmail", credentials=creds, mailbox="me",
+    filters=[{"kind": "blacklist", "domains": ["spam.com"]}],
+    on_filtered="tag",           # (default) deliver with disposition="filtered"
+)
+# Or to restore the old behavior (drop matched emails):
+mf = connect("gmail", credentials=creds, mailbox="me",
+    filters=[{"kind": "blacklist", "domains": ["spam.com"]}],
+    on_filtered="drop",          # silently suppress matched emails
+)
+```
+
+When `on_filtered="tag"` (the default), a filter-matched email arrives with:
+- `disposition == "filtered"` (instead of `"emitted"`)
+- `filter_reason` — the description of which filter(s) matched
+- `matched_filter` — the matched filter spec or function
+
+This lets you decide: archive filtered mail, skip processing, route to a secondary handler, etc.
+
+```python
+for email in mf.stream():
+    if email.disposition == "filtered":
+        archive_but_dont_process(email)   # you decide: keep / skip / route
+    else:
+        handle(email)
+```
+
+**Breaking change:** Prior versions dropped filter-matched emails silently. If your code relies
+on that suppression, pass `on_filtered="drop"` to restore it. New code should leave the
+default (`"tag"`) and explicitly handle the `disposition == "filtered"` case.
+
 Select only the data you need — just name the fields (smaller payload, self-documenting):
 
 ```python

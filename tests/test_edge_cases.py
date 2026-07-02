@@ -72,7 +72,7 @@ def test_whitelist_keep_short_circuits_blacklist() -> None:
 def test_filter_order_first_drop_wins() -> None:
     mf = connect("memory",
                  seed={STREAM: [SeedEmail("m1", _raw("m1", "a@spam.com"))]}, tenant="acme",
-                 filters=[{"kind": "blacklist", "domains": ["spam.com"]}])
+                 filters=[{"kind": "blacklist", "domains": ["spam.com"]}], on_filtered="drop")
     assert mf.fetch_new() == []
 
 
@@ -132,7 +132,7 @@ def test_filters_and_stages_combined() -> None:
         SeedEmail("m2", _raw("m2", "b@gmail.com", "ok")),
     ]}
     mf = connect("memory", seed=seed, tenant="acme",
-                 filters=[{"kind": "no_personal"}],
+                 filters=[{"kind": "no_personal"}], on_filtered="drop",
                  stages=[lambda e: e.model_copy(update={"subject": "S"})])
     out = mf.fetch_new()
     assert [e.from_.address for e in out] == ["a@partner.com"]   # gmail filtered

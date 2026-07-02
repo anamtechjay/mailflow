@@ -12,6 +12,7 @@ from typing import Any
 
 from mailflow.core.events import SCHEMA_VERSION
 from mailflow.core.models import Attachment, CleanEmail, Direction, Envelope, RawMessage, Recipient
+from mailflow.extract.clean import html_to_text
 
 
 def _recipient(node: dict[str, Any] | None) -> Recipient:
@@ -36,7 +37,9 @@ def _body(data: dict[str, Any]) -> tuple[str, str]:
     body = data.get("body") or {}
     content = str(body.get("content", ""))
     if str(body.get("contentType", "")).lower() == "html":
-        return "", content
+        # B5 parity: HTML-only mail must still yield readable body_text, via the same
+        # gentle HTML->text fallback the MIME extractor applies (extract/mime.py).
+        return html_to_text(content), content
     return content, ""
 
 

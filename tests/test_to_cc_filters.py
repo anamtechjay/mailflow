@@ -70,7 +70,7 @@ def test_to_filter_e2e_drops_matching_recipient() -> None:
         SeedEmail("m2", _raw("m2", "real@acme.com")),
     ]}
     mf = connect("memory", seed=seed, tenant="acme",
-                 filters=[{"kind": "to", "addresses": ["alerts@acme.com"]}])
+                 filters=[{"kind": "to", "addresses": ["alerts@acme.com"]}], on_filtered="drop")
     out = mf.fetch_new()
     assert {r.address for e in out for r in e.to} == {"real@acme.com"}
 
@@ -81,7 +81,7 @@ def test_cc_filter_e2e_regex_nested_params() -> None:
         SeedEmail("m2", _raw("m2", "real@acme.com", cc="ok@acme.com")),
     ]}
     mf = connect("memory", seed=seed, tenant="acme",
-                 filters=[{"kind": "cc", "params": {"patterns": ["@lists\\.io$"]}}])
+                 filters=[{"kind": "cc", "params": {"patterns": ["@lists\\.io$"]}}], on_filtered="drop")
     out = mf.fetch_new()
     assert len(out) == 1
     assert out[0].cc[0].address == "ok@acme.com"

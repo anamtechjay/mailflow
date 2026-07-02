@@ -21,7 +21,7 @@ Three ways to receive emails:
 from __future__ import annotations
 
 import threading
-from typing import Any, Callable, Iterator, Mapping, TypeVar
+from typing import Any, Callable, Iterator, Literal, Mapping, TypeVar
 
 from mailflow.config.schema import SecurityConfig
 from mailflow.config.state import resolve_state
@@ -230,6 +230,7 @@ def connect(
     tenant: str = "default",
     verify_scope_on_startup: bool = _DEFAULT_VERIFY_SCOPE,
     attachments: AttachmentPolicy | AttachmentRule | dict[str, Any] | None = None,
+    on_filtered: Literal["tag", "drop"] = "tag",
 ) -> Mailflow:
     """Wire a runnable Mailflow for the given provider. `provider` is
     "memory" | "gmail" | "graph". `filters` is the unified list (spec §3);
@@ -271,7 +272,7 @@ def connect(
             dedupe_store=dedupe_store,
             blob_store=blob_store,
             cleaner=cleaner,
-            config=PipelineConfig(tenant=tenant),
+            config=PipelineConfig(tenant=tenant, on_filtered=on_filtered),
         )
         return Mailflow(
             provider_kind="memory", emitter=emitter, cursor_store=cursor_store,
@@ -286,7 +287,7 @@ def connect(
             cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
             filters=chain, cleaner=cleaner, rotation_sink=ov.get("rotation_sink"),
             verify_scope_on_startup=verify_scope_on_startup,
-            attachment_policy=pol,
+            attachment_policy=pol, on_filtered=on_filtered,
         )
         fetcher = _build_gmail_fetcher(
             credentials=credentials or {}, mailbox=mailbox,
@@ -380,6 +381,7 @@ def _build_gmail_live(
     rotation_sink: Any = None,
     verify_scope_on_startup: bool = _DEFAULT_VERIFY_SCOPE,
     attachment_policy: AttachmentPolicy | None = None,
+    on_filtered: Literal["tag", "drop"] = "tag",
 ) -> Callable[[], None]:
     """Return a blocking callable that runs the live Gmail consume loop. The Gmail SDK is
     imported lazily inside run_service, so importing this module needs no `gmail` extra."""
@@ -406,6 +408,7 @@ def _build_gmail_live(
             cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
             filters=filters, cleaner=cleaner, rotation_sink=rotation_sink,
             verify_scope=verify_scope_on_startup, attachment_policy=attachment_policy,
+            on_filtered=on_filtered,
         )
 
     return live

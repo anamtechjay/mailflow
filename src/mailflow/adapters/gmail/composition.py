@@ -5,6 +5,8 @@ Gmail-specific parser/extractor. Imports NO vendor SDK — that lives in live.py
 
 from __future__ import annotations
 
+from typing import Literal
+
 from mailflow.adapters.gmail.client import GmailClient
 from mailflow.adapters.gmail.config import GmailConfig, PubSubConfig
 from mailflow.adapters.gmail.provider import GmailProvider
@@ -44,6 +46,7 @@ def build_gmail_runtime(
     cleaner: ContentCleaner | None = None,
     dlq_store: DeadLetterStore | None = None,
     attachment_policy: AttachmentPolicy | None = None,
+    on_filtered: Literal["tag", "drop"] = "tag",
 ) -> GmailPubSubRuntime:
     client = GmailClient(
         base_url=gmail_cfg.base_url,
@@ -65,7 +68,7 @@ def build_gmail_runtime(
         cursor_store=cursor_store,
         dedupe_store=dedupe_store,
         blob_store=blob_store,
-        config=PipelineConfig(tenant=tenant, max_attempts=gmail_cfg.max_attempts),
+        config=PipelineConfig(tenant=tenant, max_attempts=gmail_cfg.max_attempts, on_filtered=on_filtered),
         classifier=classifier,
         cleaner=cleaner,
         auth_refresher=token_provider,
