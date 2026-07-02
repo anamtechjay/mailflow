@@ -11,7 +11,7 @@ supplies the client secret + refresh token via the SecretProvider; nothing hardc
 
 from __future__ import annotations
 
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Literal, Protocol
 
 from mailflow.adapters.gmail.bootstrap import (
     bootstrap_watches,
@@ -215,6 +215,7 @@ def run_service(
     cleaner: ContentCleaner | None = None,
     dlq_store: DeadLetterStore | None = None,
     attachment_policy: AttachmentPolicy | None = None,
+    on_filtered: Literal["tag", "drop"] = "tag",
 ) -> None:
     """Full live entrypoint: resolve OAuth secrets, build the token provider + httpx
     transport, start the Gmail watch (seeding the cursor), wire the runtime via the
@@ -251,7 +252,7 @@ def run_service(
         emitter=emitter, dlq_emitter=dlq_emitter,
         cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
         filters=filters, cleaner=cleaner, dlq_store=dlq_store,
-        attachment_policy=attachment_policy,
+        attachment_policy=attachment_policy, on_filtered=on_filtered,
     )
 
     # Reliability: renew the watch (else it expires ~7 days) + a safety-net sweep, both

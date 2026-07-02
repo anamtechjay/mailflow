@@ -29,7 +29,7 @@ def test_no_filters_passes_everything() -> None:
 
 def test_blacklist_spec_drops() -> None:
     mf = connect("memory", seed=_seed(), tenant="acme",
-                 filters=[{"kind": "blacklist", "domains": ["spam.com"]}])
+                 filters=[{"kind": "blacklist", "domains": ["spam.com"]}], on_filtered="drop")
     out = mf.fetch_new()
     assert {e.from_.address for e in out} == {"alice@partner.com", "bob@gmail.com"}
 
@@ -41,7 +41,7 @@ def test_only_domain_keeps_just_that_domain() -> None:
         SeedEmail("m3", _raw("m3", "carol@spam.com")),
     ]}
     mf = connect("memory", seed=seed, tenant="acme",
-                 filters=[{"kind": "only_domain", "domains": ["partner.com"]}])
+                 filters=[{"kind": "only_domain", "domains": ["partner.com"]}], on_filtered="drop")
     out = mf.fetch_new()
     assert {e.from_.address for e in out} == {"alice@partner.com"}   # ONLY partner.com
 
@@ -53,7 +53,7 @@ def test_block_sender_drops_just_that_person() -> None:
         SeedEmail("m3", _raw("m3", "alice@partner.com")),
     ]}
     mf = connect("memory", seed=seed, tenant="acme",
-                 filters=[{"kind": "block_sender", "addresses": ["jeevaskp1308@gmail.com"]}])
+                 filters=[{"kind": "block_sender", "addresses": ["jeevaskp1308@gmail.com"]}], on_filtered="drop")
     out = mf.fetch_new()
     kept = {e.from_.address for e in out}
     assert "jeevaskp1308@gmail.com" not in kept             # the one address is dropped
@@ -66,7 +66,7 @@ def test_only_sender_keeps_just_that_person() -> None:
         SeedEmail("m2", _raw("m2", "bob@partner.com")),
     ]}
     mf = connect("memory", seed=seed, tenant="acme",
-                 filters=[{"kind": "only_sender", "addresses": ["alice@partner.com"]}])
+                 filters=[{"kind": "only_sender", "addresses": ["alice@partner.com"]}], on_filtered="drop")
     out = mf.fetch_new()
     assert {e.from_.address for e in out} == {"alice@partner.com"}   # ONLY alice, not bob
 
@@ -79,14 +79,14 @@ def test_only_domain_empty_is_safe_noop() -> None:
 
 def test_no_personal_drops_gmail() -> None:
     mf = connect("memory", seed=_seed(), tenant="acme",
-                 filters=[{"kind": "no_personal"}])
+                 filters=[{"kind": "no_personal"}], on_filtered="drop")
     out = mf.fetch_new()
     assert "bob@gmail.com" not in {e.from_.address for e in out}
 
 
 def test_custom_function_filter() -> None:
     mf = connect("memory", seed=_seed(), tenant="acme",
-                 filters=[lambda env: "invoice" not in env.subject.lower()])
+                 filters=[lambda env: "invoice" not in env.subject.lower()], on_filtered="drop")
     out = mf.fetch_new()
     subjects = {e.subject for e in out}
     assert "Invoice 42" not in subjects        # dropped by the custom function

@@ -1,4 +1,28 @@
-from mailflow.core.models import CleanEmail
+from mailflow.core.models import CleanEmail, StreamRef
+from mailflow.core.filtering import FilterContext
+from mailflow.core.models import Disposition
+from mailflow.core.pipeline import Pipeline, PipelineConfig
+from mailflow.filters.chain import FilterChain
+from mailflow.filters.deterministic import ListMailFilter
+from mailflow.providers.memory import MemoryProvider, SeedEmail
+from mailflow.emit.memory import MemoryEmitter
+from mailflow.extract.envelope import MimeEnvelopeParser
+from mailflow.extract.mime import MimeExtractor
+from mailflow.extract.clean import ThinContentCleaner
+from mailflow.stores.memory import (
+    InMemoryCursorStore, InMemoryDedupeStore, InMemoryBlobStore,
+)
+from mailflow import connect
+
+
+AUTO_SUBMITTED_RAW = (
+    b"From: mailer@example.com\r\n"
+    b"To: me@example.com\r\n"
+    b"Subject: Out of office\r\n"
+    b"Auto-Submitted: auto-replied\r\n"
+    b"Message-ID: <a1@example.com>\r\n\r\n"
+    b"I am away.\r\n"
+)
 
 
 def test_cleanemail_disposition_defaults_to_emitted():
@@ -15,34 +39,6 @@ def test_cleanemail_can_be_marked_filtered():
     email.filter_reason = "list/auto-submitted header present"
     assert email.disposition == "filtered"
     assert email.filter_reason == "list/auto-submitted header present"
-
-
-import pytest
-
-from mailflow.core.filtering import FilterContext
-from mailflow.core.models import Disposition
-from mailflow.core.pipeline import Pipeline, PipelineConfig
-from mailflow.filters.chain import FilterChain
-from mailflow.filters.deterministic import ListMailFilter
-from mailflow.providers.memory import MemoryProvider, SeedEmail
-from mailflow.core.models import StreamRef
-from mailflow.emit.memory import MemoryEmitter
-from mailflow.extract.envelope import MimeEnvelopeParser
-from mailflow.extract.mime import MimeExtractor
-from mailflow.extract.clean import ThinContentCleaner
-from mailflow.stores.memory import (
-    InMemoryCursorStore, InMemoryDedupeStore, InMemoryBlobStore,
-)
-
-
-AUTO_SUBMITTED_RAW = (
-    b"From: mailer@example.com\r\n"
-    b"To: me@example.com\r\n"
-    b"Subject: Out of office\r\n"
-    b"Auto-Submitted: auto-replied\r\n"
-    b"Message-ID: <a1@example.com>\r\n\r\n"
-    b"I am away.\r\n"
-)
 
 
 def _pipeline(on_filtered):
@@ -85,7 +81,6 @@ def test_tag_mode_delivers_filtered_email_with_tag():
 
 
 def test_tag_mode_is_the_default():
-    stream = StreamRef(mailbox="me@example.com", folder=None)
     cfg = PipelineConfig(tenant="acme")
     assert cfg.on_filtered == "tag"
 
@@ -107,3 +102,19 @@ def test_emitted_email_disposition_stays_emitted():
     )
     pipe.run_once()
     assert emitter.events[0].email.disposition == "emitted"
+
+
+def test_connect_memory_tag_mode_delivers_filtered():
+    stream = StreamRef(mailbox="me@example.com", folder=None)
+    seed = {stream: [SeedEmail(provider_message_id="m1", raw=AUTO_SUBMITTED_RAW)]}
+    mf = connect("memory", seed=seed, filters=[ListMailFilter()])  # default on_filtered="tag"
+    emails = mf.fetch_new()
+    assert len(emails) == 1
+    assert emails[0].disposition == "filtered"
+
+
+def test_connect_memory_drop_mode_suppresses_filtered():
+    stream = StreamRef(mailbox="me@example.com", folder=None)
+    seed = {stream: [SeedEmail(provider_message_id="m1", raw=AUTO_SUBMITTED_RAW)]}
+    mf = connect("memory", seed=seed, filters=[ListMailFilter()], on_filtered="drop")
+    assert mf.fetch_new() == []

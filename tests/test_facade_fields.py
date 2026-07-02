@@ -52,6 +52,6 @@ def test_fields_with_filter() -> None:
                         b"To: ops@acme.com\r\nSubject: hi\r\n\r\nx"),
     ]}
     mf = connect("memory", seed=seed, tenant="acme",
-                 fields=["from"], filters=[{"kind": "no_personal"}])
+                 fields=["from"], filters=[{"kind": "no_personal"}], on_filtered="drop")
     out = mf.fetch_new()
     assert [d["from"].address for d in out] == ["alice@partner.com"]  # gmail filtered + projected
