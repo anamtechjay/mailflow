@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>mailflow — Complete Solution Doc</title>
+<script src="./mermaid.min.js"></script>
+<!--
+  ============================================================================
+  mailflow — COMPLETE solution document (superset of all 5 angle-versions).
+  Sections are modular. To remove a section: delete the <section>…</section>
+  block AND its matching <a> link in the <nav>. Each section is fenced with a
+  "SECTION:" comment so you can find boundaries quickly (search "SECTION:").
+  Other format-specific versions live alongside: -executive, -deck, -technical,
+  -status, and the lean walkthrough (solution-doc.html).
+  ============================================================================
+-->
+<style>
+  :root{
+    --bg:#f6f8fb; --panel:#ffffff; --ink:#1b2330; --muted:#5a6675; --line:#e4e8ef;
+    --accent:#2f6df0; --accent-soft:#eaf1ff; --accent2:#7c3aed; --accent2-soft:#f1ebff;
+    --ok:#15803d; --ok-bg:#dcfce7; --partial:#b45309; --partial-bg:#fef3c7;
+    --miss:#b91c1c; --miss-bg:#fee2e2; --defer:#5b6472; --defer-bg:#e9edf3;
+    --gold:#b5871f;
+    --code-bg:#0d1320; --code-ink:#cdd6e4; --code-kw:#c792ea; --code-ty:#7fdbca;
+    --code-str:#ecc48d; --code-dec:#82aaff; --code-cm:#6b7a8f;
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 4px 14px rgba(16,24,40,.05);
+    --nav-w:268px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.62 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  code,.mono{font-family:"SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86em}
+  code{background:#eef1f6;color:#0b3b8c;padding:1px 5px;border-radius:5px}
+
+  /* ---- layout ---- */
+  .wrap{display:flex;align-items:flex-start;max-width:1300px;margin:0 auto}
+  nav{position:sticky;top:0;width:var(--nav-w);flex:0 0 var(--nav-w);height:100vh;overflow:auto;
+    padding:20px 14px 50px;border-right:1px solid var(--line);background:var(--panel)}
+  nav .brand{font-weight:800;font-size:19px;letter-spacing:-.02em;margin:0 0 1px;padding:0 8px}
+  nav .brand .dot{color:var(--accent)}
+  nav .tag{color:var(--muted);font-size:11.5px;margin:0 0 14px;padding:0 8px}
+  nav a{display:block;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:7px;
+    font-size:13px;border-left:2px solid transparent}
+  nav a:hover{background:var(--accent-soft);color:var(--ink)}
+  nav a.sub{padding-left:20px;font-size:12.5px}
+  nav a.active{color:var(--accent);background:var(--accent-soft);border-left-color:var(--accent);font-weight:600}
+  nav .grp{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:#97a1b0;margin:15px 0 3px;padding:0 10px;font-weight:700}
+
+  main{flex:1 1 auto;min-width:0;padding:34px 48px 140px;max-width:960px}
+  section{scroll-margin-top:18px;padding-top:12px;margin-bottom:34px}
+  .part-label{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent2)}
+  h1{font-size:32px;line-height:1.15;letter-spacing:-.022em;margin:.08em 0 .12em}
+  h2{font-size:22px;letter-spacing:-.012em;margin:1.2em 0 .5em;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  h3{font-size:16px;margin:1.3em 0 .4em}
+  p{margin:.5em 0}
+  .lede{font-size:17px;color:#33404f}
+  .muted{color:var(--muted)} .small{font-size:13px}
+  ul{margin:.4em 0 .6em;padding-left:1.2em} li{margin:.25em 0}
+
+  /* ---- hero / kpi / banner ---- */
+  .hero{background:linear-gradient(180deg,#ffffff,#fbfcff);border:1px solid var(--line);
+    border-radius:14px;padding:22px 24px;box-shadow:var(--shadow)}
+  .oneliner{font-size:18px;font-weight:600;color:#22303f;margin:.2em 0}
+  .kpis{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px}
+  .kpi{flex:1 1 150px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .kpi b{display:block;font-size:19px;letter-spacing:-.01em} .kpi span{font-size:12px;color:var(--muted)}
+  .banner{display:flex;align-items:center;gap:18px;flex-wrap:wrap;border-radius:14px;padding:16px 20px;margin:16px 0;
+    background:linear-gradient(120deg,#241b3a,#3a2b63);color:#fff;box-shadow:var(--shadow)}
+  .stamp{font:800 18px/1 -apple-system,sans-serif;letter-spacing:.04em;background:var(--miss);color:#fff;
+    padding:10px 16px;border-radius:10px;border:2px solid #ef4444;transform:rotate(-3deg)}
+  .banner .bk{display:flex;flex-direction:column;gap:1px}
+  .banner b{font-size:15px} .banner span{font-size:12.5px;color:#cdc4e8}
+
+  /* ---- cards ---- */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 18px;
+    margin:13px 0;box-shadow:var(--shadow)}
+  .card .head{display:flex;align-items:baseline;flex-wrap:wrap;gap:9px;margin-bottom:2px}
+  .card .head h3{margin:0;font-size:16px}
+  .card .sub{color:var(--muted);font-style:italic;font-size:13.5px}
+  .row{display:grid;grid-template-columns:124px 1fr;gap:5px 14px;margin:9px 0 2px;font-size:13.8px}
+  .row .k{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;padding-top:1px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px} @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  /* ---- chips ---- */
+  .chip{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;vertical-align:middle}
+  .c-ok{background:var(--ok-bg);color:var(--ok)} .c-partial{background:var(--partial-bg);color:var(--partial)}
+  .c-miss{background:var(--miss-bg);color:var(--miss)} .c-defer{background:var(--defer-bg);color:var(--defer)}
+  .id{display:inline-block;font:600 11px ui-monospace,monospace;background:#eef1f6;color:#3a475a;padding:1px 6px;border-radius:5px;margin-right:2px}
+
+  /* ---- diagrams ---- */
+  .diagram{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin:15px 0;overflow:auto;box-shadow:var(--shadow)}
+  .diagram .cap{font-size:12.5px;color:var(--muted);margin:2px 4px 8px;text-align:center}
+  .mermaid{display:flex;justify-content:center}
+
+  /* ---- callouts ---- */
+  .note{border-left:3px solid var(--accent);background:var(--accent-soft);padding:10px 14px;border-radius:0 8px 8px 0;margin:13px 0}
+  .note.warn{border-color:var(--partial);background:var(--partial-bg)}
+  .note.purple{border-color:var(--accent2);background:var(--accent2-soft)}
+
+  /* ---- tables ---- */
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.2px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:#fafbfd}
+  tr:last-child td{border-bottom:none}
+  td .id{margin:0}
+  .mini-bar{height:7px;width:70px;background:#eef1f6;border-radius:5px;display:inline-block;overflow:hidden;vertical-align:middle}
+  .mini-bar i{display:block;height:100%;background:linear-gradient(90deg,#3b82f6,#2f6df0)}
+
+  /* ---- progress bars ---- */
+  .bars{display:grid;gap:10px;margin:14px 0}
+  .bar{display:grid;grid-template-columns:185px 1fr 42px;align-items:center;gap:12px;font-size:13.4px}
+  .bar .track{height:14px;background:#eef1f6;border-radius:8px;overflow:hidden}
+  .bar .fill{height:100%;border-radius:8px;background:linear-gradient(90deg,#3b82f6,#2f6df0)}
+  .bar .pct{text-align:right;font-weight:700;color:var(--muted);font-size:12.5px}
+
+  /* ---- code blocks ---- */
+  pre.code{background:var(--code-bg);color:var(--code-ink);border-radius:10px;padding:14px 16px;overflow:auto;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.6px;line-height:1.6;margin:12px 0;border:1px solid #1b2436}
+  pre.code .kw{color:var(--code-kw)} pre.code .ty{color:var(--code-ty)} pre.code .str{color:var(--code-str)}
+  pre.code .dec{color:var(--code-dec)} pre.code .cm{color:var(--code-cm)}
+
+  /* ---- checklist ---- */
+  .check{list-style:none;padding:0;margin:12px 0}
+  .check li{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--line);border-radius:9px;margin:7px 0;background:var(--panel)}
+  .check li .bx{flex:0 0 18px;height:18px;border:2px solid var(--accent);border-radius:5px;margin-top:1px}
+
+  /* ---- ranked gaps ---- */
+  .rank{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin:9px 0;background:var(--panel)}
+  .rank .n{flex:0 0 30px;height:30px;border-radius:8px;background:var(--accent2);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:14px}
+  .rank.crit .n{background:var(--miss)}
+  .rank .b b{font-size:14px}
+
+  details.adv{margin-top:8px}
+  details.adv summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:600;outline:none}
+  details.adv[open] summary{margin-bottom:6px}
+
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:6px 0 0}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  hr.sep{border:none;border-top:1px solid var(--line);margin:30px 0}
+  .vlinks{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .vlinks a{font-size:12.5px;text-decoration:none;color:var(--accent);border:1px solid var(--line);border-radius:7px;padding:5px 10px;background:var(--panel)}
+  .vlinks a:hover{background:var(--accent-soft)}
+  @media(max-width:880px){nav{display:none} main{padding:24px 18px 90px}}
+  @media print{nav{display:none} .card,.diagram,.hero{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav id="nav">
+  <p class="brand">mail<span class="dot">flow</span></p>
+  <p class="tag">Complete solution doc · V1 · 2026-06-29</p>
+  <a href="#snapshot">Snapshot &amp; verdict</a>
+  <div class="grp">1 · The product</div>
+  <a class="sub" href="#what">What mailflow is</a>
+  <a class="sub" href="#journey">The journey</a>
+  <a class="sub" href="#delivers">What V1 delivers</a>
+  <a class="sub" href="#using">Using it</a>
+  <div class="grp">2 · Architecture</div>
+  <a class="sub" href="#arch">Ports &amp; adapters</a>
+  <a class="sub" href="#ports">The port surface</a>
+  <a class="sub" href="#contracts">Frozen contracts</a>
+  <div class="grp">3 · Pipeline</div>
+  <a class="sub" href="#s-wake">1 · Wake &amp; verify</a>
+  <a class="sub" href="#s-fetch">2 · Fetch &amp; cursor</a>
+  <a class="sub" href="#s-size">3 · Size guard</a>
+  <a class="sub" href="#s-extract">4 · Extract &amp; thread</a>
+  <a class="sub" href="#s-clean">5 · Clean</a>
+  <a class="sub" href="#s-filter">6 · Filter</a>
+  <a class="sub" href="#s-emit">7 · Emit &amp; idempotency</a>
+  <div class="grp">4 · Cross-cutting</div>
+  <a class="sub" href="#x-errors">Error taxonomy</a>
+  <a class="sub" href="#x-reliability">Reliability</a>
+  <a class="sub" href="#x-extend">Extensibility</a>
+  <a class="sub" href="#x-observe">Observability</a>
+  <div class="grp">5 · Scope &amp; roadmap</div>
+  <a class="sub" href="#decisions">The 11 decisions</a>
+  <a class="sub" href="#buckets">Scope buckets</a>
+  <a class="sub" href="#roadmap">Roadmap P0–P3</a>
+  <div class="grp">6 · Readiness</div>
+  <a class="sub" href="#scoreboard">Baseline vs now</a>
+  <a class="sub" href="#items">Item-by-item</a>
+  <a class="sub" href="#gaps">What remains</a>
+  <div class="grp">7 · Build</div>
+  <a class="sub" href="#phases">Phases &amp; tracks</a>
+  <a class="sub" href="#discipline">Discipline</a>
+  <a class="sub" href="#dod">Definition of done</a>
+  <div class="grp">Reference</div>
+  <a class="sub" href="#glossary">Glossary</a>
+</nav>
+
+<main>
+  <!-- =================== SECTION: SNAPSHOT =================== -->
+  <section id="snapshot">
+    <p class="part-label">Solution overview · complete edition</p>
+    <h1>mailflow</h1>
+    <p class="lede muted">The complete picture of <b>mailflow</b> — product, architecture, frozen contracts, scope, readiness, and the path to its first release. Skim the diagrams and cards for the shape; dive into the code blocks only if you're implementing.</p>
+
+    <div class="banner" style="background:linear-gradient(120deg,#0f3d2c,#15643f)">
+      <div class="stamp" style="background:#15803d;border-color:#22c55e;transform:rotate(-2deg)">BUILT</div>
+      <div class="bk"><b>The locked V1 scope is implemented and green — now in final verification.</b>
+        <span>Every in-scope item (A2 · A4 · A5 · A6 · A7 · A8 · A10 · A11 · B1–B5) has landed in code. <b>203 tests pass · <code style="color:#bdf0cf">mypy --strict</code> clean (71 files).</b> Remaining: Phase-2 verification &amp; Phase-3 tag, plus the deferred Outlook-live and GDPR work.</span></div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><b>Implemented ✓</b><span>full locked V1 scope in code</span></div>
+      <div class="kpi"><b>203 tests ✓</b><span>green · mypy --strict clean</span></div>
+      <div class="kpi"><b>Phase 2–3</b><span>verify → integrate → tag</span></div>
+      <div class="kpi"><b>Deferred</b><span>Outlook live · GDPR</span></div>
+    </div>
+    <p class="small muted"><b>The ask:</b> align that the implementation meets the locked scope, and on taking it through final verification → V1 tag — Outlook and GDPR stay out by decision. <b>Historical note:</b> a 2026-06-29 audit (commit <code>8b0cc4b</code>) graded the <i>then</i>-code <b>NO-GO / ~35%</b>; the Phase-1 build has since closed that gap. The Readiness section below keeps the audit baseline for context, with the current state called out.</p>
+    <div class="note" id="key">
+      <b>How to read this doc.</b> <b>V1</b> = version 1.0, the first stable release — its public contracts are <i>frozen</i> (changing them after release breaks every app built on mailflow). <b>P0</b> = the must-haves that block V1. Remaining work is tracked by short IDs in four families:
+      <b>A</b> freeze-now contracts · <b>B</b> correctness defects · <b>C</b> live blockers (Outlook) · <b>D</b> provider proof.
+      <span class="legend" style="display:flex;margin-top:9px">
+        <span><span class="chip c-ok">✓ done</span> shipped &amp; tested</span>
+        <span><span class="chip c-partial">~ partial</span> present, incomplete/wrong</span>
+        <span><span class="chip c-miss">✗ missing</span> to build for V1</span>
+        <span><span class="chip c-defer">⏸ deferred</span> out of V1 scope</span>
+      </span>
+      <details class="adv" open style="margin-top:9px"><summary>Full ID → name key</summary>
+        <div class="small" style="columns:2;column-gap:30px;margin-top:8px">
+          <div><span class="id">A1</span> Notifications = wake-signals only</div>
+          <div><span class="id">A2</span> Typed error taxonomy <i>(keystone)</i></div>
+          <div><span class="id">A3</span> Cursor contract (durable bookmark)</div>
+          <div><span class="id">A4</span> idempotency_key + at-least-once</div>
+          <div><span class="id">A5</span> WebhookVerifier (ping authenticity)</div>
+          <div><span class="id">A6</span> ContentCleaner port (HTML→text)</div>
+          <div><span class="id">A7</span> Provider-native thread key</div>
+          <div><span class="id">A8</span> Token-rotation persistence</div>
+          <div><span class="id">A9</span> GDPR erase/encryption <i>(deferred)</i></div>
+          <div><span class="id">A10</span> Builder overrides + decorators</div>
+          <div><span class="id">A11</span> Sync-only + version policy</div>
+          <div><span class="id">A12</span> StreamRef granularity</div>
+          <div><span class="id">B1</span> Size guard fail-closed</div>
+          <div><span class="id">B2</span> Per-message DLQ isolation</div>
+          <div><span class="id">B3</span> 404/410/decode → Permanent</div>
+          <div><span class="id">B4</span> Backoff + storm containment</div>
+          <div><span class="id">B5</span> HTML→text body parity</div>
+          <div><span class="id">B6</span> Page-atomic cursor commit</div>
+          <div><span class="id">C1</span> Graph subscription expiry <i>(Outlook)</i></div>
+          <div><span class="id">C2</span> Graph size-probe <i>(Outlook)</i></div>
+          <div><span class="id">D1</span> Second-provider proof (Gmail)</div>
+        </div>
+      </details>
+    </div>
+    <p class="small muted">This file is a superset; sections are modular and labelled with <code>SECTION:</code> comments so you can delete any you don't need. New here? A <a href="#glossary">glossary</a> of terms (DLQ, cursor, idempotency, OIDC-JWT…) is at the end.</p>
+    <div class="vlinks">
+      <span class="small muted" style="align-self:center">Other formats:</span>
+      <a href="./solution-doc.html">Walkthrough</a>
+      <a href="./solution-doc-executive.html">Executive</a>
+      <a href="./solution-doc-deck.html">Slide deck</a>
+      <a href="./solution-doc-technical.html">Technical</a>
+      <a href="./solution-doc-status.html">Status</a>
+    </div>
+  </section>
+
+  <!-- =================== SECTION: WHAT IS IT =================== -->
+  <section id="what">
+    <p class="part-label">1 · The product</p>
+    <h2>What mailflow is</h2>
+    <div class="hero">
+      <p class="oneliner">mailflow watches an inbox, and on every new email it fetches, opens, cleans, and hands a tidy structured record to your app — handling the messy parts (auth, throttling, duplicates, broken mail) for you.</p>
+      <p class="muted" style="margin:.6em 0 0">Mental model — an <b>automated mailroom</b>: a letter arrives → the clerk is pinged → the clerk fetches it using a durable <i>bookmark</i> (not the ping) → opens it, pulls out the useful parts, discards junk → hands a summary card to the department that asked. Everything below is how that mailroom is built.</p>
+      <div class="kpis">
+        <div class="kpi"><b>Gmail</b><span>live provider in V1 (Outlook adapter present, fast-follow)</span></div>
+        <div class="kpi"><b>Poll-authoritative</b><span>push only <i>wakes</i> the poller</span></div>
+        <div class="kpi"><b>Single-tenant</b><span>single worker, synchronous</span></div>
+        <div class="kpi"><b>At-least-once</b><span>dedupe via idempotency_key</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== SECTION: JOURNEY =================== -->
+  <section id="journey">
+    <h2>The journey every email takes</h2>
+    <div class="diagram">
+      <div class="cap">Each step maps to a section below (feature IDs in parentheses).</div>
+      <pre class="mermaid">
+flowchart LR
+    A["📨 Inbox<br/>Gmail"] -->|"push ping<br/>(Pub/Sub)"| B{"Ping<br/>genuine?<br/>(A5)"}
+    B -->|forged| X["🗑️ Reject"]
+    B -->|genuine| C["Wake →<br/>poll from cursor<br/>(A1/A3)"]
+    C --> D["Fetch changed<br/>page-atomic<br/>(B6)"]
+    D --> E{"Size OK?<br/>(B1)"}
+    E -->|"unknown /<br/>too big"| DLQ[("Problem pile<br/>DLQ (B2/B3)")]
+    E -->|ok| F["Extract fields<br/>+ thread_key<br/>(A7)"]
+    F --> G["Clean<br/>HTML→text<br/>(A6/B5)"]
+    G --> H["Filters<br/>(A10)"]
+    H --> I["Emit EmailEvent<br/>+ idempotency_key<br/>(A4)"]
+    I --> J["🎯 Consumer<br/>(your app)"]
+    classDef dlq fill:#fee2e2,stroke:#b91c1c,color:#000
+    classDef ok fill:#dcfce7,stroke:#15803d,color:#000
+    class DLQ dlq
+    class J ok
+      </pre>
+    </div>
+  </section>
+
+  <!-- =================== SECTION: WHAT V1 DELIVERS =================== -->
+  <section id="delivers">
+    <h2>What V1 delivers</h2>
+    <div class="grid2">
+      <div class="card"><h3>What you get</h3>
+        <ul>
+          <li><b>Reuse, not rebuild:</b> one hardened email connector instead of every team writing their own.</li>
+          <li><b>Clean inputs:</b> sender, subject, readable body, attachments — no raw-email parsing downstream.</li>
+          <li><b>Safe by default:</b> broken / oversized / poisonous mail is set aside, not allowed to crash the line.</li>
+          <li><b>Honest delivery:</b> a duplicate fingerprint on every event so consumers can de-duplicate cleanly.</li>
+        </ul>
+      </div>
+      <div class="card"><h3>What V1 unlocks next</h3>
+        <ul>
+          <li>A proven, provider-agnostic foundation — adding Outlook is an adapter on the same ports.</li>
+          <li>A stable public contract teams can start building products against.</li>
+          <li>A clear, low-risk path to richer features (attachments, filtering, recovery) as fast-follows.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== SECTION: USING IT =================== -->
+  <section id="using">
+    <h2>Using it — the consumer's view</h2>
+    <p>The consuming app wires mailflow through one front door — <code>connect()</code> — then reads clean events off it. <span class="small muted">(Illustrative shape; exact API in the README.)</span></p>
+    <pre class="code"><span class="kw">from</span> mailflow <span class="kw">import</span> connect
+
+flow = connect(
+    provider=<span class="str">"gmail"</span>,
+    filters=[<span class="kw">lambda</span> e: e.to == <span class="str">"support@acme.com"</span>],   <span class="cm"># your rules (To/CC/subject, regex)</span>
+    clean_fn=my_cleaner,                              <span class="cm"># optional HTML→text override</span>
+)
+
+<span class="kw">for</span> event <span class="kw">in</span> flow.run():            <span class="cm"># synchronous — one email at a time</span>
+    <span class="kw">if</span> <span class="kw">not</span> already_seen(event.idempotency_key):   <span class="cm"># at-least-once ⇒ you de-dupe on this key</span>
+        handle(event.email)</pre>
+    <p>What you receive on each turn:</p>
+    <pre class="code"><span class="ty">EmailEvent</span>(
+    schema_version = <span class="str">"1.1"</span>,
+    tenant         = <span class="str">"acme"</span>,
+    ordering_key   = <span class="str">"&lt;thread/best-effort grouping&gt;"</span>,
+    idempotency_key = <span class="str">"acme|support@acme.com|&lt;provider-msg-id&gt;"</span>,   <span class="cm"># a string: tenant|mailbox|message-id</span>
+    email = <span class="ty">CleanEmail</span>(sender, subject, body_text, attachments, thread_key, ...),
+)</pre>
+    <p class="small muted">Delivery is <b>at-least-once</b>: the same email may arrive twice (after a crash/retry), so consumers de-duplicate on <code>idempotency_key</code>. The library does the fetching, cleaning, throttling and error-handling; your code only decides what to keep and what to do with it.</p>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- =================== SECTION: ARCHITECTURE =================== -->
+  <section id="arch">
+    <p class="part-label">2 · Architecture</p>
+    <h2>Ports &amp; adapters — the core idea</h2>
+    <p>The one idea that explains everything else: <b>mailflow is a small core of frozen <i>contracts</i> (ports) surrounded by swappable implementations.</b> The core knows the <i>shape</i> of a mailbox provider, a webhook verifier, a content cleaner, a store — never a specific vendor. Gmail and Outlook are just two implementations of the same ports.</p>
+    <p>That is also the build philosophy: <b>freeze the contracts first, then build behind them in parallel.</b> A contract is a signature or model field that, once V1 ships, consumers build against — changing it later breaks them.</p>
+    <div class="diagram">
+      <div class="cap">Core defines the ports; adapters &amp; stores implement them; the facade wires it together for the consumer.</div>
+      <pre class="mermaid">
+flowchart TB
+    APP["Your app — the consumer"]
+    subgraph FAC["Library facade — connect() / builder"]
+      F1["overrides= · as_filter · as_cleaner&nbsp;(A10)"]
+    end
+    subgraph CORE["Core — frozen contracts (sync, single-worker)"]
+      PIPE["Pipeline"]
+      P["Ports / Protocols:<br/>MailboxProvider · WebhookVerifier · ContentCleaner<br/>SecretProvider · BlobStore · CursorStore · DedupeStore"]
+      M["Models: CleanEmail · EmailEvent · Envelope<br/>Errors: Auth / Permanent / Transient (A2)"]
+    end
+    subgraph IMPL["Swappable implementations"]
+      GM["Gmail adapter<br/>(live in V1)"]
+      GR["Graph / Outlook adapter<br/>(fast-follow)"]
+      ST["Stores:<br/>memory · sqlite · local blob"]
+    end
+    APP --> FAC --> PIPE
+    PIPE --> P
+    PIPE --> M
+    P -. implemented by .-> GM
+    P -. implemented by .-> GR
+    P -. implemented by .-> ST
+    classDef core fill:#eaf1ff,stroke:#2f6df0,color:#000
+    class CORE core
+      </pre>
+    </div>
+    <div class="note purple"><b>Why a lead should care:</b> the risk in a library isn't today's working code — it's the <i>promises</i>. Right ports → a new provider/store/cleaner slots in without touching the core or breaking a consumer. Wrong ports → every consumer pays for the rewrite. V1's whole job is to lock the right promises.</div>
+  </section>
+
+  <!-- =================== SECTION: PORT SURFACE =================== -->
+  <section id="ports">
+    <h2>The port surface</h2>
+    <p>Ports are <code>@runtime_checkable</code> Protocols. Conceptual signatures (grounded in <code>core/ports.py</code>; exact shapes may differ slightly):</p>
+    <pre class="code"><span class="cm"># core/ports.py — the seam every implementation plugs into</span>
+<span class="kw">class</span> <span class="ty">MailboxProvider</span>(Protocol):       <span class="cm"># Gmail / Graph</span>
+    <span class="kw">def</span> connect(self) -> <span class="ty">None</span>: ...
+    <span class="kw">def</span> sync_streams(self) -> list[<span class="ty">StreamRef</span>]: ...      <span class="cm"># provider-defined granularity (A12)</span>
+    <span class="kw">def</span> fetch(self, stream, cursor) -> Iterator[<span class="ty">RawMessage</span>]: ...
+    <span class="kw">def</span> message_size(self, msg) -> <span class="ty">int</span> | <span class="ty">None</span>: ...   <span class="cm"># None ⇒ unknown ⇒ fail closed (B1)</span>
+
+<span class="kw">class</span> <span class="ty">WebhookVerifier</span>(Protocol):         <span class="cm"># A5 — returns identity only, never payload trust</span>
+    <span class="kw">def</span> verify(self, headers, body) -> <span class="ty">WebhookIdentity</span>: ...
+
+<span class="kw">class</span> <span class="ty">ContentCleaner</span>(Protocol):          <span class="cm"># A6 — a real pipeline stage</span>
+    <span class="kw">def</span> clean(self, email: <span class="ty">CleanEmail</span>) -> <span class="ty">CleanEmail</span>: ...
+
+<span class="kw">class</span> <span class="ty">SecretProvider</span>(Protocol):
+    <span class="kw">def</span> get(self, ref: <span class="ty">str</span>) -> <span class="ty">str</span>: ...
+<span class="kw">class</span> <span class="ty">TokenRotationSink</span>(Protocol):        <span class="cm"># A8 (provisional) — persist rotated refresh token</span>
+    <span class="kw">def</span> on_refresh(self, ref: <span class="ty">str</span>, new_token: <span class="ty">str</span>) -> <span class="ty">None</span>: ...
+
+<span class="kw">class</span> <span class="ty">BlobStore</span>(Protocol): ...      <span class="cm"># content-addressed attachment storage</span>
+<span class="kw">class</span> <span class="ty">CursorStore</span>(Protocol): ...    <span class="cm"># durable, monotonic bookmark</span>
+<span class="kw">class</span> <span class="ty">DedupeStore</span>(Protocol): ...    <span class="cm"># try_claim / record_attempt / mark_done / release</span></pre>
+    <div class="note warn"><b>Design note:</b> A8 token-rotation persistence is modelled as a separate <code>@provisional TokenRotationSink.on_refresh(ref, new_token)</code> port rather than widening <code>SecretProvider</code> — keeping the frozen <code>SecretProvider.get</code> shape intact. The build plan explicitly allowed either path ("extend <i>SecretProvider, or the OAuth token-provider seam</i>"), so this is within plan, not a deviation.</div>
+  </section>
+
+  <!-- =================== SECTION: FROZEN CONTRACTS =================== -->
+  <section id="contracts">
+    <h2>Frozen contracts reference</h2>
+    <p>These are the shapes &amp; invariants that <b>cannot change after 1.0</b> without breaking consumers or the persistence layer.</p>
+    <table>
+      <thead><tr><th>Contract</th><th>Shape / rule</th><th>Why immutable</th></tr></thead>
+      <tbody>
+        <tr><td><b>idempotency_key</b></td><td>a <b>string</b> <code>"tenant|mailbox|provider_message_id"</code> (<code>|</code>-joined)</td><td>Consumers key dedupe on it; changing it silently breaks duplicate detection.</td></tr>
+        <tr><td><b>canonical_id</b></td><td>trusted <code>&lt;…@…&gt;</code> Message-ID, else <code>stable_hash(provider, provider_message_id, mailbox)</code></td><td>Stable identity across retries/reorders; the internal anchor the dedupe store claims on (works alongside the wire <code>idempotency_key</code>).</td></tr>
+        <tr><td><b>Wire event</b></td><td><code>EmailEvent(schema_version, tenant, ordering_key, idempotency_key, email)</code>; <code>SCHEMA_VERSION</code> 1.0→1.1 (additive). <span class="small muted"><code>ordering_key</code> is a best-effort grouping hint — delivery stays at-least-once, not strictly ordered.</span></td><td>The public payload; additive bumps only.</td></tr>
+        <tr><td><b>Extractor seam</b></td><td><code>MimeExtractor.extract_bytes(raw, *, provider, provider_message_id, stream_id, watched_mailbox) -&gt; CleanEmail</code>; others implement port <code>extract(msg, env)</code>; <code>Pipeline._extract</code> dispatches by type</td><td>Lets Gmail (raw RFC822) and Graph (structured) share one pipeline.</td></tr>
+        <tr><td><b>Cursor</b></td><td><code>commit_if_ahead</code> strictly monotonic; advances on <i>every</i> terminal disposition</td><td>Crash-safe resume; never slides backward.</td></tr>
+        <tr><td><b>Dedupe</b></td><td>exactly <code>try_claim / record_attempt / mark_done / release</code> (no lease-expiry sim in memory store)</td><td>Real Firestore/Redis adapter adds expiry without changing callers.</td></tr>
+        <tr><td><b>DLQ counting</b></td><td><code>add_dead_letter()</code> + paired <code>record(_trace(…dead_lettered…))</code> as one unit; never a standalone trace</td><td>One poison/oversized message ⇒ exactly one count.</td></tr>
+        <tr><td><b>from_ ↔ from</b></td><td>alias on <code>Envelope</code>/<code>CleanEmail</code>, spelled identically everywhere</td><td>Wire-name stability.</td></tr>
+        <tr><td><b>Sync-only</b></td><td>explicit policy + provisional/stable port markers + config <code>version</code> (A11)</td><td>Makes a future async family additive, not breaking.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- =================== SECTION: PIPELINE =================== -->
+  <section>
+    <p class="part-label">3 · The pipeline, stage by stage</p>
+    <h2 style="margin-top:.2em">Each stage: what · contract · why it matters · status</h2>
+  </section>
+
+  <section id="s-wake">
+    <div class="card">
+      <div class="head"><h3>1 · Wake signal &amp; webhook verification</h3><span class="id">A5</span><span class="chip c-ok">✓ Gmail verifier landed</span></div>
+      <p class="sub">"A new-mail ping arrived — but is it really from Google, and is it safe to act on?"</p>
+      <div class="row"><div class="k">Contract</div><div><code>WebhookVerifier</code> port → returns <b>identity only</b> (verified subscription/mailbox), never payload trust.</div></div>
+      <div class="row"><div class="k">V1 impl</div><div>Gmail Pub/Sub <b>OIDC-JWT</b> — signature via JWKS, audience, issuer. (Outlook <code>validationToken</code> handshake deferred.)</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>Push ingestion is internet-facing. Without verification anyone can forge a ping. A verified ping still earns only a <i>wake</i> — never "fetch this exact ID."</div></div>
+    </div>
+  </section>
+
+  <section id="s-fetch">
+    <div class="card">
+      <div class="head"><h3>2 · Fetch &amp; cursor (the golden rule)</h3><span class="id">A1</span><span class="id">A3</span><span class="id">B6</span><span class="chip c-ok">✓ Gmail (Outlook deferred)</span></div>
+      <p class="sub">"On wake, re-derive what changed from a durable bookmark — never trust the ID inside a ping."</p>
+      <div class="row"><div class="k">Contract</div><div>Cursor is <b>durable</b>, <b>strictly monotonic</b> (<code>commit_if_ahead</code>), advances on <i>every</i> terminal disposition. Gmail = <code>historyId</code>; Outlook = <code>deltaLink</code>.</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>Pings can be forged, duplicated, or arrive out of order. The bookmark is the only trustworthy "where I stopped," so a crash resumes exactly — no gaps, no re-scans.</div></div>
+      <div class="row"><div class="k">V1 status</div><div>Gmail re-derives from <code>historyId</code> and commits one cursor per page (B6 ✓). Outlook wake-rewire deferred.</div></div>
+    </div>
+  </section>
+
+  <section id="s-size">
+    <div class="card">
+      <div class="head"><h3>3 · Size guard — fail closed</h3><span class="id">B1</span><span class="chip c-ok">✓ fail-closed landed</span></div>
+      <p class="sub">"If we can't tell how big an email is, assume it's too big and set it aside — before downloading."</p>
+      <div class="row"><div class="k">Behavior</div><div>Unknown / omitted size ⇒ treat as over-limit ⇒ DLQ <b>before</b> fetch. Implemented in <code>pipeline.py</code> (size ≤ 0 ⇒ dead-letter "size unknown"). Previously an unknown size became 0 and slipped under the ceiling.</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>"Fail open" on size means an unbounded payload can be pulled into memory and crash the run. Safe default is reject, not guess.</div></div>
+    </div>
+  </section>
+
+  <section id="s-extract">
+    <div class="card">
+      <div class="head"><h3>4 · Extract fields &amp; thread key</h3><span class="id">A7</span><span class="chip c-ok">✓ thread_key landed (Gmail)</span></div>
+      <p class="sub">"Open the envelope, pull out sender/subject/body/attachments — and the ID that groups a conversation."</p>
+      <div class="row"><div class="k">Contract</div><div>New <code>thread_key</code> on <code>CleanEmail</code>; maps Gmail <code>threadId</code> / Outlook <code>conversationId</code>, with a subject-normalized fallback.</div></div>
+      <div class="row"><div class="k">Seam</div><div><code>MimeExtractor.extract_bytes(...)</code> for raw RFC822 (Gmail); other providers implement <code>extract(msg, env)</code> directly (Graph). <code>Pipeline._extract</code> dispatches by type.</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>Without a provider-native thread key, consumers can't reliably tie a reply to its original — conversation grouping breaks.</div></div>
+    </div>
+  </section>
+
+  <section id="s-clean">
+    <div class="card">
+      <div class="head"><h3>5 · Clean — HTML → text</h3><span class="id">A6</span><span class="id">B5</span><span class="chip c-ok">✓ cleaner + parity landed</span></div>
+      <p class="sub">"Turn an email's HTML into readable plain text — gently by default, aggressively only if asked."</p>
+      <div class="row"><div class="k">Contract</div><div><code>ContentCleaner</code> port (<code>clean(CleanEmail) -&gt; CleanEmail</code>), wired as a real pipeline stage — not a post-emit afterthought.</div></div>
+      <div class="row"><div class="k">Parity (B5)</div><div>A shared <code>html_to_text</code> converter backfills <code>body_text</code> via the default cleaner stage (and inline in the Gmail extractor), so an HTML-only email yields non-empty <code>body_text</code> identically across providers.</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>V1 is plain-text-only (no sanitizer/renderer). If HTML-only mail produced blank text the product would look empty. This stage makes the output usable.</div></div>
+    </div>
+  </section>
+
+  <section id="s-filter">
+    <div class="card">
+      <div class="head"><h3>6 · Filter</h3><span class="id">A10</span><span class="chip c-ok">✓ overrides + decorators landed</span></div>
+      <p class="sub">"Only hand the consumer the emails they actually want."</p>
+      <div class="row"><div class="k">Built-in</div><div>To / CC / subject matching incl. regex; consumers inject their own filters.</div></div>
+      <div class="row"><div class="k">How</div><div>Filters/cleaners inject as callables via <code>connect(filters=[...], clean_fn=...)</code>; the generic <code>overrides=</code> seam and <code>as_filter</code>/<code>as_cleaner</code> decorators are now wired in <code>facade.py</code>/<code>builder.py</code>.</div></div>
+    </div>
+  </section>
+
+  <section id="s-emit">
+    <div class="card">
+      <div class="head"><h3>7 · Emit event &amp; idempotency</h3><span class="id">A4</span><span class="chip c-ok">✓ key on wire (1.1)</span></div>
+      <p class="sub">"Hand the consumer a clean event stamped with a fingerprint so they can spot duplicates."</p>
+      <div class="row"><div class="k">Contract</div><div><code>idempotency_key</code> surfaced on <code>EmailEvent</code> = <code>(tenant, mailbox, provider_message_id)</code>. Wire schema <code>1.0 → 1.1</code> (additive).</div></div>
+      <div class="row"><div class="k">Delivery</div><div><b>At-least-once</b>, documented honestly. Exactly-once is not promised; duplicates are expected and handled by the key. (Earlier docs that claimed exactly-once have been corrected.)</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>The emitted event <i>is</i> the public contract. The fingerprint is computed internally already — V1 exposes it so consumers don't rebuild it.</div></div>
+    </div>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- =================== SECTION: CROSS-CUTTING =================== -->
+  <section id="x-errors">
+    <p class="part-label">4 · Cross-cutting concerns</p>
+    <div class="card">
+      <div class="head"><h3>Error taxonomy &amp; routing</h3><span class="id">A2</span><span class="id">B3</span><span class="chip c-ok">✓ taxonomy + routing landed</span></div>
+      <p class="sub">"Sort every failure into Auth / Permanent / Transient, and react differently to each."</p>
+      <div class="row"><div class="k">Contract</div><div><code>AuthError</code> · <code>PermanentError</code> · <code>TransientError</code> (subclasses of <code>MailflowError</code>); provider errors re-parented onto them. <span class="small muted">Now in <code>core/errors.py</code>.</span></div></div>
+      <div class="row"><div class="k">Routing</div><div>Wired in <code>pipeline.py</code>: Auth (401) → refresh once, retry · Permanent (403/404/410/decode) → DLQ no-retry · Transient (429/5xx/network) → bounded backoff, then DLQ.</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>Before this, one bare <code>except</code> retried everything by attempt count — so 410 "gone" and garbled data looped forever. The keystone: B3 and B4 build on it (B3's permanent-classification + B4's backoff plug into this routing).</div></div>
+    </div>
+    <div class="diagram">
+      <div class="cap">The routing this taxonomy unlocks.</div>
+      <pre class="mermaid">
+flowchart TD
+    E["Failure at provider boundary"] --> Q{"What kind? (A2)"}
+    Q -->|"401 — login expired"| R["🔄 Refresh token,<br/>retry once"]
+    Q -->|"403/404/410/decode<br/>Permanent (B3)"| D[("🗑️ DLQ — never retry")]
+    Q -->|"429/5xx/network<br/>Transient (B4)"| T["⏳ Backoff + jitter,<br/>honor Retry-After, bounded"]
+    R -->|still failing| D
+    T -->|retries exhausted| D
+    classDef dlq fill:#fee2e2,stroke:#b91c1c,color:#000
+    class D dlq
+      </pre>
+    </div>
+    <h3>Raise → route map</h3>
+    <table>
+      <thead><tr><th>At boundary</th><th>Raised as</th><th>Pipeline routes to</th></tr></thead>
+      <tbody>
+        <tr><td>401 unauthorized</td><td><code>AuthError</code></td><td>refresh token once → retry</td></tr>
+        <tr><td>403 / 404 / 410 / invalid-base64 decode</td><td><code>PermanentError</code></td><td>DLQ, no retry</td></tr>
+        <tr><td>429 / 5xx / network</td><td><code>TransientError</code></td><td>bounded backoff + jitter → DLQ if exhausted</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="x-reliability">
+    <div class="card">
+      <div class="head"><h3>Reliability — isolation, backoff, storm containment</h3><span class="id">B2</span><span class="id">B4</span><span class="chip c-ok">✓ landed</span></div>
+      <div class="row"><div class="k">DLQ isolation (B2)</div><div>One broken/oversized message is set aside <b>alone</b> — never crashes the batch. Counted exactly once. Per-record fetch isolation now skips a poison record (404/410/bad-base64) and continues the stream.</div></div>
+      <div class="row"><div class="k">Backoff + storm (B4)</div><div>Retry 5xx; exponential backoff + jitter honoring <code>Retry-After</code>; bounded in-flight concurrency cap; and an exhausted-retry storm is contained so it can't abort the run.</div></div>
+      <div class="row"><div class="k">Why it matters</div><div>The difference between "one bad email" and "the run dies." Before B4, a 429 storm propagated uncaught and took everything down.</div></div>
+    </div>
+  </section>
+
+  <section id="x-extend">
+    <div class="card">
+      <div class="head"><h3>Extensibility &amp; stability policy</h3><span class="id">A8</span><span class="id">A10</span><span class="id">A11</span><span class="chip c-ok">✓ landed</span></div>
+      <div class="row"><div class="k">Overrides (A10)</div><div>Generic <code>overrides=</code> mapping to inject any component instance, plus <code>as_filter</code>/<code>as_cleaner</code> decorator sugar.</div></div>
+      <div class="row"><div class="k">Token rotation (A8)</div><div>An <b>on-refresh persistence callback</b>: a rotated OAuth refresh token is <i>saved</i>, or the next run silently breaks. (Multi-tenant/DWD out of V1.)</div></div>
+      <div class="row"><div class="k">Versioning (A11)</div><div>Explicit <b>sync-only</b> declaration, provisional/stable port markers, config <code>version</code> field.</div></div>
+    </div>
+  </section>
+
+  <section id="x-observe">
+    <div class="card">
+      <div class="head"><h3>Observability</h3><span class="chip c-partial">~ light in V1</span></div>
+      <div class="row"><div class="k">In V1</div><div>Basic structured logs + run-report counters (emitted / dropped / duplicate / dead-lettered).</div></div>
+      <div class="row"><div class="k">Deferred</div><div>PII redaction (scrubbing bodies from logs) is post-V1; for now, full bodies aren't logged by default.</div></div>
+    </div>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- =================== SECTION: DECISIONS =================== -->
+  <section id="decisions">
+    <p class="part-label">5 · Scope &amp; roadmap</p>
+    <h2>The 11 scope decisions (locked 2026-06-29)</h2>
+    <div class="note"><b>V1 in one line:</b> a <b>Gmail-only</b>, <b>single-tenant</b>, <b>poll-authoritative</b> library (Gmail push only <i>wakes</i> the poller), cleaning each email to plain text and emitting a clean, de-duplicatable event.</div>
+    <table>
+      <thead><tr><th>#</th><th>Decision</th><th>Choice</th><th>Consequence for V1</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Gmail e2e vs paper-audit</td><td><b>Gmail end-to-end</b></td><td>Gmail is the live V1 provider (D1 ✓).</td></tr>
+        <tr><td>2</td><td>Push vs poll authoritative</td><td><b>Poll/delta</b></td><td>Async buffer stays P2; push only wakes the poller.</td></tr>
+        <tr><td>3</td><td>Auth model</td><td><b>Delegated OAuth refresh-token</b></td><td>SecretProvider stays simple; one token per mailbox.</td></tr>
+        <tr><td>4</td><td>Tenancy</td><td><b>Single-tenant POC</b></td><td>A8 shrinks to rotation-persistence only.</td></tr>
+        <tr><td>5</td><td>Gmail scope</td><td><b><code>gmail.readonly</code></b></td><td>Full content + attachments; cleaning in scope.</td></tr>
+        <tr><td>6</td><td>Concurrency</td><td><b>Single worker</b></td><td>Fencing/leases stay P2.</td></tr>
+        <tr><td>7</td><td>Ordering</td><td><b>Availability-first</b></td><td>No strict-ordering machinery; dupes via idempotency_key.</td></tr>
+        <tr><td>8</td><td>GDPR / retention</td><td><b>Out of V1</b></td><td>A9 erase/encryption dropped; PII redaction deferred.</td></tr>
+        <tr><td>9</td><td>HTML in UI</td><td><b>Plain text only</b></td><td>No HTML sanitizer; HTML→text (B5) becomes important.</td></tr>
+        <tr><td>10</td><td>Webhooks in V1</td><td><b>Push as wake-trigger (Gmail Pub/Sub)</b></td><td>A5 reduced to Gmail OIDC-JWT only.</td></tr>
+        <tr><td>11</td><td>Providers live in V1</td><td><b>Gmail-only; Outlook fast-follow</b></td><td>C1/C2 + Outlook rewire (A1) leave V1.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- =================== SECTION: BUCKETS =================== -->
+  <section id="buckets">
+    <h2>Locked scope buckets</h2>
+    <p class="small muted">These are <b>scope membership</b> (what V1 covers), not completion — the whole "build" + "reduced" set is <b>now implemented</b> (see <a href="#scoreboard">Readiness</a>); deferred items stay out by decision.</p>
+    <div class="grid2">
+      <div class="card"><h3><span class="chip" style="background:#eef1f6;color:#3a475a">full build</span> Implemented in full</h3>
+        <p class="small">A2 · A4 · A6 · A7 · A10 · A11 · B1 · B2 · B3 · B4 · B5</p></div>
+      <div class="card"><h3><span class="chip" style="background:#eef1f6;color:#3a475a">reduced</span> Narrowed for V1</h3>
+        <p class="small">A5 → Gmail OIDC-JWT only · A8 → token-rotation persistence only</p></div>
+      <div class="card"><h3><span class="chip c-ok">done</span> Already shipped</h3>
+        <p class="small">A3 (Gmail cursor) · A12 (StreamRef) · B6 (page-atomic) · D1 (Gmail proof)</p></div>
+      <div class="card"><h3><span class="chip c-defer">deferred</span> Out of V1</h3>
+        <p class="small">A1 (Outlook rewire) · A9 (GDPR) · C1 + C2 (Outlook live) · PII redaction · multi-tenant · concurrency · strict ordering · HTML sanitizer</p></div>
+    </div>
+  </section>
+
+  <!-- =================== SECTION: ROADMAP =================== -->
+  <section id="roadmap">
+    <h2>Roadmap — P0 → P3</h2>
+    <div class="diagram">
+      <div class="cap">Value milestones — each tier adds reach &amp; richness on seams designed now.</div>
+      <pre class="mermaid">
+timeline
+    title mailflow value milestones
+    P0 · V1 (ship now) : Gmail polling library : Frozen public contracts : Clean de-duplicatable events
+    P1 · sturdier fast-follow : Subscription renewal + backfill : Attachment streaming + dedup : Replayable DLQ : Fuller observability
+    P2 · post-V1 seams : Rich cleaning + HTML sanitizer : Malware scanner : KMS encryption : S3 stores : Async buffer : GDPR tooling
+    P3 · future / on-demand : Plugin kind registry : iCalendar : TNEF decode : More providers (IMAP/SES)
+      </pre>
+    </div>
+    <table>
+      <thead><tr><th>Tier</th><th>Meaning</th><th>Highlights</th></tr></thead>
+      <tbody>
+        <tr><td><b>P0 · V1</b></td><td>Release blockers — frozen contracts + correctness defects</td><td>A2 A4 A5 A6 A7 A10 A11; B1 B2 B3 B4 B5</td></tr>
+        <tr><td><b>P1</b></td><td>Should-have, fast-follow</td><td>Renewal driver, backfill, attachment streaming + dedup, replayable DLQ, reference blob store, config validation, observability</td></tr>
+        <tr><td><b>P2</b></td><td>Post-V1 — design the seam now</td><td>Rich cleaning, HTML sanitizer, malware scanner, KMS encryption, S3 stores, async buffer, persistent dedupe, GDPR DSAR, bounce/OOO engine</td></tr>
+        <tr><td><b>P3</b></td><td>Future / optional</td><td>Plugin kind registry, iCalendar, TNEF, encrypted Graph resource-data, more providers</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- =================== SECTION: SCOREBOARD =================== -->
+  <section id="scoreboard">
+    <p class="part-label">6 · Readiness</p>
+    <h2>Readiness — baseline vs now</h2>
+    <div class="note purple"><b>Now:</b> the entire in-scope set is implemented — <b>203 tests pass</b>, <code>mypy --strict</code> clean (71 files). What remains to V1 is <b>Phase-2 verification</b> + <b>Phase-3 integration/tag</b>; Outlook-live and GDPR are deferred by decision.</div>
+    <p class="small muted">The bars below are the <b>starting baseline</b> — the 2026-06-29 audit (commit <code>8b0cc4b</code>), <i>before</i> the Phase-1 build. They're kept to show the distance covered, not the live state (which the green cards above reflect).</p>
+    <p style="margin:4px 0 0"><span class="chip c-defer">▶ BASELINE · 2026-06-29 · pre-build</span> <span class="small muted">— historical; not current state</span></p>
+    <div class="bars" style="opacity:.62;filter:grayscale(1)">
+      <div class="bar"><span>A — freeze-now contracts</span><div class="track"><div class="fill" style="width:32%;background:#94a3b8"></div></div><span class="pct">32%</span></div>
+      <div class="bar"><span>B — correctness defects</span><div class="track"><div class="fill" style="width:39%;background:#94a3b8"></div></div><span class="pct">39%</span></div>
+      <div class="bar"><span>C — live blockers <span class="small">(Outlook, deferred)</span></span><div class="track"><div class="fill" style="width:18%;background:#94a3b8"></div></div><span class="pct">18%</span></div>
+      <div class="bar"><span>D — provider proof</span><div class="track"><div class="fill" style="width:80%;background:#94a3b8"></div></div><span class="pct">80%</span></div>
+    </div>
+    <p class="small muted">Audit category figures from <code>v1-readiness-report.md</code> — kept only to show the distance the Phase-1 build covered.</p>
+  </section>
+
+  <!-- =================== SECTION: ITEM-BY-ITEM =================== -->
+  <section id="items">
+    <h2>Item-by-item: baseline → now</h2>
+    <p class="small muted"><b>At audit</b> = the 2026-06-29 grade (commit <code>8b0cc4b</code>). <b>Now</b> = current state in the tree (203 tests green, <code>mypy --strict</code> clean). Deferred items are out of V1 by decision.</p>
+    <table>
+      <thead><tr><th>ID</th><th>Item</th><th>At audit</th><th>Now</th></tr></thead>
+      <tbody>
+        <tr><td><span class="id">A2</span></td><td>Typed error taxonomy + routing <span class="small muted">(keystone)</span></td><td><span class="chip c-miss">missing</span> 10%</td><td><span class="chip c-ok">✓ implemented</span></td></tr>
+        <tr><td><span class="id">A4</span></td><td>idempotency_key + at-least-once docs</td><td><span class="chip c-partial">partial</span> 15%</td><td><span class="chip c-ok">✓ implemented</span></td></tr>
+        <tr><td><span class="id">A5</span></td><td>WebhookVerifier <span class="small muted">(Gmail OIDC-JWT)</span></td><td><span class="chip c-partial">partial</span> 22%</td><td><span class="chip c-ok">✓ implemented</span></td></tr>
+        <tr><td><span class="id">A6</span></td><td>ContentCleaner port (thin default)</td><td><span class="chip c-miss">missing</span> 15%</td><td><span class="chip c-ok">✓ implemented</span></td></tr>
+        <tr><td><span class="id">A7</span></td><td>Provider-native thread key</td><td><span class="chip c-miss">missing</span> 10%</td><td><span class="chip c-ok">✓ implemented</span></td></tr>
+        <tr><td><span class="id">A8</span></td><td>Token-rotation persistence <span class="small muted">(separate sink)</span></td><td><span class="chip c-miss">missing</span> 10%</td><td><span class="chip c-ok">✓ implemented</span></td></tr>
+        <tr><td><span class="id">A10</span></td><td>Builder overrides= + decorators</td><td><span class="chip c-partial">partial</span> 55%</td><td><span class="chip c-ok">✓ implemented</span></td></tr>
+        <tr><td><span class="id">A11</span></td><td>Sync-only + version policy</td><td><span class="chip c-miss">missing</span> 10%</td><td><span class="chip c-ok">✓ implemented</span></td></tr>
+        <tr><td><span class="id">B1</span></td><td>Size guard fail-closed</td><td><span class="chip c-partial">partial</span> 15%</td><td><span class="chip c-ok">✓ implemented</span></td></tr>
+        <tr><td><span class="id">B2</span></td><td>Per-message DLQ isolation</td><td><span class="chip c-partial">partial</span> 60%</td><td><span class="chip c-ok">✓ implemented</span></td></tr>
+        <tr><td><span class="id">B3</span></td><td>404/410/base64 → Permanent</td><td><span class="chip c-partial">partial</span> 15%</td><td><span class="chip c-ok">✓ implemented</span></td></tr>
+        <tr><td><span class="id">B4</span></td><td>Backoff + concurrency cap</td><td><span class="chip c-partial">partial</span> 40%</td><td><span class="chip c-ok">✓ implemented</span></td></tr>
+        <tr><td><span class="id">B5</span></td><td>Cross-provider body_text parity</td><td><span class="chip c-miss">missing</span> 20%</td><td><span class="chip c-ok">✓ implemented</span></td></tr>
+        <tr><td colspan="4" style="background:#fafbfd;font-size:11px;letter-spacing:.04em;color:#97a1b0;text-transform:uppercase">Already done at audit · still green</td></tr>
+        <tr><td><span class="id">A1</span></td><td>Notifications = wake-signals only</td><td><span class="chip c-partial">partial</span> 50%</td><td><span class="chip c-ok">✓ Gmail (Outlook deferred)</span></td></tr>
+        <tr><td><span class="id">A3</span></td><td>Cursor contract</td><td><span class="chip c-partial">partial</span> 60%</td><td><span class="chip c-ok">✓ Gmail (Outlook deferred)</span></td></tr>
+        <tr><td><span class="id">A12</span></td><td>StreamRef granularity</td><td><span class="chip c-ok">done</span> 90%</td><td><span class="chip c-ok">✓ done</span></td></tr>
+        <tr><td><span class="id">B6</span></td><td>Page-atomic cursor commit</td><td><span class="chip c-ok">done</span> 82%</td><td><span class="chip c-ok">✓ done</span></td></tr>
+        <tr><td><span class="id">D1</span></td><td>Second-provider proof (Gmail)</td><td><span class="chip c-ok">done</span> 80%</td><td><span class="chip c-ok">✓ done</span></td></tr>
+        <tr><td colspan="4" style="background:#fafbfd;font-size:11px;letter-spacing:.04em;color:#97a1b0;text-transform:uppercase">Deferred — out of V1 by decision</td></tr>
+        <tr><td><span class="id">A9</span></td><td>GDPR erase + encryption-context</td><td><span class="chip c-defer">deferred</span></td><td><span class="chip c-defer">⏸ deferred</span></td></tr>
+        <tr><td><span class="id">C1</span></td><td>Graph subscription expiry ≤4230 min <span class="small muted">(Outlook)</span></td><td><span class="chip c-defer">deferred</span></td><td><span class="chip c-defer">⏸ deferred</span></td></tr>
+        <tr><td><span class="id">C2</span></td><td>Graph size-probe <span class="small muted">(Outlook)</span></td><td><span class="chip c-defer">deferred</span></td><td><span class="chip c-defer">⏸ deferred</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- =================== SECTION: TOP GAPS =================== -->
+  <section id="gaps">
+    <h2>What remains to V1</h2>
+    <p class="small muted">The audit's top gaps (A2 taxonomy, B4 storm, B1 size, A4 fingerprint, A5 verify, B3 permanent, A7 thread, A8 rotation, B5 parity) are all <b>now closed</b> — implemented and covered by the passing suite. What's left is verification and the deferred scope:</p>
+    <div class="rank"><div class="n" style="background:#15803d">1</div><div class="b"><b>Phase 2 — adversarial verification.</b> Re-run the audit prompt against the new code: one verifier per in-scope item, each quoting <code>file:line</code> proof that the behavior exists <i>and</i> is tested. No proof ⇒ loop back. (Implementation is done; this is the sign-off pass.)</div></div>
+    <div class="rank"><div class="n" style="background:#15803d">2</div><div class="b"><b>Phase 3 — integrate &amp; tag.</b> Full suite + <code>mypy --strict</code> green (currently 203 ✓ / clean), a live or recorded Gmail run exercising the end-to-end path, then tag <b>V1</b>.</div></div>
+    <div class="rank"><div class="n" style="background:var(--defer)">3</div><div class="b"><b>Deferred — not blocking V1.</b> Outlook live (A1 wake-rewire, C1 expiry clamp, C2 size-probe), GDPR erase/encryption (A9), and PII redaction. The Outlook adapter stays in the tree; Gmail is the live proof.</div></div>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- =================== SECTION: PHASES =================== -->
+  <section id="phases">
+    <p class="part-label">7 · Build &amp; path to done</p>
+    <h2>How it gets built</h2>
+    <div class="diagram">
+      <div class="cap">Freeze contracts serially → implement in parallel tracks (TDD) → adversarially verify → integrate &amp; tag. <b>Now: Phase 1 done → Phase 2–3.</b></div>
+      <pre class="mermaid">
+flowchart LR
+    P0["Phase 0<br/>Freeze contracts<br/>(serial)"] --> G0{"Human<br/>gate"}
+    G0 --> P1["Phase 1<br/>Implement — 4 parallel<br/>tracks, TDD"]
+    P1 --> P2["Phase 2<br/>Adversarial<br/>verify"]
+    P2 --> G1{"All in-scope<br/>done?"}
+    G1 -->|gaps| P1
+    G1 -->|clean| P3["Phase 3<br/>Integrate +<br/>tag V1"]
+    classDef p0 fill:#fef3c7,stroke:#b45309,color:#000
+    classDef p3 fill:#dcfce7,stroke:#15803d,color:#000
+    class P0 p0
+    class P3 p3
+      </pre>
+    </div>
+    <p class="note"><b>Build order followed:</b> <b>A2</b> (keystone) → live-safety (<b>B1</b>, <b>B4</b>) → the contract + cleaner items (<b>A6</b>, <b>B5</b>, <b>A10</b>, <b>A11</b>, <b>A8</b>). All landed — Phase 1 is complete. The project is now in <b>Phase 2 (verify)</b> heading to <b>Phase 3 (integrate &amp; tag V1)</b>.</p>
+    <h3>Ownership tracks (Phase 1 — file-disjoint, parallel)</h3>
+    <table>
+      <thead><tr><th>Track</th><th>Owns</th></tr></thead>
+      <tbody>
+        <tr><td><b>core-foundation</b></td><td><code>core/{errors,models,identity,events,ports,filtering,observability}.py</code></td></tr>
+        <tr><td><b>extract-filter</b></td><td><code>extract/</code>, <code>filters/</code></td></tr>
+        <tr><td><b>adapters</b></td><td><code>adapters/</code> (gmail, graph), <code>stores/</code>, <code>providers/</code>, <code>emit/</code></td></tr>
+        <tr><td><b>pipeline</b></td><td><code>core/pipeline.py</code>, <code>config/</code>, <code>registry.py</code>, <code>builder.py</code>, <code>__init__.py</code></td></tr>
+        <tr><td><b>fixtures/docs</b></td><td><code>tests/fixtures/</code>, golden + e2e tests, <code>README.md</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- =================== SECTION: DISCIPLINE =================== -->
+  <section id="discipline">
+    <h2>Engineering discipline (guardrails)</h2>
+    <ul>
+      <li><b>TDD, one behavior per cycle:</b> failing test → confirm it fails for the stated reason → minimal impl → green → <code>mypy --strict</code> clean → commit.</li>
+      <li><b>File-disjoint ownership:</b> each track edits only its own files; cross-track needs are flagged, not patched.</li>
+      <li><b>Bisectability:</b> every commit leaves the whole tree importable and mypy-clean. If A imports B, commit B first.</li>
+      <li><b>Evidence or it's not done:</b> a task is done only when its test passes and a verifier can quote the proof.</li>
+    </ul>
+  </section>
+
+  <!-- =================== SECTION: DEFINITION OF DONE =================== -->
+  <section id="dod">
+    <h2>Definition of done for V1</h2>
+    <p class="small muted">✓ = met now · ☐ = pending the verification/integration pass.</p>
+    <ul class="check">
+      <li><span class="bx" style="background:#15803d;border-color:#15803d"></span><div><b>Full suite green</b> — <code>pytest</code> (e2e + reliability + unit). <span class="chip c-ok">✓ 203 passed</span></div></li>
+      <li><span class="bx" style="background:#15803d;border-color:#15803d"></span><div><b><code>mypy --strict</code> clean</b> on the whole tree. <span class="chip c-ok">✓ 71 files</span></div></li>
+      <li><span class="bx" style="background:#15803d;border-color:#15803d"></span><div>A forged push is rejected. <span class="chip c-ok">✓ tested</span></div></li>
+      <li><span class="bx" style="background:#15803d;border-color:#15803d"></span><div>An oversized/unknown message is DLQ'd <i>pre-download</i>. <span class="chip c-ok">✓ tested</span></div></li>
+      <li><span class="bx" style="background:#15803d;border-color:#15803d"></span><div>A 429-storm does not abort the run. <span class="chip c-ok">✓ tested</span></div></li>
+      <li><span class="bx" style="background:#15803d;border-color:#15803d"></span><div>Docs say <b>at-least-once</b> (no exactly-once claims anywhere). <span class="chip c-ok">✓ corrected</span></div></li>
+      <li><span class="bx"></span><div>Every in-scope item <b>verified with quoted <code>file:line</code> proof</b> (Phase-2 sign-off). <span class="chip c-partial">implemented; verification pending</span></div></li>
+      <li><span class="bx"></span><div>A <b>live</b> (not recorded) Gmail run end-to-end, then tag V1 (Phase 3). <span class="chip c-partial">e2e tested; live run pending</span></div></li>
+    </ul>
+    <div class="note purple"><b>Bottom line:</b> the locked V1 scope is <b>implemented and green</b> — 203 tests pass, <code>mypy --strict</code> clean. The freeze-forever contract surface (the part that's expensive to change after 1.0) is in place: error taxonomy, idempotency_key on the wire, webhook verification, content cleaner, thread key, rotation persistence, sync/version policy. What's left is the <b>verification sign-off</b> (Phase 2) and <b>integration + V1 tag</b> (Phase 3); Outlook-live and GDPR remain deferred by decision.</div>
+    <p class="small muted" style="margin-top:18px">mailflow · complete solution doc · 2026-06-29 · sources: features.md · v1-build-plan.md · v1-readiness-report.md</p>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- =================== SECTION: GLOSSARY =================== -->
+  <section id="glossary">
+    <p class="part-label">Reference</p>
+    <h2>Glossary</h2>
+    <p class="small muted">Plain-English definitions for the terms used above.</p>
+    <div class="small" style="columns:2;column-gap:34px">
+      <p><b>Library / facade</b> — reusable code other apps plug into; the facade (<code>connect()</code>) is the simple front door.</p>
+      <p><b>Consumer</b> — the app that <i>uses</i> mailflow.</p>
+      <p><b>Port (Protocol)</b> — a defined "plug shape": any component matching it fits. In Python, a <code>@runtime_checkable Protocol</code> (structural typing — no inheritance needed).</p>
+      <p><b>Contract</b> — a promise about a shape/behavior. Breaking it after V1 breaks every consumer.</p>
+      <p><b>Webhook / push / Pub/Sub</b> — the internet plumbing that delivers a "you have mail" ping. Gmail uses Google Cloud <b>Pub/Sub</b>.</p>
+      <p><b>Poll / delta</b> — instead of waiting for a ping, periodically ask "anything new since last time?" A delta is "what changed."</p>
+      <p><b>Cursor / bookmark</b> — durable marker of how far reading got, so a crash resumes without gaps or repeats. Gmail's is <code>historyId</code>; Outlook's is <code>deltaLink</code>.</p>
+      <p><b>Page / page-atomic</b> — providers return mail in batches ("pages"); the cursor advances one whole page at a time, safely.</p>
+      <p><b>DLQ (Dead-Letter Queue)</b> — the "problem pile." Messages that can't be processed (broken, oversized, poison) are set aside here instead of jamming the line.</p>
+      <p><b>Idempotency / idempotency_key</b> — a unique fingerprint per email <code>(tenant, mailbox, provider_message_id)</code> so a consumer can spot and ignore a duplicate.</p>
+      <p><b>At-least-once vs exactly-once</b> — two delivery promises. Exactly-once (guaranteed one delivery) is impractical; mailflow does at-least-once (occasionally twice), which is why the key matters.</p>
+      <p><b>OIDC-JWT / JWKS</b> — a signed token (JWT) proving a push came from Google; verified against Google's public keys (JWKS), checking signature, audience and issuer.</p>
+      <p><b>RFC822</b> — the raw text wire-format of an email (headers + body). Gmail hands this over raw; mailflow parses it.</p>
+      <p><b>Envelope / CleanEmail / EmailEvent</b> — <b>Envelope</b> = parsed headers (from, to, subject…); <b>CleanEmail</b> = the cleaned message; <b>EmailEvent</b> = the packaged announcement handed to the consumer.</p>
+      <p><b>StreamRef / stream</b> — a watched slice of a mailbox. Provider-defined: Gmail = one whole-mailbox stream; Outlook = one per folder.</p>
+      <p><b>thread_key</b> — the ID grouping a conversation (email + replies). Gmail <code>threadId</code> / Outlook <code>conversationId</code>.</p>
+      <p><b>Fail closed / fail open</b> — on uncertainty, "fail closed" rejects (safe); "fail open" lets it through (risky). The size guard must fail closed.</p>
+      <p><b>Backoff / jitter / Retry-After</b> — when a server says "slow down," wait longer each retry (backoff), add randomness (jitter), and honor the server's <code>Retry-After</code> hint.</p>
+      <p><b>Error taxonomy (Auth / Permanent / Transient)</b> — failure buckets: re-login, give-up-and-DLQ, or wait-and-retry.</p>
+      <p><b>Graph</b> — Microsoft Graph, the API behind Outlook. "Graph" = Outlook throughout.</p>
+      <p><b>SecretProvider / token rotation</b> — supplies login tokens; "rotation persistence" = saving a refreshed token so the next run still works.</p>
+      <p><b>DWD · DSAR · KMS · TNEF</b> — Domain-Wide Delegation (multi-mailbox auth) · Data-Subject Access Request (GDPR) · Key Management Service (encryption) · a legacy Outlook attachment format. All out of V1.</p>
+      <p><b>Fencing / leases</b> — coordination locks that stop two workers double-processing the same item. Only needed once mailflow runs multi-worker (P2); V1 is single-worker so they're deferred.</p>
+      <p><b>POC</b> — proof of concept: an early build to validate the approach, not yet production-hardened.</p>
+      <p><b>OOO</b> — out-of-office auto-reply. Detecting these (and bounces) is the P2 bounce/OOO engine.</p>
+      <p><b>@provisional / @stable</b> — markers on a port saying whether its shape is safe to build on (<i>stable</i>) or may still change (<i>provisional</i>).</p>
+    </div>
+  </section>
+
+</main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad:true, theme:'base', securityLevel:'loose',
+    flowchart:{useMaxWidth:true,htmlLabels:true,curve:'basis'},
+    themeVariables:{
+      fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif',
+      primaryColor:'#eaf1ff', primaryBorderColor:'#2f6df0', primaryTextColor:'#1b2330',
+      lineColor:'#8a97a8', fontSize:'13px'
+    }
+  });
+  const links=[...document.querySelectorAll('nav a')];
+  const map=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+  const obs=new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting){
+      links.forEach(l=>l.classList.remove('active'));
+      const a=map.get(e.target.id); if(a)a.classList.add('active');
+    }});
+  },{rootMargin:'-8% 0px -80% 0px'});
+  document.querySelectorAll('section[id]').forEach(s=>obs.observe(s));
+</script>
+</body>
+</html>

@@ -50,7 +50,7 @@ calls these out so the gaps are deliberate, not accidental.
 | ID | Finding | Where it lands |
 |----|---------|----------------|
 | **C2** | Concurrency / same-key dedupe race (two claimants, one emits). The in-memory store is, verbatim, a *"Single-process in-memory model"* that *"does not simulate lease expiry"* — you can't meaningfully test a concurrency invariant against a single-process dict. Phase-1's bar is `test_dedupe_claim_is_exclusive` (sequential), which is correct. | **Plan 2** — Firestore/Redis adapter, where real claim races and lease expiry exist. |
-| **S4** | `security.read_allowlist` enforcement is not asserted. The config field round-trips now; enforcement is *"inside provider adapters in Plan 2."* | **Plan 2** — provider adapters. |
+| **S4** | ~~`security.read_allowlist` enforcement is not asserted. The config field round-trips now; enforcement is *"inside provider adapters in Plan 2."*~~ **Withdrawn (field deleted in Phase 1, config-hardening Task 3):** its "fail-closed / empty = read nothing" semantics were inverted from real behavior (default `[]` read everything = fake security), enforcement was deferred to Plan 2, and sender/domain allowlisting is already covered by OnlySender/OnlyDomain/Whitelist filters. Plan 2 reintroduces an enforced version at the point it is applied. | **Plan 2** — provider adapters. |
 | — | Attachment streaming, LLM classifier hardening, webhooks/heartbeats/canary/resync, Pub/Sub ordering, plugin allowlist. | **Plans 2 & 4** (see scope note). |
 
 ### Withdrawn on review
@@ -75,3 +75,45 @@ The suite is **faithful to the Phase-1 plan and not under-delivering against its
 Of 15 raw findings: **2 are true Phase-1 gaps (C1, I5)**, the rest are deferred-by-design or
 test-rigor upgrades the plan never asked for, and 1 (I4) was withdrawn. Recommended order if we
 act: **C1 → I5**, then the hardening sweep (C3, I1–I3, S2/S3/S6) as a Plan-2 warm-up.
+
+---
+
+## Review 2026-06-30 — Attachment safety seam (Task 2)
+
+Reviewer: code review of the just-landed attachment safety seam. Outcome: behaviour is correct as
+designed; one correct-but-undocumented footgun captured below. Documentation-only follow-up — no
+behaviour change (docstrings + this entry).
+
+| ID | Sev | Finding | Evidence | Scope verdict |
+|----|-----|---------|----------|---------------|
+| **A1** | 🟡 Low/Medium | The allowlist/scanner safety check governs BOTH real attachments AND inline media (logos, tracking pixels, CID images) — it sits under `is_attachment or is_inline_media`. Because a single blocked part raises and fails the WHOLE message (fail-closed quarantine → DLQ), an allowlist scoped to attachment types (e.g. `{"application/pdf"}`) would also block an inline `image/png` logo and dead-letter otherwise-normal mail. By design (the plan scoped inline-in); only triggers when an operator enables a **non-empty** allowlist (V1 default empty allowlist + no-op scanner = allow-all, so default behaviour is unaffected). Documented in the `safety.py` module docstring + a `mime.py` inline comment. | `src/mailflow/extract/mime.py` safety block (`_walk_body`, the `if is_attachment or is_inline_media:` branch, allowlist/scan check); `src/mailflow/extract/safety.py` (`check_allowlist` + module docstring) | **Documented design caveat** — deferred decision: whether inline media should be exempt from the attachment allowlist or governed by a separate one (P2/follow-up). |
+
+---
+
+## Review 2026-06-30 — Attachment Handling holistic
+
+Reviewer: holistic review of the landed attachment-handling feature. Outcome: one behaviour-neutral
+reorder shipped (allowlist-before-decode, commit `97fe433`) + the missing quoted-printable decode
+test; the four findings below are notes/caveats logged for follow-up (no behaviour change here).
+
+| ID | Sev | Finding | Evidence | Scope |
+|----|-----|---------|----------|-------|
+| **A2** | 🟡 | DLQ durable-write amplification: a message under the 50 MB B1 message cap but carrying an over-25MB-per-attachment-cap attachment dead-letters and writes ~40 MB of base64 into the `DeadLetterRecord` (the whole raw message is persisted as `raw_b64`). An attachment just over the per-attachment cap therefore costs a large durable DLQ write. | `core/pipeline.py` `_dead_letter_record` (`raw_b64`); `extract/streaming.py` `MAX_ATTACHMENT_BYTES` | **Deferred** — Plan-2/DLQ hardening (cap or strip the raw bytes persisted on attachment-cap DLQs). |
+| **A3** | 🟢 | Fail-closed malformed-base64 DLQ shift: the new streaming path raises `AttachmentUnreadableError` on slightly-malformed base64 that the legacy lenient decode tolerated, dead-lettering the whole message. | `extract/streaming.py` base64 branch | **Documented design caveat** — on-call should expect DLQs for non-conformant senders; not a code bug. |
+| **A4** | 🟢 | Allowlist not case-normalized: operator-supplied allowlist entries must be lowercase. `check_allowlist` lowercases the attachment's content-type/extension but NOT the allowlist set, so an entry like `"application/PDF"` silently never matches. | `extract/safety.py` `check_allowlist` | **Hardening** — normalize the allowlist on construction or document the lowercase requirement. |
+| **A5** | 🟢 | Redrive cap not threaded: redrive re-runs with `MimeExtractor()`'s default 25 MB cap regardless of the cap that originally DLQ'd the message. | `core/redrive.py` | **Note** — operator-invoked, no auto poison-loop; thread cap config into redrive if/when custom caps are used. |
+
+---
+
+## Review 2026-06-30 — Gmail Subscription Lifecycle holistic
+
+Reviewer: holistic review of the Gmail subscription-lifecycle hardening plan (4 commits). Outcome:
+SHIP — the one production change (`should_schedule_renew` extraction) is behaviour-equivalent and the
+three tests form an honest coverage story. The notes below are coverage follow-ups (no behaviour
+change here). Graph/Outlook subscription lifecycle is a separate deferred plan.
+
+| ID | Sev | Finding | Evidence | Scope |
+|----|-----|---------|----------|-------|
+| **G1** | 🟢 | No direct `run_service` integration test: the A1 characterization test reconstructs `run_service`'s renew closure (`lambda: renew_watches(...)`) test-locally rather than invoking `run_service`, and A2 tests the extracted guard in isolation. So the live.py guard rewire + the actual lambda's `watch_manager`/`handles` capture have no direct test — a deletion or mis-wire there would keep the suite green. Inherent to "testable without the blocking Pub/Sub consume loop" (which needs the Google SDK). | `tests/test_gmail_reliability.py` (A1 closure), `src/mailflow/adapters/gmail/live.py:257-261` (guard) | **Deferred** — needs a recorded/seam-mocked `run_service` integration harness; out of this unit-hardening pass's scope. |
+| **G2** | 🟢 | Asymmetric guard coverage: the renew-scheduling guard was decomposed into the tested `should_schedule_renew` predicate, but the sibling sweep-scheduling guard `if gmail_cfg.sweep_seconds > 0:` was left inline + untested (its runtime behaviour is covered by A3, but the arming decision is not). | `src/mailflow/adapters/gmail/live.py` sweep-guard | **Hardening** — extract a `should_schedule_sweep` predicate for symmetry if the sweep arming logic grows. |
+| **G3** | 🟢 | A3's cursor-monotonic assertion is a guard-rail, not an independent test of `commit_if_ahead`'s strict rejection: both push and sweep operate at historyId 200, so it proves "no regression under overlap" but never drives a *lower* order through `commit_if_ahead`. The dedupe (emit-once) assertion carries the real weight. | `tests/test_gmail_e2e.py` overlap test | **Note** — strict-monotonic rejection is covered elsewhere; this assertion is a deliberate guard-rail. |

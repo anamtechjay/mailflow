@@ -19,7 +19,11 @@ class ClassifierConfig(BaseModel):
 
 
 class SecurityConfig(BaseModel):
-    read_allowlist: list[str] = Field(default_factory=list)   # fail-closed (spec §9.1)
+    # Fail fast at startup if the granted Gmail OAuth scope is missing gmail.readonly
+    # (enforced in adapters/gmail/live.py). read_allowlist was deleted in Phase 1:
+    # unenforced and its "fail-closed" doc was inverted from real behavior; sender/domain
+    # allowlisting is covered by OnlySender/OnlyDomain/Whitelist filters. Plan 2
+    # reintroduces an enforced allowlist at the point it is applied.
     verify_scope_on_startup: bool = True
 
 
@@ -30,6 +34,7 @@ class StoresConfig(BaseModel):
 
 
 class MailflowConfig(BaseModel):
+    version: str = "1.0"  # config-schema version; fail-fast on unknown major in Phase 1 (A11)
     tenant: str = "default"
     provider: ComponentConfig = Field(default_factory=lambda: ComponentConfig(kind="memory"))
     filters: list[ComponentConfig] = Field(default_factory=list)

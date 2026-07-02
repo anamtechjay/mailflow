@@ -3,16 +3,40 @@ policy so headers come back parsed and unfolded."""
 
 from __future__ import annotations
 
-import hashlib
 from email import message_from_bytes
 from email.message import EmailMessage
 from email.policy import default as default_policy
 from email.utils import getaddresses, parsedate_to_datetime
 from typing import Any
 
+from mailflow.core.classification import derive_auto_submitted, derive_is_bounce
 from mailflow.core.events import SCHEMA_VERSION
 from mailflow.core.identity import derive_canonical_id
-from mailflow.core.models import Attachment, CleanEmail, Direction, Recipient
+from mailflow.core.models import (
+    Attachment,
+    CleanEmail,
+    Direction,
+    Recipient,
+    ScanVerdict,
+    StrippedAttachment,
+    StripReason,
+)
+from mailflow.core.ports import AttachmentScanner, BlobStore
+from mailflow.extract.clean import html_to_text, normalize_subject
+from mailflow.extract.policy import AttachmentPolicy
+from mailflow.extract.safety import (
+    DEFAULT_ALLOWLIST,
+    AttachmentBlockedError,
+    NoOpAttachmentScanner,
+    check_allowlist,
+)
+from mailflow.extract.streaming import (
+    MAX_ATTACHMENT_BYTES,
+    AttachmentTooLargeError,
+    AttachmentUnreadableError,
+    digest_and_size,
+    iter_decoded,
+)
 
 
 def _recipients(msg: EmailMessage, header: str) -> list[Recipient]:
@@ -35,6 +59,30 @@ def _raw_headers(msg: EmailMessage) -> dict[str, list[str]]:
 class MimeExtractor:
     """ContentExtractor implementation for raw RFC822 (Gmail format=raw / memory)."""
 
+    def __init__(
+        self,
+        *,
+        scanner: AttachmentScanner | None = None,
+        allowlist: frozenset[str] = DEFAULT_ALLOWLIST,
+        max_attachment_bytes: int = MAX_ATTACHMENT_BYTES,
+        attachment_policy: AttachmentPolicy | None = None,
+    ) -> None:
+        # Mutual exclusion: the per-class policy supersedes the single-rule legacy
+        # knobs; mixing them would silently ignore one set, so reject it loudly.
+        if attachment_policy is not None and (
+            scanner is not None
+            or allowlist != DEFAULT_ALLOWLIST
+            or max_attachment_bytes != MAX_ATTACHMENT_BYTES
+        ):
+            raise ValueError(
+                "attachment_policy is mutually exclusive with the legacy "
+                "scanner/allowlist/max_attachment_bytes params"
+            )
+        self.scanner: AttachmentScanner = scanner or NoOpAttachmentScanner()
+        self.allowlist = allowlist
+        self.max_attachment_bytes = max_attachment_bytes
+        self.attachment_policy = attachment_policy
+
     def extract_bytes(
         self,
         raw: bytes,
@@ -43,6 +91,8 @@ class MimeExtractor:
         provider_message_id: str,
         stream_id: str,
         watched_mailbox: str,
+        blob_store: BlobStore | None = None,
+        thread_key: str = "",
     ) -> CleanEmail:
         msg = message_from_bytes(raw, policy=default_policy)
         assert isinstance(msg, EmailMessage)
@@ -64,7 +114,9 @@ class MimeExtractor:
             else Direction.inbound
         )
 
-        body_text, body_html, attachments = self._walk_body(msg)
+        body_text, body_html, attachments, stripped_attachments = self._walk_body(
+            msg, blob_store
+        )
 
         date_hdr = msg["date"]
         date_utc = None
@@ -79,6 +131,15 @@ class MimeExtractor:
 
         alias_from: dict[str, Any] = {"from": from_}
 
+        subject = str(msg["subject"] or "")
+        # A7 subject-fallback: when the adapter passes no provider thread id, group
+        # by a case-insensitive Re:/Fwd:-stripped subject so a reply joins its root.
+        effective_thread_key = thread_key or normalize_subject(subject).lower()
+
+        auto_sub = str(msg["auto-submitted"]) if msg["auto-submitted"] else None
+        content_type = str(msg["content-type"]) if msg["content-type"] is not None else None
+        return_path = str(msg["return-path"]) if msg["return-path"] is not None else None
+
         return CleanEmail(
             canonical_id=canonical_id,
             message_id=message_id,
@@ -89,6 +150,7 @@ class MimeExtractor:
             provider=provider,
             provider_message_id=provider_message_id,
             provider_stream_id=stream_id,
+            thread_key=effective_thread_key,
             direction=direction,
             **alias_from,  # alias
             sender=_one(msg, "sender"),
@@ -96,12 +158,17 @@ class MimeExtractor:
             to=_recipients(msg, "to"),
             cc=_recipients(msg, "cc"),
             bcc=_recipients(msg, "bcc"),
-            subject=str(msg["subject"] or ""),
+            subject=subject,
             date_utc=date_utc,
             body_text=body_text,
             body_html=body_html,
             attachments=attachments,
-            auto_submitted=str(msg["auto-submitted"]) if msg["auto-submitted"] else None,
+            stripped_attachments=stripped_attachments,
+            auto_submitted=auto_sub,
+            is_auto_submitted=derive_auto_submitted(auto_sub),
+            is_bounce=derive_is_bounce(
+                from_address=from_.address, return_path=return_path, content_type=content_type
+            ),
             list_id=str(msg["list-id"]) if msg["list-id"] else None,
             list_unsubscribe=str(msg["list-unsubscribe"]) if msg["list-unsubscribe"] else None,
             message_size_bytes=len(raw),
@@ -110,11 +177,12 @@ class MimeExtractor:
         )
 
     def _walk_body(
-        self, msg: EmailMessage
-    ) -> tuple[str, str, list[Attachment]]:
+        self, msg: EmailMessage, blob_store: BlobStore | None = None
+    ) -> tuple[str, str, list[Attachment], list[StrippedAttachment]]:
         body_text = ""
         body_html = ""
         attachments: list[Attachment] = []
+        stripped: list[StrippedAttachment] = []
 
         for part in msg.walk():
             if part.is_multipart():
@@ -123,8 +191,6 @@ class MimeExtractor:
             disp = (part.get_content_disposition() or "").lower()
             cid = part.get("content-id")
             filename = part.get_filename()
-            decoded = part.get_payload(decode=True)
-            payload: bytes = decoded if isinstance(decoded, bytes) else b""
 
             is_attachment = disp == "attachment" or (bool(filename) and disp != "inline")
             is_inline_media = disp == "inline" or cid is not None
@@ -137,15 +203,101 @@ class MimeExtractor:
                 continue
 
             if is_attachment or is_inline_media:
-                attachments.append(
-                    Attachment(
-                        filename=filename or "",
-                        content_type=ctype,
-                        size_bytes=len(payload),
-                        content_hash=hashlib.sha256(payload).hexdigest() if payload else "",
-                        content_id=str(cid) if cid else "",
-                        is_inline=bool(is_inline_media and not is_attachment),
-                    )
+                meta = Attachment(
+                    filename=filename or "",
+                    content_type=ctype,
+                    content_id=str(cid) if cid else "",
+                    is_inline=bool(is_inline_media and not is_attachment),
                 )
+                if self.attachment_policy is None:
+                    # Legacy single-rule path — violations RAISE (-> DLQ). Unchanged.
+                    attachments.append(self._process_legacy(part, meta, ctype, blob_store))
+                else:
+                    # Policy mode — classify (spec §4.1) then STRIP on any violation.
+                    inline_for_policy = is_inline_media and disp != "attachment"
+                    kept, removed = self._process_policy(
+                        part, meta, ctype, inline_for_policy, blob_store, self.attachment_policy
+                    )
+                    if kept is not None:
+                        attachments.append(kept)
+                    if removed is not None:
+                        stripped.append(removed)
 
-        return body_text, body_html, attachments
+        # Gentle HTML->text fallback when the part set is HTML-only (B5/A6).
+        if not body_text and body_html:
+            body_text = html_to_text(body_html)
+
+        return body_text, body_html, attachments, stripped
+
+    def _process_legacy(
+        self,
+        part: EmailMessage,
+        meta: Attachment,
+        ctype: str,
+        blob_store: BlobStore | None,
+    ) -> Attachment:
+        """Single-rule path: each safety check fails closed by RAISING (-> DLQ)."""
+        # Safety seam — cheap allowlist check on metadata FIRST, before any decode,
+        # so a disallowed type is rejected without streaming/hashing the payload
+        # (avoids wasting a full decode on a blocked huge attachment).
+        # NOTE: this governs inline media (logos, tracking pixels) too — one blocked
+        # part DLQs the whole message (a non-empty allowlist must include expected
+        # inline types).
+        if check_allowlist(meta, self.allowlist).verdict is ScanVerdict.block:
+            raise AttachmentBlockedError(meta.filename, f"type not allowlisted: {ctype}")
+        # Decode + fail-closed cap now that the type is permitted.
+        content_hash, size_bytes = digest_and_size(part, cap=self.max_attachment_bytes)
+        meta = meta.model_copy(update={"content_hash": content_hash, "size_bytes": size_bytes})
+        # Scanner hook gets full metadata (incl. size/hash); a block fails closed -> DLQ.
+        if self.scanner.scan(meta).verdict is ScanVerdict.block:
+            raise AttachmentBlockedError(meta.filename, "blocked by scanner")
+        storage_ref = ""
+        # Stream the decoded bytes into the blob store in chunks (avoids a second
+        # full copy of the decoded payload) so downstream apps can download the file
+        # (else metadata only).
+        if blob_store is not None and size_bytes:
+            storage_ref = blob_store.put_stream(content_hash, iter_decoded(part), ctype)
+        return meta.model_copy(update={"storage_ref": storage_ref})
+
+    def _process_policy(
+        self,
+        part: EmailMessage,
+        meta: Attachment,
+        ctype: str,
+        inline_for_policy: bool,
+        blob_store: BlobStore | None,
+        policy: AttachmentPolicy,
+    ) -> tuple[Attachment | None, StrippedAttachment | None]:
+        """Policy path: a violation STRIPS the part (omit, store nothing, record a
+        StrippedAttachment) and NEVER raises. Preserves the legacy ordering — cheap
+        allowlist before decode, blob written only after every check passes."""
+        rule = policy.inline if inline_for_policy else policy.real
+
+        def _strip(reason: StripReason, size_bytes: int = 0) -> tuple[None, StrippedAttachment]:
+            return None, StrippedAttachment(
+                filename=meta.filename,
+                content_type=ctype,
+                size_bytes=size_bytes,
+                is_inline=inline_for_policy,
+                reason=reason,
+            )
+
+        # 1. Cheap allowlist on metadata first (no decode yet).
+        if check_allowlist(meta, rule.allowlist).verdict is ScanVerdict.block:
+            return _strip(StripReason.not_allowlisted)
+        # 2. Decode + per-class cap; over-cap / undecodable strip rather than raise.
+        try:
+            content_hash, size_bytes = digest_and_size(part, cap=rule.max_bytes)
+        except AttachmentTooLargeError:
+            return _strip(StripReason.oversize)
+        except AttachmentUnreadableError:
+            return _strip(StripReason.unreadable)
+        # 3. Per-class scanner (size/hash now known).
+        meta = meta.model_copy(update={"content_hash": content_hash, "size_bytes": size_bytes})
+        if rule.scanner is not None and rule.scanner.scan(meta).verdict is ScanVerdict.block:
+            return _strip(StripReason.scanner, size_bytes=size_bytes)
+        # 4. All checks passed — write the blob (so a stripped part leaves none).
+        storage_ref = ""
+        if blob_store is not None and size_bytes:
+            storage_ref = blob_store.put_stream(content_hash, iter_decoded(part), ctype)
+        return meta.model_copy(update={"storage_ref": storage_ref}), None

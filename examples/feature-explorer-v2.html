@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mailflow · feature/library feature explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0e13; --bg2:#0f141b; --panel:#0e131a; --panel2:#121922;
+    --ink:#e8eef5; --mut:#8a97a8; --dim:#5c6675; --line:#1d2530;
+    --amber:#ffb454; --amber-d:#d98a2b; --mint:#5ad1b4; --red:#ff7a85;
+    --blue:#79c0ff; --purp:#d2a8ff; --grn:#7ee787;
+    --c-com:#6c7787; --c-str:#a5d6ff; --c-num:#79c0ff; --c-kw:#ff7b9c; --c-fn:#d2a8ff;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Hanken Grotesk",system-ui,sans-serif;
+    line-height:1.5; -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(900px 500px at 12% -6%, rgba(255,180,84,.10), transparent 60%),
+      radial-gradient(800px 600px at 98% 8%, rgba(90,209,180,.08), transparent 55%),
+      linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+    background-size:auto, auto, 44px 44px, 44px 44px;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.035;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap{position:relative; z-index:1; max-width:1320px; margin:0 auto; padding:40px 28px 80px}
+
+  /* ---- header ---- */
+  header{display:flex; flex-wrap:wrap; align-items:flex-end; gap:20px 32px; margin-bottom:8px}
+  .brand{display:flex; align-items:baseline; gap:14px}
+  .logo{
+    font-family:"Instrument Serif",serif; font-size:64px; line-height:.9; letter-spacing:-.01em;
+    background:linear-gradient(94deg,var(--amber),#ffd9a0 55%,var(--mint));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .logo .dot{color:var(--amber); -webkit-text-fill-color:var(--amber)}
+  .ver{
+    font-family:"JetBrains Mono",monospace; font-size:12px; font-weight:700; letter-spacing:.06em;
+    color:var(--bg); background:var(--amber); padding:4px 9px; border-radius:999px; transform:translateY(-10px);
+  }
+  .tag{max-width:560px; color:var(--mut); font-size:15.5px; margin:6px 0 0}
+  .tag b{color:var(--ink); font-weight:600}
+  .legend{margin-left:auto; font-family:"JetBrains Mono",monospace; font-size:11px; color:var(--dim); text-align:right; line-height:1.9}
+  .legend .k{display:inline-block; width:11px; height:11px; border-radius:3px; vertical-align:-1px; margin-right:6px}
+
+  .rule{height:1px; background:linear-gradient(90deg,transparent,var(--line) 12%,var(--line) 88%,transparent); margin:26px 0}
+
+  /* ---- pipeline diagram ---- */
+  .flow{display:flex; align-items:stretch; gap:0; flex-wrap:wrap; margin-bottom:14px}
+  .stage{
+    flex:1 1 0; min-width:96px; text-align:center; padding:12px 8px 11px; position:relative;
+    border:1px solid var(--line); border-right:none; background:var(--panel);
+    transition:.35s; font-family:"JetBrains Mono",monospace;
+  }
+  .stage:first-child{border-radius:12px 0 0 12px}
+  .stage:last-child{border-right:1px solid var(--line); border-radius:0 12px 12px 0}
+  .stage .s-name{font-size:12px; font-weight:600; color:var(--mut); transition:.3s}
+  .stage .s-sub{font-size:9.5px; color:var(--dim); margin-top:2px; letter-spacing:.04em; text-transform:uppercase}
+  .stage.lit{background:linear-gradient(180deg,rgba(90,209,180,.16),rgba(90,209,180,.04)); border-color:rgba(90,209,180,.5)}
+  .stage.lit .s-name{color:var(--mint)}
+  .stage::after{
+    content:"→"; position:absolute; right:-9px; top:50%; transform:translateY(-50%);
+    color:var(--dim); font-size:14px; z-index:2; background:var(--bg); padding:0 1px;
+  }
+  .stage:last-child::after{display:none}
+
+  .always{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:30px; align-items:center}
+  .always .lbl{font-family:"JetBrains Mono",monospace; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin-right:4px}
+  .chip{
+    font-family:"JetBrains Mono",monospace; font-size:11px; color:var(--mut);
+    border:1px solid var(--line); border-radius:999px; padding:4px 11px; background:var(--panel);
+    cursor:default; transition:.2s;
+  }
+  .chip:hover{border-color:var(--amber-d); color:var(--amber)}
+  .chip::before{content:"●"; color:var(--grn); font-size:8px; margin-right:6px; vertical-align:1px}
+
+  /* ---- main grid ---- */
+  .grid{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.05fr); gap:26px; align-items:start}
+
+  .col-h{display:flex; align-items:center; gap:10px; margin:2px 0 14px}
+  .col-h h2{font-family:"Instrument Serif",serif; font-size:27px; font-weight:400; margin:0; letter-spacing:.01em}
+  .col-h .hint{font-size:12.5px; color:var(--mut); font-family:"JetBrains Mono",monospace}
+
+  /* segmented controls */
+  .seg-row{display:flex; flex-wrap:wrap; gap:18px; margin-bottom:22px}
+  .seg{flex:1 1 200px}
+  .seg .seg-lbl{font-family:"JetBrains Mono",monospace; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-bottom:7px}
+  .seg .opts{display:flex; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:3px; gap:3px}
+  .seg button{
+    flex:1; border:0; background:transparent; color:var(--mut); cursor:pointer;
+    font-family:"JetBrains Mono",monospace; font-size:12px; font-weight:500; padding:7px 6px; border-radius:7px; transition:.2s;
+  }
+  .seg button:hover:not(.on):not(:disabled){color:var(--ink)}
+  .seg button.on{background:linear-gradient(180deg,var(--amber),var(--amber-d)); color:#1a1206; font-weight:700; box-shadow:0 2px 10px rgba(255,180,84,.22)}
+  .seg button:disabled{opacity:.32; cursor:not-allowed; text-decoration:line-through}
+
+  /* feature groups */
+  .fgroup{margin-bottom:24px}
+  .fgroup-h{font-family:"JetBrains Mono",monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--amber); margin:0 0 10px; display:flex; align-items:center; gap:8px}
+  .fgroup-h::after{content:""; flex:1; height:1px; background:var(--line)}
+
+  .feat{border:1px solid var(--line); border-radius:12px; background:var(--panel); margin-bottom:9px; overflow:hidden; transition:.22s}
+  .feat.active{border-color:rgba(90,209,180,.45); background:linear-gradient(180deg,rgba(90,209,180,.05),transparent)}
+  .feat.disabled{opacity:.4; pointer-events:none}
+  .feat-head{display:flex; align-items:center; gap:13px; padding:12px 14px}
+  .sw{
+    --on:0; flex:none; width:42px; height:24px; border-radius:999px; border:1px solid var(--line);
+    background:var(--panel2); position:relative; cursor:pointer; transition:.25s; padding:0;
+  }
+  .sw::after{content:""; position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:var(--dim); transition:.25s}
+  .feat.active .sw{background:linear-gradient(90deg,var(--mint),#7ee0c6); border-color:transparent}
+  .feat.active .sw::after{left:20px; background:#072018}
+  .feat-meta{flex:1; min-width:0}
+  .feat-name{font-weight:600; font-size:15px; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .feat-name code{font-family:"JetBrains Mono",monospace; font-size:12.5px; color:var(--amber); background:rgba(255,180,84,.08); padding:1px 6px; border-radius:5px; font-weight:500}
+  .stag{font-family:"JetBrains Mono",monospace; font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--mint); border:1px solid rgba(90,209,180,.3); border-radius:5px; padding:1px 6px}
+  .gonly{font-family:"JetBrains Mono",monospace; font-size:9.5px; color:var(--blue); border:1px solid rgba(121,192,255,.3); border-radius:5px; padding:1px 6px}
+  .feat-desc{font-size:12.8px; color:var(--mut); margin-top:3px}
+  .ex-btn{flex:none; background:transparent; border:1px solid var(--line); color:var(--mut); border-radius:7px; cursor:pointer; font-family:"JetBrains Mono",monospace; font-size:11px; padding:5px 9px; transition:.2s}
+  .ex-btn:hover{border-color:var(--amber-d); color:var(--amber)}
+  .ex-wrap{max-height:0; overflow:hidden; transition:max-height .3s ease; border-top:1px solid transparent}
+  .ex-wrap.open{max-height:340px; border-top-color:var(--line)}
+  .ex-wrap pre{margin:0; padding:13px 16px; font-family:"JetBrains Mono",monospace; font-size:12px; line-height:1.65; overflow-x:auto; color:var(--ink); background:rgba(0,0,0,.22)}
+
+  /* ---- code panel ---- */
+  .code-col{position:sticky; top:18px}
+  .editor{border:1px solid var(--line); border-radius:var(--radius); background:linear-gradient(180deg,var(--panel2),var(--panel)); overflow:hidden; box-shadow:0 24px 60px -28px rgba(0,0,0,.8)}
+  .ed-bar{display:flex; align-items:center; gap:8px; padding:11px 14px; border-bottom:1px solid var(--line); background:rgba(0,0,0,.2)}
+  .dots{display:flex; gap:6px}
+  .dots i{width:11px; height:11px; border-radius:50%; display:block}
+  .dots i:nth-child(1){background:#ff5f57} .dots i:nth-child(2){background:#febc2e} .dots i:nth-child(3){background:#28c840}
+  .ed-file{font-family:"JetBrains Mono",monospace; font-size:12px; color:var(--mut); margin-left:6px}
+  .ed-file b{color:var(--ink); font-weight:500}
+  .ed-actions{margin-left:auto; display:flex; gap:7px}
+  .ed-actions button{background:var(--panel); border:1px solid var(--line); color:var(--mut); border-radius:7px; cursor:pointer; font-family:"JetBrains Mono",monospace; font-size:11px; padding:5px 10px; transition:.18s}
+  .ed-actions button:hover{border-color:var(--amber-d); color:var(--amber)}
+  #copyBtn.done{border-color:var(--mint); color:var(--mint)}
+  .code{counter-reset:l; margin:0; padding:16px 4px 18px 0; font-family:"JetBrains Mono",monospace; font-size:12.5px; line-height:1.62; overflow-x:auto; max-height:74vh; overflow-y:auto; scrollbar-width:thin; scrollbar-color:#2a3442 transparent}
+  .code::-webkit-scrollbar,.ex-wrap pre::-webkit-scrollbar{width:9px; height:9px}
+  .code::-webkit-scrollbar-thumb,.ex-wrap pre::-webkit-scrollbar-thumb{background:#2a3442; border-radius:999px; border:2px solid transparent; background-clip:padding-box}
+  .code::-webkit-scrollbar-thumb:hover,.ex-wrap pre::-webkit-scrollbar-thumb:hover{background:#3a4756; background-clip:padding-box}
+  .code::-webkit-scrollbar-track,.ex-wrap pre::-webkit-scrollbar-track{background:transparent}
+  .ln{display:flex; white-space:pre; transition:background .2s}
+  .ln::before{
+    counter-increment:l; content:counter(l); width:44px; flex:none; text-align:right; padding-right:16px;
+    color:#3c4654; user-select:none; font-size:11.5px;
+  }
+  .ln .lc{flex:1; padding-right:18px}
+  .ln.flash{animation:flash 1.1s ease}
+  @keyframes flash{
+    0%{background:rgba(90,209,180,.28)} 20%{background:rgba(90,209,180,.22)} 100%{background:transparent}
+  }
+  .ln.flash .lc{position:relative}
+  .ln.flash::after{}
+  .c-com{color:var(--c-com); font-style:italic} .c-str{color:var(--c-str)}
+  .c-num{color:var(--c-num)} .c-kw{color:var(--c-kw)} .c-fn{color:var(--c-fn)}
+
+  .ed-foot{display:flex; align-items:center; gap:14px; padding:10px 14px; border-top:1px solid var(--line); background:rgba(0,0,0,.18); font-family:"JetBrains Mono",monospace; font-size:11px; color:var(--dim); flex-wrap:wrap}
+  .ed-foot b{color:var(--mint)}
+  .runline{color:var(--mut)}
+  .runline .sym{color:var(--amber)}
+
+  footer{margin-top:40px; border-top:1px solid var(--line); padding-top:22px; color:var(--mut); font-size:13px}
+  footer h3{font-family:"Instrument Serif",serif; font-weight:400; font-size:21px; margin:0 0 10px; color:var(--ink)}
+  footer ul{margin:0; padding-left:18px} footer li{margin:4px 0}
+  footer code{font-family:"JetBrains Mono",monospace; font-size:12px; color:var(--amber)}
+  .note{font-style:italic; color:var(--dim); margin-top:14px}
+
+  /* ---- "configuring attachments" section ---- */
+  .cfg{margin-top:42px; border-top:1px solid var(--line); padding-top:26px}
+  .cfg-lead{color:var(--mut); font-size:14.5px; max-width:880px; margin:0 0 18px}
+  .cfg-lead code,.cfg .knob code,.warn code,.note2 code{font-family:"JetBrains Mono",monospace; font-size:12px; color:var(--amber); background:rgba(255,180,84,.08); padding:1px 5px; border-radius:5px}
+  .cfg-grid{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-bottom:18px}
+  .knob{border:1px solid var(--line); border-radius:12px; background:var(--panel); padding:13px 15px}
+  .knob-h{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-bottom:7px}
+  .knob-h code{font-family:"JetBrains Mono",monospace; font-size:12.5px; color:var(--mint); background:none; padding:0}
+  .knob-h .dflt{font-family:"JetBrains Mono",monospace; font-size:10px; letter-spacing:.03em; color:var(--dim); border:1px solid var(--line); border-radius:5px; padding:1px 6px}
+  .knob p{margin:0; font-size:12.6px; color:var(--mut); line-height:1.55}
+  .cfg-code{margin:0 0 16px; padding:15px 17px; border:1px solid var(--line); border-radius:12px; background:linear-gradient(180deg,var(--panel2),var(--panel)); font-family:"JetBrains Mono",monospace; font-size:12.5px; line-height:1.62; overflow-x:auto; color:var(--ink); box-shadow:0 18px 50px -30px rgba(0,0,0,.8)}
+  .warn{border:1px solid rgba(255,122,133,.32); background:rgba(255,122,133,.06); border-radius:12px; padding:12px 15px; font-size:12.8px; color:var(--mut); line-height:1.55}
+  .warn b{color:var(--red)}
+  .note2{font-size:12.8px; color:var(--mut); margin:14px 0 0; line-height:1.55}
+  .note2 b{color:var(--ink)}
+  @media (max-width:980px){ .cfg-grid{grid-template-columns:1fr} }
+
+  @media (max-width:980px){
+    .grid{grid-template-columns:1fr}
+    .code-col{position:static}
+    .logo{font-size:48px} .legend{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <div class="brand">
+        <span class="logo">mailflow<span class="dot">.</span></span>
+        <span class="ver">feature/library</span>
+      </div>
+      <p class="tag">Provider-agnostic email ingestion with reliability built in. <b>Toggle a feature</b> and watch its real code drop into the program on the right — toggle it off and it's gone. Every snippet is the actual API; the guarantees in the <b>always-on</b> row come for free.</p>
+    </div>
+    <div class="legend">
+      <div><span class="k" style="background:var(--mint)"></span>added to program</div>
+      <div><span class="k" style="background:var(--amber)"></span>mailflow brand / selectable</div>
+      <div><span class="k" style="background:var(--grn)"></span>always-on (no code needed)</div>
+    </div>
+  </header>
+
+  <div class="rule"></div>
+
+  <!-- pipeline -->
+  <div class="flow" id="flow">
+    <div class="stage" data-stage="provider"><div class="s-name">provider</div><div class="s-sub">source</div></div>
+    <div class="stage" data-stage="parse"><div class="s-name">parse</div><div class="s-sub">envelope</div></div>
+    <div class="stage" data-stage="filter"><div class="s-name">filter</div><div class="s-sub">which mail</div></div>
+    <div class="stage" data-stage="extract"><div class="s-name">extract</div><div class="s-sub">CleanEmail</div></div>
+    <div class="stage" data-stage="clean"><div class="s-name">clean</div><div class="s-sub">html→text</div></div>
+    <div class="stage" data-stage="process"><div class="s-name">stages</div><div class="s-sub">transform</div></div>
+    <div class="stage" data-stage="deliver"><div class="s-name">deliver</div><div class="s-sub">to you</div></div>
+  </div>
+  <div class="always">
+    <span class="lbl">always on:</span>
+    <span class="chip" title="idempotency_key = tenant|mailbox|message-id · claim before any work">dedupe</span>
+    <span class="chip" title="strictly monotonic · advances on every terminal outcome">cursor</span>
+    <span class="chip" title="&gt;50MB or unknown size → DLQ before download">size&nbsp;guard</span>
+    <span class="chip" title="transient → backoff retry (≤3) → dead-letter · permanent → DLQ now">retry&nbsp;→&nbsp;DLQ</span>
+    <span class="chip" title="duplicates possible — dedupe on EmailEvent.idempotency_key">at-least-once</span>
+    <span class="chip" title="exponential backoff w/ jitter + bounded concurrency (load-shed)">storm&nbsp;containment</span>
+    <span class="chip" title="Gmail fetch-time 401 forces ONE token refresh + one retry before dead-lettering">401&nbsp;→&nbsp;refresh-once</span>
+    <span class="chip" title="poison / over-cap messages persist to a DeadLetterStore — redrive() re-submits them through a fresh pipeline">durable&nbsp;DLQ&nbsp;+&nbsp;redrive</span>
+    <span class="chip" title="default (no policy): 25 MB per-attachment cap, fail-closed → DLQ; with connect(attachments=…): over-cap / not-allowlisted / scanner-blocked / unreadable parts are stripped and recorded on email.stripped_attachments (strip-and-deliver) — see Configuring attachments below">attachment&nbsp;cap</span>
+    <span class="chip" title="content-addressed: the same attachment across two messages is stored exactly once">blob&nbsp;dedupe</span>
+    <span class="chip" title="Gmail OAuth scope verified at startup (default on) — fails fast if gmail.readonly is missing; opt out with connect(verify_scope_on_startup=False)">scope&nbsp;check</span>
+    <span class="chip" title="structured logging + a dependency-free metrics seam (RunReport.counters()) + a health() probe">metrics&nbsp;+&nbsp;health</span>
+  </div>
+
+  <div class="grid">
+    <!-- LEFT: controls -->
+    <div>
+      <div class="col-h"><h2>Compose</h2><span class="hint">// click to add / remove</span></div>
+
+      <div class="seg-row">
+        <div class="seg">
+          <div class="seg-lbl">Source</div>
+          <div class="opts" id="segProvider">
+            <button data-v="memory" class="on">memory · demo</button>
+            <button data-v="gmail">gmail · live</button>
+          </div>
+        </div>
+        <div class="seg">
+          <div class="seg-lbl">Consume</div>
+          <div class="opts" id="segConsume">
+            <button data-v="stream" class="on">stream()</button>
+            <button data-v="fetch_new">fetch_new()</button>
+            <button data-v="push">on_email</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="features"></div>
+    </div>
+
+    <!-- RIGHT: live code -->
+    <div class="code-col">
+      <div class="col-h"><h2>Your program</h2><span class="hint" id="lineCount"></span></div>
+      <div class="editor">
+        <div class="ed-bar">
+          <div class="dots"><i></i><i></i><i></i></div>
+          <span class="ed-file"><b>quickstart.py</b> — built live</span>
+          <div class="ed-actions">
+            <button id="copyBtn">copy</button>
+            <button id="clearBtn">clear all</button>
+          </div>
+        </div>
+        <div class="code" id="code"></div>
+        <div class="ed-foot">
+          <span class="runline"><span class="sym">$</span> python quickstart.py</span>
+          <span>·</span>
+          <span><b id="featCount">0</b> features composed</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section class="cfg">
+    <div class="col-h"><h2>Configuring attachments</h2><span class="hint">// connect(attachments=…) — types · sizes · scanning</span></div>
+    <p class="cfg-lead">Attachments stream through a per-class byte cap, are content-addressed (identical bytes are stored once), and pass a safety seam <i>before</i> they're persisted. Pass <code>attachments=</code> to <code>connect()</code> to activate <b>strip-and-deliver</b>: offending parts are removed, recorded on <code>email.stripped_attachments</code>, and the message is still delivered. Without a policy the default remains fail-closed — a single blocked or over-cap part dead-letters the entire message.</p>
+
+    <div class="cfg-grid">
+      <div class="knob">
+        <div class="knob-h"><code>max_bytes</code><span class="dflt">default 25&nbsp;MB</span></div>
+        <p>Hard per-attachment cap, enforced while streaming. With a policy: over-cap parts are stripped and recorded (<code>reason="oversize"</code>). Without a policy: a single over-cap part dead-letters the entire message — nothing partial is stored.</p>
+      </div>
+      <div class="knob">
+        <div class="knob-h"><code>allowlist</code><span class="dflt">default ∅ = allow all</span></div>
+        <p>A <code>frozenset</code> of permitted content-types <i>or</i> lowercased file extensions — e.g. <code>"application/pdf"</code> or <code>"pdf"</code>. Either one matching admits the part. Non-matching parts are stripped with <code>reason="not_allowlisted"</code>.</p>
+      </div>
+      <div class="knob">
+        <div class="knob-h"><code>scanner</code><span class="dflt">default no-op</span></div>
+        <p>A swappable <code>AttachmentScanner</code> port — your <code>.scan(attachment)</code> returns a <code>ScanResult</code> (allow / block). The default allows everything; drop in an AV / CDR check here. Blocked parts are stripped with <code>reason="scanner"</code>.</p>
+      </div>
+    </div>
+
+    <p class="note2"><b>Two attachment classes — real vs. inline.</b> <code>AttachmentPolicy</code> has two slots: <code>real</code> (parts with <code>Content-Disposition: attachment</code>, or with a filename and no inline disposition) and <code>inline</code> (parts with <code>Content-Disposition: inline</code> <i>or</i> a <code>Content-ID</code> header that are not explicitly dispositioned as attachment — CID-referenced logos, tracking pixels, and embedded images). Pass a bare <code>dict</code> or <code>AttachmentRule</code> to apply the same policy to both classes at once.</p>
+
+    <pre class="cfg-code"><span class="c-kw">from</span> mailflow <span class="c-kw">import</span> <span class="c-fn">connect</span>, <span class="c-fn">AttachmentPolicy</span>, <span class="c-fn">AttachmentRule</span>
+
+<span class="c-com"># Simple: a bare dict applies to BOTH classes (real + inline)</span>
+mf = <span class="c-fn">connect</span>(<span class="c-str">"gmail"</span>, credentials=creds,
+    attachments={<span class="c-str">"max_bytes"</span>: <span class="c-num">10_000_000</span>, <span class="c-str">"allowlist"</span>: [<span class="c-str">"application/pdf"</span>]},
+)
+
+<span class="c-com"># Per-class: different rules for real vs. inline parts</span>
+mf = <span class="c-fn">connect</span>(<span class="c-str">"gmail"</span>, credentials=creds,
+    attachments=<span class="c-fn">AttachmentPolicy</span>(
+        real=<span class="c-fn">AttachmentRule</span>(max_bytes=<span class="c-num">10_000_000</span>,
+                           allowlist=[<span class="c-str">"application/pdf"</span>, <span class="c-str">"image/png"</span>]),
+        inline=<span class="c-fn">AttachmentRule</span>(max_bytes=<span class="c-num">2_000_000</span>),  <span class="c-com"># size-cap only</span>
+    ),
+)
+
+<span class="c-com"># Stripped parts are recorded on the delivered CleanEmail:</span>
+<span class="c-kw">for</span> email <span class="c-kw">in</span> mf.<span class="c-fn">stream</span>():
+    <span class="c-kw">for</span> s <span class="c-kw">in</span> email.stripped_attachments:
+        print(s.filename, s.content_type, s.size_bytes, s.reason)
+        <span class="c-com"># reason: "not_allowlisted" | "oversize" | "unreadable" | "scanner"</span></pre>
+
+    <pre class="cfg-code"><span class="c-kw">from</span> mailflow.core.models <span class="c-kw">import</span> <span class="c-fn">ScanResult</span>, <span class="c-fn">ScanVerdict</span>
+
+<span class="c-kw">class</span> <span class="c-fn">PdfOnlyScanner</span>:                       <span class="c-com"># optional AV / CDR hook</span>
+    <span class="c-kw">def</span> <span class="c-fn">scan</span>(self, attachment):
+        <span class="c-kw">if</span> attachment.content_type == <span class="c-str">"application/pdf"</span>:
+            <span class="c-kw">return</span> <span class="c-fn">ScanResult</span>()                 <span class="c-com"># verdict defaults to allow</span>
+        <span class="c-kw">return</span> <span class="c-fn">ScanResult</span>(verdict=ScanVerdict.block, reason=<span class="c-str">"not a pdf"</span>)
+
+mf = <span class="c-fn">connect</span>(<span class="c-str">"gmail"</span>, credentials=creds,
+    attachments=<span class="c-fn">AttachmentRule</span>(
+        max_bytes=<span class="c-num">10_000_000</span>,
+        allowlist=[<span class="c-str">"application/pdf"</span>],
+        scanner=<span class="c-fn">PdfOnlyScanner</span>(),
+    ),
+)</pre>
+
+    <div class="warn"><b>Strip-and-deliver is opt-in; the default remains fail-closed.</b> Without an <code>attachments=</code> policy, a single over-cap, scanner-blocked, or unreadable part dead-letters the <i>entire</i> message — it is quarantined, not dropped per-part. With a policy, the offending part is stripped and its metadata appended to <code>email.stripped_attachments</code>; the message is then delivered normally. A non-empty <code>allowlist</code> runs on <i>every</i> non-body part (real <i>and</i> inline) — include the inline types you expect in ordinary mail (e.g. <code>image/png</code>, <code>image/jpeg</code>), or a routine logo will be stripped.</div>
+  </section>
+
+  <footer>
+    <h3>How to read this</h3>
+    <ul>
+      <li><b>One front door:</b> <code>connect(provider, ...)</code> returns a handle. You pick a <b>Source</b> and how you <b>Consume</b>, then layer optional features.</li>
+      <li><b>The four knobs compose:</b> <code>filters</code> (which emails) · <code>fields</code> (which data) · <code>stages</code> + <code>clean_fn</code> (process each). They run in pipeline order shown above.</li>
+      <li><b>Filters</b> see the cheap <code>Envelope</code> before the body is parsed; <b>stages</b> see the full <code>CleanEmail</code> and can drop it by returning <code>None</code>.</li>
+      <li><b>State:</b> <code>"memory"</code> is stateless (dedupe on <code>canonical_id</code> yourself); <code>"sqlite:///…"</code> persists cursor + dedupe and durably stores attachments, and resumes after a restart.</li>
+      <li><b>The "always on" row is not optional — it's the point.</b> Dedupe, ordered cursor, size guard, retry→DLQ, durable dead-lettering + redrive, and 401→refresh-once run automatically — you don't wire reliability, the pipeline guarantees it. Attachments stream, cap, and dedupe automatically too; what you <i>can</i> tune is the attachment <b>policy</b> (per-class size / type / scanning, and strip-vs-dead-letter) via the <code>Attachment policy</code> toggle — i.e. <code>connect(attachments=…)</code>. See <b>Configuring attachments</b> below.</li>
+    </ul>
+    <p class="note">Generated for sharing — a single self-contained HTML file, no build step. Code shown reflects the current <code>feature/library</code> build — wire event schema 1.3.</p>
+  </footer>
+</div>
+
+<script>
+/* ----------------------------------------------------------------------
+   FEATURE CATALOG — single source of truth.
+   Each feature: id, group, name, code (kwarg shown), stage, desc, example.
+   gmailOnly features are disabled on the memory source.
+---------------------------------------------------------------------- */
+const FEATURES = [
+  // ---- Filtering ----
+  {id:"blacklist", group:"Filtering", name:"Blacklist domains", code:'"kind":"blacklist"', stage:"filter",
+   desc:"Drop mail from given sender domains.",
+   example:`mf = connect("memory", seed=seed, tenant="acme",
+    filters=[{"kind": "blacklist", "domains": ["spam.com"]}])
+# every sender @spam.com is dropped BEFORE the body is parsed`},
+
+  {id:"whitelist", group:"Filtering", name:"Whitelist domains", code:'"kind":"whitelist"', stage:"filter",
+   desc:"Keep these domains and short-circuit the chain.",
+   example:`filters=[{"kind": "whitelist", "domains": ["partner.com"]}]
+# KEEPs partner.com and stops the chain; non-matches fall through`},
+
+  {id:"no_personal", group:"Filtering", name:"Block personal email", code:'"kind":"no_personal"', stage:"filter",
+   desc:"Drop gmail / yahoo / outlook / icloud / proton…",
+   example:`filters=[{"kind": "no_personal"}]
+# drops consumer mailbox senders. pass domains=[...] to override the set`},
+
+  {id:"only_sender", group:"Filtering", name:"Allow only senders", code:'"kind":"only_sender"', stage:"filter",
+   desc:"Allow-list at the individual address level.",
+   example:`filters=[{"kind": "only_sender", "addresses": ["boss@acme.com"]}]
+# anyone NOT in the list is dropped (person-level, not domain)`},
+
+  {id:"only_domain", group:"Filtering", name:"Allow only domains", code:'"kind":"only_domain"', stage:"filter",
+   desc:"Keep ONLY these sender domains — drop everything else.",
+   example:`filters=[{"kind": "only_domain", "domains": ["acme.com", "partner.com"]}]
+# domain-level allow-list: unlike whitelist (keep + fall through), this DROPS non-matches`},
+
+  {id:"block_sender", group:"Filtering", name:"Block senders", code:'"kind":"block_sender"', stage:"filter",
+   desc:"Drop specific sender addresses (person-level block).",
+   example:`filters=[{"kind": "block_sender", "addresses": ["spammer@acme.com"]}]
+# the address-level counterpart of blacklist — block one person, not their whole domain`},
+
+  {id:"internal_domain", group:"Filtering", name:"Drop internal domains", code:'"kind":"internal_domain"', stage:"filter",
+   desc:"Drop mail FROM your own internal domains (skip self-sent / internal noise).",
+   example:`filters=[{"kind": "internal_domain", "domains": ["mycompany.com"]}]
+# drops any sender whose domain is internal — keep only external mail`},
+
+  {id:"subject", group:"Filtering", name:"Subject regex", code:'"kind":"subject"', stage:"filter",
+   desc:"Drop subjects matching any regex.",
+   example:`filters=[{"kind": "subject", "patterns": ["(?i)invoice", "receipt"]}]
+# uses re.search; inline flags like (?i) work, no flags param`},
+
+  {id:"to_filter", group:"Filtering", name:"Filter by To recipient", code:'"kind":"to"', stage:"filter",
+   desc:"Drop mail addressed TO matching recipients (exact or regex).",
+   example:`filters=[{"kind": "to",
+            "addresses": ["alerts@acme.com"],
+            "patterns": ["(?i)^ops-"]}]
+# drops if ANY To: recipient matches an address (case-insensitive) OR a regex.
+# empty config = no-op (safe). new on feature/library.`},
+
+  {id:"cc_filter", group:"Filtering", name:"Filter by Cc recipient", code:'"kind":"cc"', stage:"filter",
+   desc:"Cc counterpart of the To filter — matches the Cc list.",
+   example:`filters=[{"kind": "cc", "patterns": ["(?i)@vendor\\\\.example$"]}]
+# same address/regex matching as "to", against Cc: recipients. new on feature/library.`},
+
+  {id:"list_mail", group:"Filtering", name:"Drop mailing lists", code:'"kind":"list_mail"', stage:"filter",
+   desc:"Drop list / auto-submitted mail (keys off the is_auto_submitted seam).",
+   example:`filters=[{"kind": "list_mail"}]
+# drops anything carrying List-ID or the derived is_auto_submitted flag (RFC 3834)`},
+
+  {id:"custom_predicate", group:"Filtering", name:"Custom predicate", code:"lambda env: …", stage:"filter",
+   desc:"Your own function over the Envelope.",
+   example:`filters=[lambda env: "urgent" in env.subject.lower()]
+# your callable gets the Envelope. return True to keep, False to drop`},
+
+  // ---- Processing ----
+  {id:"fields", group:"Processing", name:"Field projection", code:"fields=[…]", stage:"deliver",
+   desc:"Receive a trimmed dict instead of a full CleanEmail.",
+   example:`mf = connect("gmail", credentials=creds, mailbox="me",
+    fields=["subject", "from", "attachments"])
+for email in mf.stream():
+    email  # -> {"subject": ..., "from": <Recipient>, "attachments": [...]}`},
+
+  {id:"clean_fn", group:"Processing", name:"Custom cleaner", code:"clean_fn=…", stage:"clean",
+   desc:"A single cleaning hook — runs first, before stages.",
+   example:`mf = connect("memory", seed=seed, tenant="acme",
+    clean_fn=lambda e: e.model_copy(update={"subject": e.subject.strip()}))
+# HTML->text is already done by the extractor; this is your extra polish`},
+
+  {id:"stages", group:"Processing", name:"Processing stages", code:"stages=[…]", stage:"process",
+   desc:"Transform or drop each CleanEmail.",
+   example:`def enrich(e):    return e.model_copy(update={"subject": e.subject + " [seen]"})
+def drop_bots(e): return None if e.from_.address.startswith("noreply@") else e
+
+mf = connect("memory", seed=seed, tenant="acme", stages=[enrich, drop_bots])
+# stages get the full CleanEmail; return None/False to drop`},
+
+  // ---- Classification ----
+  {id:"classify", group:"Classification", name:"Bounce / auto-submitted flags", code:"email.is_bounce", stage:"extract",
+   desc:"Every CleanEmail carries is_bounce + is_auto_submitted, derived at extract.",
+   example:`def route(email):                      # a stage reading the seam flags
+    if email.is_bounce:         return None   # drop NDRs / DSNs (delivery failures)
+    if email.is_auto_submitted: return None   # drop vacation / auto-replies (RFC 3834)
+    return email
+
+mf = connect("memory", seed=seed, tenant="acme", stages=[route])
+# both flags are set at extract (MIME + Graph) and ride the wire
+# event — EmailEvent(schema_version="1.3"). new on feature/library.`},
+
+  // ---- Attachments ----
+  {id:"attachments", group:"Attachments", name:"Attachment policy", code:"attachments=…", stage:"extract",
+   desc:"Cap size / allowlist types; strip offending parts instead of dead-lettering the message.",
+   example:`mf = connect("gmail", credentials=creds,
+    attachments={"max_bytes": 10_000_000, "allowlist": ["application/pdf"]})
+# a bare dict applies to BOTH real + inline parts. over-cap / not-allowlisted parts
+# are STRIPPED (not DLQ'd) and recorded on email.stripped_attachments.
+# per-class: attachments=AttachmentPolicy(real=AttachmentRule(…), inline=AttachmentRule(…)).
+# new on feature/library.`},
+
+  // ---- State ----
+  {id:"state_sqlite", group:"State", name:"Persistent SQLite state", code:'state="sqlite:///…"', stage:"deliver",
+   desc:"Persist cursor + dedupe; resume after restart.",
+   example:`mf = connect("gmail", credentials=creds, mailbox="me",
+    state="sqlite:///mailflow.db")
+# cursor + dedupe persist to one file (pure stdlib sqlite3).
+# default "memory" is stateless -> dedupe on email.canonical_id yourself`},
+
+  // ---- Live / Gmail ----
+  {id:"rotation_sink", group:"Live · Gmail", name:"Token rotation sink", code:'overrides={"rotation_sink":…}', stage:"provider", gmailOnly:true,
+   desc:"Persist a rotated OAuth refresh token (A8).",
+   example:`from mailflow.adapters.gmail.rotation import FileTokenRotationSink
+
+mf = connect("gmail", credentials=creds, mailbox="me",
+    overrides={"rotation_sink": FileTokenRotationSink("tokens.json")})
+# if Google rotates the refresh token, the new one is saved (0600)`},
+
+  {id:"on_demand", group:"Live · Gmail", name:"On-demand retrieval", code:"mf.get_email(id)", stage:"deliver", gmailOnly:true,
+   desc:"Pull any part live by message id — store nothing.",
+   example:`email = mf.get_email("<message_id>")      # full CleanEmail
+body  = mf.get_body("<message_id>")       # str
+files = mf.get_attachments("<message_id>")  # list[Attachment]`},
+];
+
+const GROUPS = ["Filtering","Processing","Classification","Attachments","State","Live · Gmail"];
+
+/* ---- state ---- */
+const active = new Set();
+let provider = "memory";
+let consume  = "stream";
+
+/* ====================================================================
+   PYTHON SYNTAX HIGHLIGHTER (tiny, dependency-free)
+==================================================================== */
+const KW = ["from","import","for","in","if","else","return","None","True","False","lambda","def","as","not","and","or","with"];
+const FN = ["connect","SeedEmail","StreamRef","FileTokenRotationSink","route","stream","fetch_new","run","get_email","get_body","get_attachments","model_copy","print","startswith","endswith","lower","strip","len","save"];
+const HLRE = new RegExp(
+  "(#.*)$"
+  + "|([bfru]?\"(?:\\\\.|[^\"\\\\])*\"|[bfru]?'(?:\\\\.|[^'\\\\])*')"
+  + "|\\b(\\d[\\d_]*)\\b"
+  + "|\\b(" + KW.join("|") + ")\\b"
+  + "|\\b(" + FN.join("|") + ")\\b", "g");
+function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function highlight(line){
+  return esc(line).replace(HLRE,(m,com,str,num,kw,fn)=>{
+    if(com) return `<span class="c-com">${com}</span>`;
+    if(str) return `<span class="c-str">${str}</span>`;
+    if(num) return `<span class="c-num">${num}</span>`;
+    if(kw)  return `<span class="c-kw">${kw}</span>`;
+    if(fn)  return `<span class="c-fn">${fn}</span>`;
+    return m;
+  });
+}
+
+/* ====================================================================
+   PROGRAM GENERATOR — returns [{text, feat}]
+==================================================================== */
+function genLines(){
+  const L=[]; const add=(t,f="base")=>L.push({text:t,feat:f});
+  const has = id => active.has(id);
+  const usesFields = has("fields");
+
+  // imports
+  add("from mailflow import connect");
+  if(provider==="memory"){
+    add("from mailflow.core.models import StreamRef");
+    add("from mailflow.providers.memory import SeedEmail");
+  }
+  if(has("rotation_sink")) add("from mailflow.adapters.gmail.rotation import FileTokenRotationSink","rotation_sink");
+  add("");
+
+  // sample data for memory source
+  if(provider==="memory"){
+    add('raw = (b"Message-ID: <m1@x>\\r\\nFrom: a@partner.com\\r\\n"');
+    add('       b"To: ops@acme.com\\r\\nSubject: Re: Invoice 42\\r\\n\\r\\nHello!")');
+    add('inbox = StreamRef(mailbox="ops@acme.com", folder="Inbox")');
+    add("");
+  }
+
+  // helper defs
+  if(has("clean_fn")){
+    add("def tidy(email):                       # clean_fn runs first","clean_fn");
+    add('    return email.model_copy(update={"subject": email.subject.strip()})',"clean_fn");
+    add("","clean_fn");
+  }
+  if(has("stages")){
+    add("def enrich(email):                     # a stage: modify","stages");
+    add('    return email.model_copy(update={"subject": email.subject + " [seen]"})',"stages");
+    add("","stages");
+    add("def drop_noreply(email):               # a stage: drop with None","stages");
+    add('    return None if email.from_.address.startswith("noreply@") else email',"stages");
+    add("","stages");
+  }
+  if(has("classify")){
+    add("def route(email):                      # drop bounces / auto-replies","classify");
+    add("    if email.is_bounce or email.is_auto_submitted:","classify");
+    add("        return None","classify");
+    add("    return email","classify");
+    add("","classify");
+  }
+  if(consume==="push"){
+    add("def handle(email):                     # receives "+(usesFields?"a dict":"a CleanEmail"),"consume");
+    add("    save(email)                        # YOUR storage — the library keeps none","consume");
+    add("","consume");
+  }
+
+  // connect(...)
+  add("mf = connect(");
+  if(provider==="memory"){
+    add('    "memory",');
+    add("    seed={inbox: [SeedEmail(\"m1\", raw)]},");
+  } else {
+    add('    "gmail",',"prov");
+    add("    credentials={","prov");
+    add('        "client_id": "1234.apps.googleusercontent.com",',"prov");
+    add('        "client_secret_ref": "env://GMAIL_CLIENT_SECRET",',"prov");
+    add('        "oauth_refresh_token_ref": "env://GMAIL_REFRESH_TOKEN",',"prov");
+    add('        "project_id": "my-gcp-project",',"prov");
+    add('        "topic": "gmail-notifications", "subscription": "mailflow",',"prov");
+    add("    },","prov");
+    add('    mailbox="me",',"prov");
+  }
+  add('    tenant="acme",');
+
+  // filters list
+  const filt=[];
+  if(has("blacklist"))        filt.push(['{"kind": "blacklist", "domains": ["spam.com"]},',"blacklist"]);
+  if(has("whitelist"))        filt.push(['{"kind": "whitelist", "domains": ["partner.com"]},',"whitelist"]);
+  if(has("no_personal"))      filt.push(['{"kind": "no_personal"},',"no_personal"]);
+  if(has("only_sender"))      filt.push(['{"kind": "only_sender", "addresses": ["boss@acme.com"]},',"only_sender"]);
+  if(has("only_domain"))      filt.push(['{"kind": "only_domain", "domains": ["acme.com", "partner.com"]},',"only_domain"]);
+  if(has("block_sender"))     filt.push(['{"kind": "block_sender", "addresses": ["spammer@acme.com"]},',"block_sender"]);
+  if(has("internal_domain"))  filt.push(['{"kind": "internal_domain", "domains": ["mycompany.com"]},',"internal_domain"]);
+  if(has("subject"))          filt.push(['{"kind": "subject", "patterns": ["(?i)invoice"]},',"subject"]);
+  if(has("to_filter"))        filt.push(['{"kind": "to", "addresses": ["alerts@acme.com"], "patterns": ["(?i)^ops-"]},',"to_filter"]);
+  if(has("cc_filter"))        filt.push(['{"kind": "cc", "patterns": ["(?i)@vendor\\\\.example$"]},',"cc_filter"]);
+  if(has("list_mail"))        filt.push(['{"kind": "list_mail"},',"list_mail"]);
+  if(has("custom_predicate")) filt.push(['lambda env: "urgent" in env.subject.lower(),  # True = keep',"custom_predicate"]);
+  if(filt.length){
+    add("    filters=[");
+    filt.forEach(([t,f])=>add("        "+t,f));
+    add("    ],");
+  }
+
+  if(has("fields"))       add('    fields=["subject", "from", "body_text"],',"fields");
+  if(has("clean_fn"))     add("    clean_fn=tidy,","clean_fn");
+  const stageNames=[];
+  if(has("stages"))   stageNames.push("enrich","drop_noreply");
+  if(has("classify")) stageNames.push("route");
+  if(stageNames.length)   add("    stages=["+stageNames.join(", ")+"],", has("stages")?"stages":"classify");
+  if(has("attachments"))  add('    attachments={"max_bytes": 10_000_000, "allowlist": ["application/pdf"]},',"attachments");
+  if(has("state_sqlite")) add('    state="sqlite:///mailflow.db",',"state_sqlite");
+  if(consume==="push")    add("    on_email=handle,","consume");
+  if(has("rotation_sink"))add('    overrides={"rotation_sink": FileTokenRotationSink("tokens.json")},',"rotation_sink");
+  add(")");
+  add("");
+
+  // consumption block
+  if(consume==="stream"){
+    add("for email in mf.stream():","consume");
+    if(usesFields) add('    print(email["subject"], email["from"].address)  # dict',"consume");
+    else           add("    print(email.subject, email.from_.address)","consume");
+  } else if(consume==="fetch_new"){
+    add("emails = mf.fetch_new()                 # one pass -> list","consume");
+    add('print(f"got {len(emails)} new emails")',"consume");
+  } else {
+    add("mf.run()                                # blocking push loop","consume");
+  }
+
+  // on-demand retrieval
+  if(has("on_demand")){
+    add("","on_demand");
+    add("# pull any part on demand by id — nothing stored","on_demand");
+    add('full  = mf.get_email("<message_id>")',"on_demand");
+    add('body  = mf.get_body("<message_id>")',"on_demand");
+    add('files = mf.get_attachments("<message_id>")',"on_demand");
+  }
+  return L;
+}
+
+/* ====================================================================
+   RENDER
+==================================================================== */
+const codeEl = document.getElementById("code");
+function renderCode(flashFeat){
+  const lines = genLines();
+  codeEl.innerHTML = lines.map(l =>
+    `<div class="ln" data-feat="${l.feat}"><span class="lc">${highlight(l.text)||"&nbsp;"}</span></div>`
+  ).join("");
+  if(flashFeat){
+    codeEl.querySelectorAll(`[data-feat="${flashFeat}"]`).forEach(el=>el.classList.add("flash"));
+  }
+  document.getElementById("lineCount").textContent = `// ${lines.length} lines`;
+  document.getElementById("featCount").textContent = active.size;
+  litStages();
+}
+
+function litStages(){
+  const lit = new Set();
+  if(provider==="gmail") lit.add("provider");
+  FEATURES.forEach(f=>{ if(active.has(f.id)) lit.add(f.stage); });
+  document.querySelectorAll(".stage").forEach(s=>{
+    s.classList.toggle("lit", lit.has(s.dataset.stage));
+  });
+}
+
+/* build feature cards */
+const featRoot = document.getElementById("features");
+function buildCards(){
+  GROUPS.forEach(g=>{
+    const inGroup = FEATURES.filter(f=>f.group===g);
+    if(!inGroup.length) return;
+    const wrap = document.createElement("div");
+    wrap.className="fgroup";
+    wrap.innerHTML = `<div class="fgroup-h">${g}</div>`;
+    inGroup.forEach(f=>{
+      const card=document.createElement("div");
+      card.className="feat"; card.dataset.id=f.id;
+      card.innerHTML = `
+        <div class="feat-head">
+          <button class="sw" aria-label="toggle ${f.name}"></button>
+          <div class="feat-meta">
+            <div class="feat-name">${f.name} <code>${esc(f.code)}</code>
+              <span class="stag">${f.stage}</span>
+              ${f.gmailOnly?'<span class="gonly">gmail</span>':''}</div>
+            <div class="feat-desc">${f.desc}</div>
+          </div>
+          <button class="ex-btn">snippet</button>
+        </div>
+        <div class="ex-wrap"><pre><code>${highlight(f.example).split("\n").join("<br>")}</code></pre></div>`;
+      // toggle add/remove
+      const toggle = ()=>{
+        if(card.classList.contains("disabled")) return;
+        if(active.has(f.id)){ active.delete(f.id); card.classList.remove("active"); renderCode(); }
+        else { active.add(f.id); card.classList.add("active"); renderCode(f.id); }
+      };
+      card.querySelector(".sw").addEventListener("click",toggle);
+      card.querySelector(".feat-name").addEventListener("click",toggle);
+      card.querySelector(".feat-desc").addEventListener("click",toggle);
+      // example expander
+      const ex=card.querySelector(".ex-wrap"), exb=card.querySelector(".ex-btn");
+      exb.addEventListener("click",e=>{e.stopPropagation(); const open=ex.classList.toggle("open"); exb.textContent=open?"hide":"snippet";});
+      wrap.appendChild(card);
+    });
+    featRoot.appendChild(wrap);
+  });
+}
+
+/* fix highlight inside the multi-line example <pre> (re-run per line) */
+function rehighlightExamples(){
+  document.querySelectorAll(".ex-wrap code").forEach(c=>{
+    // already escaped+highlighted line-by-line below
+  });
+}
+
+/* segmented controls */
+function applyConstraints(){
+  // fetch_new is memory-only; disable for gmail
+  const fbtn = document.querySelector('#segConsume [data-v="fetch_new"]');
+  fbtn.disabled = (provider==="gmail");
+  if(provider==="gmail" && consume==="fetch_new"){ setConsume("stream"); }
+  // gmail-only features
+  FEATURES.filter(f=>f.gmailOnly).forEach(f=>{
+    const card=document.querySelector(`.feat[data-id="${f.id}"]`);
+    const off = (provider!=="gmail");
+    card.classList.toggle("disabled",off);
+    if(off && active.has(f.id)){ active.delete(f.id); card.classList.remove("active"); }
+  });
+}
+function setProvider(v){
+  provider=v;
+  document.querySelectorAll("#segProvider button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  applyConstraints(); renderCode(v==="gmail"?"prov":null);
+}
+function setConsume(v){
+  consume=v;
+  document.querySelectorAll("#segConsume button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  renderCode("consume");
+}
+document.querySelectorAll("#segProvider button").forEach(b=>b.addEventListener("click",()=>setProvider(b.dataset.v)));
+document.querySelectorAll("#segConsume button").forEach(b=>b.addEventListener("click",()=>{ if(!b.disabled) setConsume(b.dataset.v); }));
+
+/* editor actions */
+document.getElementById("copyBtn").addEventListener("click",async function(){
+  const text = genLines().map(l=>l.text).join("\n");
+  try{ await navigator.clipboard.writeText(text); }catch(e){
+    const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
+  }
+  this.textContent="copied ✓"; this.classList.add("done");
+  setTimeout(()=>{this.textContent="copy"; this.classList.remove("done");},1400);
+});
+document.getElementById("clearBtn").addEventListener("click",()=>{
+  active.clear();
+  document.querySelectorAll(".feat.active").forEach(c=>c.classList.remove("active"));
+  renderCode();
+});
+
+/* init */
+buildCards();
+applyConstraints();
+renderCode();
+</script>
+</body>
+</html>

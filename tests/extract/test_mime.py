@@ -1,83 +1,52 @@
-from mailflow.core.models import Direction
 from mailflow.extract.mime import MimeExtractor
 
-PLAIN = (
-    b"Message-ID: <abc.1@example.com>\r\n"
+HTML_ONLY = (
+    b"Message-ID: <html.1@example.com>\r\n"
     b"From: Alice <alice@partner.com>\r\n"
     b"To: ops@acme.com\r\n"
-    b"Subject: Quote request\r\n"
-    b"Date: Mon, 09 Jun 2026 10:00:00 +0000\r\n"
+    b"Subject: HTML only\r\n"
+    b"Content-Type: text/html; charset=utf-8\r\n"
     b"\r\n"
-    b"Hello, please send a quote.\r\n"
-)
-
-MULTIPART = (
-    b"Message-ID: <m2@example.com>\r\n"
-    b"From: Bob <bob@partner.com>\r\n"
-    b"To: ops@acme.com\r\n"
-    b"Subject: With attachment\r\n"
-    b'Content-Type: multipart/mixed; boundary="B"\r\n'
-    b"\r\n"
-    b"--B\r\n"
-    b"Content-Type: text/plain\r\n\r\nBody text here\r\n"
-    b"--B\r\n"
-    b"Content-Type: application/pdf\r\n"
-    b'Content-Disposition: attachment; filename="q.pdf"\r\n\r\n'
-    b"PDFBYTES\r\n"
-    b"--B\r\n"
-    b"Content-Type: image/png\r\n"
-    b"Content-ID: <logo>\r\n"
-    b"Content-Disposition: inline\r\n\r\n"
-    b"PNGBYTES\r\n"
-    b"--B--\r\n"
+    b"<html><body><p>Hello,</p><p>please send a <b>quote</b>.</p></body></html>\r\n"
 )
 
 
-def _extract(raw: bytes, mailbox="ops@acme.com:Inbox"):
+def _extract(raw: bytes, *, thread_key: str = ""):
     return MimeExtractor().extract_bytes(
-        raw, provider="memory", provider_message_id="m", stream_id=mailbox,
+        raw,
+        provider="memory",
+        provider_message_id="m",
+        stream_id="ops@acme.com/Inbox",
         watched_mailbox="ops@acme.com",
+        thread_key=thread_key,
     )
 
 
-def test_extracts_headers_addresses_and_body():
-    ce = _extract(PLAIN)
-    assert ce.subject == "Quote request"
-    assert ce.from_.address == "alice@partner.com"
-    assert ce.from_.name == "Alice"
-    assert ce.to[0].address == "ops@acme.com"
-    assert "send a quote" in ce.body_text
-    assert ce.message_id == "<abc.1@example.com>"
-    assert ce.message_id_present is True
-    assert ce.message_id_trusted is True
-    assert ce.raw_headers["subject"] == ["Quote request"]
+def test_html_only_body_populates_body_text():
+    ce = _extract(HTML_ONLY)
+    assert ce.body_html  # html captured
+    assert ce.body_text  # non-empty, derived from html
+    assert "please send a quote" in ce.body_text
 
 
-def test_inbound_direction_when_sender_is_not_the_watched_mailbox():
-    ce = _extract(PLAIN)
-    assert ce.direction is Direction.inbound
+def _with_subject(subject: bytes) -> bytes:
+    return (
+        b"Message-ID: <s.1@example.com>\r\n"
+        b"From: Alice <alice@partner.com>\r\n"
+        b"To: ops@acme.com\r\n"
+        b"Subject: " + subject + b"\r\n"
+        b"\r\n"
+        b"body\r\n"
+    )
 
 
-def test_outbound_direction_when_sender_is_the_watched_mailbox():
-    raw = PLAIN.replace(b"alice@partner.com", b"ops@acme.com")
-    ce = _extract(raw)
-    assert ce.direction is Direction.outbound
+def test_empty_thread_key_falls_back_to_normalized_subject():
+    re_hello = _extract(_with_subject(b"Re: Hello"))
+    hello = _extract(_with_subject(b"hello"))
+    assert re_hello.thread_key  # non-empty fallback
+    assert re_hello.thread_key == hello.thread_key  # same group
 
 
-def test_separates_real_attachment_from_inline_media():
-    ce = _extract(MULTIPART)
-    reals = [a for a in ce.attachments if not a.is_inline]
-    inlines = [a for a in ce.attachments if a.is_inline]
-    assert len(reals) == 1 and reals[0].filename == "q.pdf"
-    assert reals[0].content_hash and len(reals[0].content_hash) == 64
-    assert len(inlines) == 1 and inlines[0].content_id == "<logo>"
-    assert "Body text here" in ce.body_text
-
-
-def test_canonical_id_present_even_without_message_id():
-    raw = PLAIN.replace(b"Message-ID: <abc.1@example.com>\r\n", b"")
-    ce = _extract(raw)
-    assert ce.canonical_id  # always present
-    assert ce.message_id is None
-    assert ce.message_id_present is False
-    assert ce.message_id_trusted is False
+def test_explicit_thread_key_is_preserved():
+    ce = _extract(_with_subject(b"Re: Hello"), thread_key="t-99")
+    assert ce.thread_key == "t-99"

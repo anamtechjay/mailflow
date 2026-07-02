@@ -1,6 +1,18 @@
 .venv/
+.DS_Store
 __pycache__/
 *.pyc
 .pytest_cache/
 .mypy_cache/
 dist/
+.env
+.env.*
+!.env.example
+*.db
+/attachments/
+.playwright-mcp/
+# stray local screenshots from manual UI runs
+/inbox-*.png
+# Root credentials dir only (google-sa.json) — anchored so it does NOT match the
+# source package src/mailflow/secrets/, which must ship in the wheel.
+/secrets/

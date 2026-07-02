@@ -35,8 +35,25 @@ def load_config(path: str) -> MailflowConfig:
     return MailflowConfig.model_validate(data)
 
 
+SUPPORTED_CONFIG_MAJOR = 1  # §A11: Phase 1 understands config-schema major 1.x
+
+
+def _check_version(cfg: MailflowConfig) -> None:
+    """§A11: fail fast on a malformed version or a future (unsupported) major."""
+    try:
+        major = int(str(cfg.version).split(".", 1)[0])
+    except ValueError:
+        raise ConfigError(f"malformed config version {cfg.version!r}")
+    if major > SUPPORTED_CONFIG_MAJOR:
+        raise ConfigError(
+            f"unsupported config version {cfg.version!r}: major {major} > "
+            f"{SUPPORTED_CONFIG_MAJOR} (upgrade mailflow)"
+        )
+
+
 def validate(cfg: MailflowConfig) -> list[str]:
-    """Raise ConfigError on unknown kinds; return non-fatal reachability warnings."""
+    """Raise ConfigError on a bad version or unknown kinds; return reachability warnings."""
+    _check_version(cfg)
     if cfg.provider.kind not in PROVIDER_KINDS:
         raise ConfigError(f"unknown provider kind {cfg.provider.kind!r}")
     if cfg.emitter.kind not in EMITTER_KINDS:

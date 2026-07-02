@@ -24,3 +24,16 @@ class ConfigError(MailflowError):
 
 class UnknownKindError(ConfigError):
     """A config `kind` is not in the registry (spec §11)."""
+
+
+class AuthError(MailflowError):
+    """Login/permission failure (e.g. 401). Routing: force one token refresh, retry the
+    message exactly once, else DLQ — never a max_attempts loop (A2)."""
+
+
+class PermanentError(MailflowError):
+    """Will never succeed (403/404/410, invalid base64). Routing: DLQ, no retry (A2)."""
+
+
+class TransientError(MailflowError):
+    """Temporary failure (429/5xx/network). Routing: bounded backoff retry (A2)."""

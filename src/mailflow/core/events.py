@@ -11,11 +11,12 @@ from pydantic import BaseModel
 
 from mailflow.core.models import CleanEmail
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.3"
 
 
 class EmailEvent(BaseModel):
     schema_version: str = SCHEMA_VERSION
     tenant: str
     ordering_key: str = ""
+    idempotency_key: str = ""
     email: CleanEmail
