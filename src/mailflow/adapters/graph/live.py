@@ -25,9 +25,11 @@ from mailflow.adapters.graph.runtime import (
 )
 from mailflow.core.ports import (
     BlobStore,
+    ContentCleaner,
     CursorStore,
     DedupeStore,
     Emitter,
+    Filter,
     SecretProvider,
 )
 
@@ -181,6 +183,8 @@ def run_service(
     cursor_store: CursorStore,
     dedupe_store: DedupeStore,
     blob_store: BlobStore,
+    filters: list[Filter] | None = None,
+    cleaner: ContentCleaner | None = None,
     connection_string: str | None = None,
     credential: Any | None = None,
     checkpoint_blob_account_url: str | None = None,
@@ -207,6 +211,8 @@ def run_service(
         cursor_store=cursor_store,
         dedupe_store=dedupe_store,
         blob_store=blob_store,
+        filters=filters,
+        cleaner=cleaner,
     )
     run_consume_loop(
         runtime=runtime,

@@ -117,3 +117,21 @@ change here). Graph/Outlook subscription lifecycle is a separate deferred plan.
 | **G1** | 🟢 | No direct `run_service` integration test: the A1 characterization test reconstructs `run_service`'s renew closure (`lambda: renew_watches(...)`) test-locally rather than invoking `run_service`, and A2 tests the extracted guard in isolation. So the live.py guard rewire + the actual lambda's `watch_manager`/`handles` capture have no direct test — a deletion or mis-wire there would keep the suite green. Inherent to "testable without the blocking Pub/Sub consume loop" (which needs the Google SDK). | `tests/test_gmail_reliability.py` (A1 closure), `src/mailflow/adapters/gmail/live.py:257-261` (guard) | **Deferred** — needs a recorded/seam-mocked `run_service` integration harness; out of this unit-hardening pass's scope. |
 | **G2** | 🟢 | Asymmetric guard coverage: the renew-scheduling guard was decomposed into the tested `should_schedule_renew` predicate, but the sibling sweep-scheduling guard `if gmail_cfg.sweep_seconds > 0:` was left inline + untested (its runtime behaviour is covered by A3, but the arming decision is not). | `src/mailflow/adapters/gmail/live.py` sweep-guard | **Hardening** — extract a `should_schedule_sweep` predicate for symmetry if the sweep arming logic grows. |
 | **G3** | 🟢 | A3's cursor-monotonic assertion is a guard-rail, not an independent test of `commit_if_ahead`'s strict rejection: both push and sweep operate at historyId 200, so it proves "no regression under overlap" but never drives a *lower* order through `commit_if_ahead`. The dedupe (emit-once) assertion carries the real weight. | `tests/test_gmail_e2e.py` overlap test | **Note** — strict-monotonic rejection is covered elsewhere; this assertion is a deliberate guard-rail. |
+
+---
+
+## Review 2026-06-30 — Extraction layer edge-case & failure-case pass
+
+Reviewer: added `tests/test_extract_edge_cases.py` — 54 edge/failure tests over the extractor,
+identity surrogate, attachment handling, and classification seam (the parts that take untrusted,
+malformed wire input). Outcome: **52 pass, 2 documented `xfail`s** surfacing the two defects below.
+Full suite 405 passed / 2 xfailed; mypy --strict clean. The 52 passing tests confirm the extractor is
+robust to: missing Message-ID/From/Subject/Date, malformed Date, empty/headers-only body, duplicate
+From, base64/quoted-printable/RFC2047 bodies, nested multipart, inline-vs-real attachments,
+no-filename attachments, content-addressed dedup, policy strip-on-oversize, and the bounce/
+auto-submitted heuristics.
+
+| ID | Sev | Finding | Evidence | Scope |
+|----|-----|---------|----------|-------|
+| **E-1** | 🟡 | Unknown-charset body crashes extraction: a `text/plain` part declaring an unregistered charset (`charset=x-totally-made-up`) raises `LookupError` from `EmailMessage.get_content()` — the extractor does not fall back to `errors='replace'`. A malformed-charset email therefore poisons to the DLQ instead of being delivered with a best-effort body. Real spam / misconfigured senders hit this. | `extract/mime.py` `_walk_body` → `part.get_content()` (~line 199/202); `tests/test_extract_edge_cases.py::test_unknown_charset_does_not_crash` (xfail) | **Phase gap** — wrap `get_content()` to catch `LookupError` and decode bytes with `errors='replace'`. Cheap, high-value robustness fix. |
+| **E-2** | 🟢 | Inconsistent `is_inline` across paths: the kept `Attachment` uses `is_inline = is_inline_media and not is_attachment`; policy mode uses `inline_for_policy = is_inline_media and disp != "attachment"`. A part with a `Content-ID` AND a `name=` but no `Content-Disposition` is `is_inline=False` when delivered yet `is_inline=True` when stripped — same part, two answers. | `extract/mime.py` `_walk_body` (meta is_inline ~line 210 vs `inline_for_policy` ~line 217) | **Hardening** — derive `is_inline` once and share it between the kept-Attachment and StrippedAttachment paths. Low severity (real inline parts carry `Content-Disposition: inline`, on which both paths agree). |

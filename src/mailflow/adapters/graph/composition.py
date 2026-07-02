@@ -25,6 +25,7 @@ from mailflow.core.pipeline import Pipeline, PipelineConfig
 from mailflow.core.ports import (
     BlobStore,
     Classifier,
+    ContentCleaner,
     CursorStore,
     DedupeStore,
     Emitter,
@@ -48,6 +49,7 @@ def build_graph_runtime(
     blob_store: BlobStore,
     filters: list[Filter] | None = None,
     classifier: Classifier | None = None,
+    cleaner: ContentCleaner | None = None,
     checkpointer: Checkpointer | None = None,
     subscription_manager: GraphSubscriptionManager | None = None,
     lifecycle_handler: GraphLifecycleHandler | None = None,
@@ -76,6 +78,7 @@ def build_graph_runtime(
         blob_store=blob_store,
         config=PipelineConfig(tenant=tenant, max_attempts=graph_cfg.max_attempts),
         classifier=classifier,
+        cleaner=cleaner,
     )
     # When a subscription manager is supplied, wire lifecycle handling: a 'missed'
     # event requests a delta sweep of the affected stream and re-runs the pipeline,

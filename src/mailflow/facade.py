@@ -231,8 +231,8 @@ def connect(
     verify_scope_on_startup: bool = _DEFAULT_VERIFY_SCOPE,
     attachments: AttachmentPolicy | AttachmentRule | dict[str, Any] | None = None,
 ) -> Mailflow:
-    """Wire a runnable Mailflow for the given provider. `provider` is "memory" | "gmail"
-    (graph is wired but not exposed here yet). `filters` is the unified list (spec §3);
+    """Wire a runnable Mailflow for the given provider. `provider` is
+    "memory" | "gmail" | "graph". `filters` is the unified list (spec §3);
     `fields` selects which data is delivered (spec §4a); `stages`/`clean_fn` post-process
     each CleanEmail (spec §5-6); `attachments` is the per-class strip policy (spec §lib)."""
     pol = normalize_attachment_policy(attachments)
@@ -299,7 +299,26 @@ def connect(
             dedupe_store=dedupe_store, blob_store=blob_store,
         )
 
-    raise ValueError(f"unknown/unsupported provider {provider!r} (use 'memory' or 'gmail')")
+    if provider == "graph":
+        live = _build_graph_live(
+            credentials=credentials or {}, mailbox=mailbox, tenant=tenant,
+            emitter=pipe_emitter, secret_provider=secret_provider or EnvSecretProvider(),
+            cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
+            filters=chain, cleaner=cleaner,
+        )
+        fetcher = _build_graph_fetcher(
+            credentials=credentials or {}, mailbox=mailbox,
+            secret_provider=secret_provider or EnvSecretProvider(), cleaner=cleaner,
+        )
+        return Mailflow(
+            provider_kind="graph", emitter=emitter, cursor_store=cursor_store,
+            live_run=live, queue=queue, fetcher=fetcher, project=project,
+            dedupe_store=dedupe_store, blob_store=blob_store,
+        )
+
+    raise ValueError(
+        f"unknown/unsupported provider {provider!r} (use 'memory', 'gmail', or 'graph')"
+    )
 
 
 def _build_gmail_fetcher(
@@ -390,3 +409,131 @@ def _build_gmail_live(
         )
 
     return live
+
+
+def _graph_configs(credentials: dict[str, Any], mailbox: str | None) -> tuple[Any, Any]:
+    """Build (GraphConfig, EventHubConfig) from the credentials dict (spec §graph). The
+    Azure/MSAL SDKs are NOT imported here — only pydantic config objects are built, so
+    wiring a Graph handle needs no `graph` extra until it is actually run."""
+    from mailflow.adapters.graph.config import EventHubConfig, GraphConfig
+
+    mailboxes = [mailbox] if mailbox else list(credentials.get("mailboxes", []))
+    graph_cfg = GraphConfig(
+        tenant_id=str(credentials["tenant_id"]),
+        client_id=str(credentials["client_id"]),
+        client_secret_ref=str(credentials["client_secret_ref"]),
+        mailboxes=mailboxes,
+    )
+    eventhub = EventHubConfig(
+        namespace=str(credentials["namespace"]),
+        hub=str(credentials["hub"]),
+        tenant_domain=str(credentials.get("tenant_domain", "")),
+        consumer_group=str(credentials.get("consumer_group", "$Default")),
+    )
+    return graph_cfg, eventhub
+
+
+def _build_graph_live(
+    *,
+    credentials: dict[str, Any],
+    mailbox: str | None,
+    tenant: str,
+    emitter: Emitter,
+    secret_provider: Any,
+    cursor_store: CursorStore,
+    dedupe_store: Any,
+    blob_store: Any,
+    filters: list[Filter],
+    cleaner: Any = None,
+) -> Callable[[], None]:
+    """Return a blocking callable that runs the live Graph (Event Hubs) consume loop —
+    parity with `_build_gmail_live`. The MSAL/Azure SDKs are imported lazily inside
+    run_service, so importing/wiring this needs no `graph` extra."""
+    from mailflow.adapters.graph.live import run_service
+
+    graph_cfg, eventhub = _graph_configs(credentials, mailbox)
+
+    def live() -> None:
+        run_service(
+            graph_cfg=graph_cfg, eventhub=eventhub, tenant=tenant,
+            secret_provider=secret_provider, emitter=emitter, dlq_emitter=MemoryEmitter(),
+            cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
+            filters=filters, cleaner=cleaner,
+            connection_string=credentials.get("connection_string"),
+            checkpoint_connection_string=credentials.get("checkpoint_connection_string"),
+            checkpoint_container=credentials.get("checkpoint_container"),
+            checkpoint_blob_account_url=credentials.get("checkpoint_blob_account_url"),
+        )
+
+    return live
+
+
+def _build_graph_fetcher(
+    *, credentials: dict[str, Any], mailbox: str | None, secret_provider: Any,
+    cleaner: Any = None,
+) -> Callable[[str], CleanEmail]:
+    """Build a fetch-by-message-id closure for Graph (spec §4): messages.get(JSON) +
+    attachment metadata -> GraphEnvelopeParser + GraphExtractor -> CleanEmail. The Graph
+    client (and its MSAL token) is constructed lazily on first use so wiring the handle
+    performs no network I/O."""
+    import json
+    from datetime import datetime, timezone
+
+    from mailflow.adapters.graph.extractor import GraphExtractor
+    from mailflow.adapters.graph.parser import GraphEnvelopeParser
+    from mailflow.core.models import Cursor, RawMessage
+
+    graph_cfg, _ = _graph_configs(credentials, mailbox)
+    mbx = graph_cfg.mailboxes[0]
+    parser = GraphEnvelopeParser()
+    extractor = GraphExtractor()
+    cache: dict[str, Any] = {}
+
+    def _client() -> Any:
+        if "c" not in cache:
+            from mailflow.adapters.graph.client import GraphClient
+            from mailflow.adapters.graph.live import HttpxTransport, MsalTokenProvider
+
+            token = MsalTokenProvider(
+                tenant_id=graph_cfg.tenant_id, client_id=graph_cfg.client_id,
+                client_secret=secret_provider.get(graph_cfg.client_secret_ref),
+                scope=graph_cfg.scope,
+            )
+            cache["c"] = GraphClient(
+                base_url=graph_cfg.base_url, token_provider=token, transport=HttpxTransport(),
+            )
+        return cache["c"]
+
+    def fetch(message_id: str) -> CleanEmail:
+        client = _client()
+        data: dict[str, Any] = client.get_message(mbx, message_id)
+        data["_attachments"] = (
+            client.list_attachments(mbx, message_id) if data.get("hasAttachments") else []
+        )
+        raw = json.dumps(data).encode()
+        stream = StreamRef(mailbox=mbx, folder=str(data.get("parentFolderId", "") or ""))
+        received = _parse_graph_dt(data.get("receivedDateTime")) or datetime.now(timezone.utc)
+        msg = RawMessage(
+            provider="graph", provider_message_id=message_id, stream=stream,
+            size_bytes=len(raw), received_at=received,
+            cursor=Cursor(value="fetch", order=0), raw_bytes=raw,
+        )
+        env = parser.parse_envelope(msg, tenant="default")
+        email = extractor.extract(msg, env)
+        if cleaner is not None:
+            email = cleaner.clean(email)
+        return email
+
+    return fetch
+
+
+def _parse_graph_dt(value: Any) -> Any:
+    """Parse a Graph ISO-8601 timestamp (trailing 'Z') to an aware datetime, or None."""
+    from datetime import datetime
+
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
