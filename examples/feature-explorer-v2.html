@@ -237,7 +237,6 @@
     <span class="chip" title="&gt;50MB or unknown size → DLQ before download">size&nbsp;guard</span>
     <span class="chip" title="transient → backoff retry (≤3) → dead-letter · permanent → DLQ now">retry&nbsp;→&nbsp;DLQ</span>
     <span class="chip" title="duplicates possible — dedupe on EmailEvent.idempotency_key">at-least-once</span>
-    <span class="chip" title="exponential backoff w/ jitter + bounded concurrency (load-shed)">storm&nbsp;containment</span>
     <span class="chip" title="Gmail fetch-time 401 forces ONE token refresh + one retry before dead-lettering">401&nbsp;→&nbsp;refresh-once</span>
     <span class="chip" title="poison / over-cap messages persist to a DeadLetterStore — redrive() re-submits them through a fresh pipeline">durable&nbsp;DLQ&nbsp;+&nbsp;redrive</span>
     <span class="chip" title="default (no policy): 25 MB per-attachment cap, fail-closed → DLQ; with connect(attachments=…): over-cap / not-allowlisted / scanner-blocked / unreadable parts are stripped and recorded on email.stripped_attachments (strip-and-deliver) — see Configuring attachments below">attachment&nbsp;cap</span>
