@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mailflow · V1 Technical Overview (Gmail)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0e13; --bg2:#0f141b; --panel:#0e131a; --panel2:#121922;
+    --ink:#e8eef5; --mut:#8a97a8; --dim:#5c6675; --line:#1d2530;
+    --amber:#ffb454; --amber-d:#d98a2b; --mint:#5ad1b4; --red:#ff7a85;
+    --blue:#79c0ff; --purp:#d2a8ff; --grn:#7ee787;
+    --mono:"JetBrains Mono",ui-monospace,monospace;
+    --serif:"Instrument Serif",Georgia,serif;
+    --sans:"Hanken Grotesk",system-ui,sans-serif;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--sans); line-height:1.62; -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(900px 500px at 8% -6%, rgba(255,180,84,.09), transparent 60%),
+      radial-gradient(800px 600px at 100% 4%, rgba(90,209,180,.07), transparent 55%),
+      linear-gradient(rgba(255,255,255,.016) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.016) 1px, transparent 1px);
+    background-size:auto, auto, 46px 46px, 46px 46px;
+    background-attachment:fixed;
+  }
+
+  /* ---------- layout ---------- */
+  .shell{max-width:1240px; margin:0 auto; padding:34px 26px 90px; display:grid;
+    grid-template-columns:224px minmax(0,1fr); gap:44px; align-items:start}
+  nav.toc{position:sticky; top:24px; font-family:var(--mono); font-size:12px; line-height:1.5}
+  nav.toc .tt{color:var(--dim); letter-spacing:.14em; text-transform:uppercase; font-size:10px; margin:18px 0 8px}
+  nav.toc a{display:block; color:var(--mut); text-decoration:none; padding:4px 10px; border-left:2px solid var(--line); transition:.18s}
+  nav.toc a:hover{color:var(--amber); border-left-color:var(--amber-d); background:rgba(255,180,84,.05)}
+  nav.toc a.part{color:var(--ink); font-weight:700; border-left-color:transparent; padding-left:2px; margin-top:4px}
+  main{min-width:0}
+
+  /* ---------- header ---------- */
+  header.hero{margin-bottom:10px}
+  .brand{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap}
+  .logo{font-family:var(--serif); font-size:58px; line-height:.9; letter-spacing:-.01em;
+    background:linear-gradient(94deg,var(--amber),#ffd9a0 55%,var(--mint));
+    -webkit-background-clip:text; background-clip:text; color:transparent}
+  .logo .dot{color:var(--amber); -webkit-text-fill-color:var(--amber)}
+  .pill{font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:.05em;
+    color:var(--bg); background:var(--amber); padding:4px 9px; border-radius:999px; transform:translateY(-8px)}
+  .pill.mint{background:var(--mint)}
+  h1.doct{font-family:var(--serif); font-weight:400; font-size:34px; margin:14px 0 6px; letter-spacing:.01em}
+  .lede{color:var(--mut); font-size:16px; max-width:760px; margin:0}
+  .lede b{color:var(--ink); font-weight:600}
+  .meta{font-family:var(--mono); font-size:11px; color:var(--dim); margin-top:12px; display:flex; gap:16px; flex-wrap:wrap}
+  .meta b{color:var(--mut); font-weight:500}
+
+  .rule{height:1px; background:linear-gradient(90deg,transparent,var(--line) 10%,var(--line) 90%,transparent); margin:30px 0}
+
+  /* ---------- typography ---------- */
+  h2.part{font-family:var(--serif); font-weight:400; font-size:15px; margin:52px 0 4px;
+    color:var(--amber); font-family:var(--mono); text-transform:uppercase; letter-spacing:.16em; font-size:11.5px}
+  h3{font-family:var(--serif); font-weight:400; font-size:27px; margin:12px 0 8px; letter-spacing:.01em; scroll-margin-top:24px}
+  h3 .num{font-family:var(--mono); font-size:14px; color:var(--amber); margin-right:10px; vertical-align:3px}
+  h4{font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--mint); margin:20px 0 8px}
+  p{margin:10px 0}
+  section{margin-bottom:14px}
+  code{font-family:var(--mono); font-size:.86em; color:var(--amber); background:rgba(255,180,84,.08); padding:1px 6px; border-radius:5px}
+  b,strong{color:var(--ink); font-weight:600}
+  a.ref{color:var(--blue); text-decoration:none; font-family:var(--mono); font-size:.82em}
+  ul,ol{margin:10px 0; padding-left:22px} li{margin:6px 0}
+
+  /* ---------- cards / callouts ---------- */
+  .card{border:1px solid var(--line); border-radius:var(--radius); background:var(--panel); padding:18px 20px; margin:16px 0}
+  .qa{border:1px solid var(--line); border-left:3px solid var(--amber-d); border-radius:10px; background:linear-gradient(180deg,rgba(255,180,84,.04),transparent); padding:4px 18px 12px; margin:16px 0}
+  .qa .q{font-weight:700; color:var(--ink); margin:14px 0 4px; display:flex; gap:9px}
+  .qa .q::before{content:"Q"; font-family:var(--mono); font-size:11px; color:var(--bg); background:var(--amber); border-radius:5px; padding:1px 6px; flex:none; height:fit-content; margin-top:3px; font-weight:700}
+  .qa .a{color:var(--mut); margin:0 0 8px 28px}
+  .qa .a b{color:var(--ink)}
+
+  .callout{border-radius:12px; padding:14px 18px; margin:18px 0; font-size:14.5px; line-height:1.55; border:1px solid}
+  .callout .h{font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; margin-bottom:5px; font-weight:700}
+  .callout.key{border-color:rgba(90,209,180,.35); background:rgba(90,209,180,.06)} .callout.key .h{color:var(--mint)}
+  .callout.warn{border-color:rgba(255,122,133,.32); background:rgba(255,122,133,.06)} .callout.warn .h{color:var(--red)}
+  .callout.info{border-color:rgba(121,192,255,.28); background:rgba(121,192,255,.05)} .callout.info .h{color:var(--blue)}
+  .callout p{margin:6px 0} .callout code{background:rgba(255,255,255,.06)}
+
+  /* hover tooltips for jargon — define tough terms in plain language */
+  .tip{border-bottom:1px dotted var(--dim); cursor:help; position:relative}
+  .tip:hover{border-bottom-color:var(--amber-d)}
+  .chip.tip{border-bottom:none}            /* chips already have a border; keep the pill clean */
+  .tip::after{
+    content:attr(data-tip);
+    position:absolute; left:50%; bottom:calc(100% + 9px); transform:translateX(-50%) translateY(4px);
+    width:max-content; max-width:250px; white-space:normal; text-align:left;
+    background:#05070a; color:var(--ink); border:1px solid var(--line); border-radius:9px;
+    padding:9px 12px; font-family:var(--sans); font-size:12.5px; font-weight:400; line-height:1.45;
+    text-transform:none; letter-spacing:normal;
+    box-shadow:0 14px 34px -12px rgba(0,0,0,.85);
+    opacity:0; visibility:hidden; transition:opacity .16s ease, transform .16s ease;
+    z-index:60; pointer-events:none;
+  }
+  .tip:hover::after{opacity:1; visibility:visible; transform:translateX(-50%) translateY(0)}
+  @media (max-width:900px){ .tip::after{max-width:210px} }
+
+  /* ---------- pipeline strip ---------- */
+  .flow{display:flex; align-items:stretch; flex-wrap:wrap; margin:18px 0 8px}
+  .stage{flex:1 1 0; min-width:92px; text-align:center; padding:12px 6px 11px; position:relative;
+    border:1px solid var(--line); border-right:none; background:var(--panel); font-family:var(--mono)}
+  .stage:first-child{border-radius:12px 0 0 12px}
+  .stage:last-child{border-right:1px solid var(--line); border-radius:0 12px 12px 0}
+  .stage .n{font-size:12px; font-weight:600; color:var(--mint)}
+  .stage .s{font-size:9px; color:var(--dim); margin-top:2px; letter-spacing:.04em; text-transform:uppercase}
+  .stage::after{content:"→"; position:absolute; right:-8px; top:50%; transform:translateY(-50%);
+    color:var(--dim); font-size:13px; z-index:2; background:var(--bg); padding:0 1px}
+  .stage:last-child::after{display:none}
+  .always{display:flex; flex-wrap:wrap; gap:7px; margin:10px 0 4px; align-items:center}
+  .always .lbl{font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin-right:2px}
+  .chip{font-family:var(--mono); font-size:10.5px; color:var(--mut); border:1px solid var(--line);
+    border-radius:999px; padding:3px 10px; background:var(--panel)}
+  .chip::before{content:"●"; color:var(--grn); font-size:7px; margin-right:6px; vertical-align:1px}
+
+  /* ---------- vertical step diagram ---------- */
+  .steps{counter-reset:st; margin:16px 0; border-left:1px dashed var(--line); padding-left:0}
+  .step{position:relative; padding:2px 0 16px 46px; margin-left:14px}
+  .step::before{counter-increment:st; content:counter(st); position:absolute; left:-15px; top:0;
+    width:30px; height:30px; border-radius:50%; background:var(--panel2); border:1px solid var(--line);
+    color:var(--amber); font-family:var(--mono); font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center}
+  .step .st-h{font-weight:600; color:var(--ink)}
+  .step .st-h code{font-size:12px}
+  .step .st-b{color:var(--mut); font-size:14px; margin-top:2px}
+  .step.term::before{color:var(--mint); border-color:rgba(90,209,180,.4)}
+
+  /* ---------- mini flow (svg-like boxes) ---------- */
+  .lane{display:flex; gap:10px; flex-wrap:wrap; margin:14px 0}
+  .box{flex:1 1 210px; border:1px solid var(--line); border-radius:10px; background:var(--panel); padding:12px 14px}
+  .box .bh{font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; margin-bottom:5px}
+  .box p{margin:2px 0; font-size:13px; color:var(--mut)}
+  .box.auth .bh{color:var(--purp)} .box.perm .bh{color:var(--red)} .box.trans .bh{color:var(--blue)}
+
+  /* attachment decision flow */
+  .aflow{margin:16px 0; font-family:var(--mono); font-size:12.5px}
+  .aflow .row{display:flex; align-items:center; gap:10px; margin:7px 0; flex-wrap:wrap}
+  .aflow .node{border:1px solid var(--line); border-radius:8px; padding:7px 12px; background:var(--panel); color:var(--ink)}
+  .aflow .node.hot{border-color:rgba(90,209,180,.4); color:var(--mint)}
+  .aflow .node.bad{border-color:rgba(255,122,133,.35); color:var(--red)}
+  .aflow .arw{color:var(--dim)}
+  .aflow .tag{color:var(--dim); font-size:11px}
+
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:13.5px}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top}
+  th{background:var(--panel2); font-family:var(--mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--mut); font-weight:600}
+  td code{font-size:12px}
+  tr:nth-child(even) td{background:rgba(255,255,255,.012)}
+
+  footer{margin-top:56px; border-top:1px solid var(--line); padding-top:22px; color:var(--dim); font-size:12.5px; font-family:var(--mono)}
+  footer b{color:var(--mut)}
+
+  @media (max-width:900px){
+    .shell{grid-template-columns:1fr; gap:10px}
+    nav.toc{position:static; display:none}
+    .logo{font-size:46px}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ================= TOC ================= -->
+  <nav class="toc">
+    <div class="tt">Overview</div>
+    <a href="#idea" class="part">The two ideas</a>
+    <div class="tt">Part 1 · Pipeline</div>
+    <a href="#walk">One email, end to end</a>
+    <div class="tt">Part 2 · Deep dives</div>
+    <a href="#ingest">1 · Ingestion &amp; cursor</a>
+    <a href="#extract">2 · Fetch &amp; extract</a>
+    <a href="#attach">3 · Attachments</a>
+    <a href="#clean">4 · HTML → text</a>
+    <a href="#filter">5 · Filtering</a>
+    <a href="#classify">6 · Classification</a>
+    <a href="#dedupe">7 · Dedupe / at-least-once</a>
+    <a href="#reliab">8 · Reliability &amp; DLQ</a>
+    <a href="#state">9 · State &amp; persistence</a>
+    <a href="#secrets">10 · Secrets &amp; rotation</a>
+    <a href="#api">11 · Consumption API</a>
+    <a href="#observ">12 · Observability</a>
+    <div class="tt">Part 3</div>
+    <a href="#limits">Honest limitations</a>
+  </nav>
+
+  <!-- ================= MAIN ================= -->
+  <main>
+    <header class="hero">
+      <div class="brand">
+        <span class="logo">mailflow<span class="dot">.</span></span>
+        <span class="pill">V1</span>
+        <span class="pill mint">gmail · live</span>
+      </div>
+      <h1 class="doct">V1 Technical Overview</h1>
+      <p class="lede">How each core feature of the shipped Gmail library actually works — the mechanics
+      behind the <b>compose-your-pipeline</b> surface and the <b>always-on reliability</b> guarantees.
+      Written to answer the questions a reviewing engineer will raise, not to restate the API.</p>
+      <div class="meta">
+        <span><b>branch</b> anam/library</span>
+        <span><b>wire schema</b> 1.3</span>
+        <span><b>live provider</b> Gmail (Outlook/Graph deferred)</span>
+        <span><b>mode</b> synchronous · single-worker · poll-authoritative</span>
+      </div>
+    </header>
+
+    <div class="rule"></div>
+
+    <!-- ============ OVERVIEW ============ -->
+    <h2 class="part">Overview</h2>
+    <h3 id="idea">The two ideas that explain everything else</h3>
+    <p>mailflow is a <b>library</b> other programs embed. It watches a Gmail inbox and turns each raw
+    message into a clean, structured <code>CleanEmail</code> event. Everything below is a variation on
+    two ideas:</p>
+
+    <p><b>Idea 1 — a pipeline you compose.</b> Every email flows through the same seven stages. You add
+    optional behaviour at the stages you care about (which mail, which fields, how to transform); the
+    rest is defaulted.</p>
+
+    <div class="flow">
+      <div class="stage"><div class="n">provider</div><div class="s">source</div></div>
+      <div class="stage"><div class="n">parse</div><div class="s">envelope</div></div>
+      <div class="stage"><div class="n">filter</div><div class="s">which mail</div></div>
+      <div class="stage"><div class="n">extract</div><div class="s">CleanEmail</div></div>
+      <div class="stage"><div class="n">clean</div><div class="s">html→text</div></div>
+      <div class="stage"><div class="n">stages</div><div class="s">transform</div></div>
+      <div class="stage"><div class="n">deliver</div><div class="s">to you</div></div>
+    </div>
+
+    <p><b>Idea 2 — reliability you don't wire.</b> A band of guarantees runs underneath <i>every</i>
+    message, whether or not you opt into anything. This is the actual product: you don't assemble
+    correctness, the pipeline enforces it.</p>
+
+    <div class="always">
+      <span class="lbl">always on</span>
+      <span class="chip tip" data-tip="Notices the same email arriving twice and processes it only once.">dedupe</span>
+      <span class="chip tip" data-tip="A bookmark of how far we've read the inbox. It only ever moves forward — never backward — so we never skip or repeat mail, even after a crash.">monotonic cursor</span>
+      <span class="chip tip" data-tip="Checks a message's size first and refuses anything too big, or of unknown size, before downloading it.">size guard (fail-closed)</span>
+      <span class="chip tip" data-tip="Temporary errors are retried a few times; if it still fails, the message is set aside in a 'problem pile' instead of blocking the others.">retry → DLQ</span>
+      <span class="chip tip" data-tip="Each email is delivered at least once — occasionally twice after a retry — so you remove duplicates using its id.">at-least-once</span>
+      <span class="chip tip" data-tip="When the server says 'slow down', we wait and cap how many requests run at once, so a flood of errors can't crash the run.">storm containment</span>
+      <span class="chip tip" data-tip="If the login token is rejected mid-run, we refresh it once and retry — never an endless loop.">401 → refresh-once</span>
+      <span class="chip tip" data-tip="The 'problem pile' is saved to disk; once you fix the cause, you can replay those messages through the pipeline.">durable DLQ + redrive</span>
+      <span class="chip tip" data-tip="Each attachment is streamed with a hard size limit — over-limit parts are set aside, never loaded whole into memory.">attachment cap</span>
+      <span class="chip tip" data-tip="Identical attachment bytes are stored only once, keyed by their content fingerprint.">blob dedupe</span>
+      <span class="chip tip" data-tip="At startup we confirm the app was granted the read permission it needs, and stop early if it wasn't.">scope check</span>
+      <span class="chip tip" data-tip="Plain counters (how many emitted / dropped / dead-lettered) and a health check you can plug into your monitoring.">metrics + health</span>
+    </div>
+
+    <div class="callout key">
+      <div class="h">The one rule to remember</div>
+      <p><b>Notifications are wake-signals only.</b> A Gmail push never carries an email and is never
+      trusted to name "the message to fetch." It carries a <code>historyId</code> watermark that only
+      means <i>"go check your inbox from your saved bookmark."</i> The durable <b class="tip" data-tip="A saved bookmark of how far we've read the inbox. It only moves forward, so after a crash we resume without missing or repeating mail.">cursor</b> — not the
+      push — is the source of truth. Pushes can be forged, replayed, duplicated, or lost; none of that
+      can corrupt or skip the stream, because the cursor is what decides what to fetch.</p>
+    </div>
+
+    <!-- ============ PART 1: WALKTHROUGH ============ -->
+    <h2 class="part">Part 1 · The pipeline</h2>
+    <h3 id="walk">One email, end to end</h3>
+    <p>Follow a single message from "you have mail" to a delivered event. Each numbered step names the
+    stage and the guarantee that fires there. Green rings are <b>terminal</b> — the cursor advances.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="st-h">A push arrives — and is treated as a nudge</div>
+        <div class="st-b">Gmail Pub/Sub delivers <code>(emailAddress, historyId)</code>. The runtime
+        parses it and <code>submit()</code>s the watermark; it fetches <i>nothing</i> yet. If the push is
+        lost, a periodic sweep triggers the same check anyway.</div>
+      </div>
+      <div class="step">
+        <div class="st-h">Fetch the delta from the saved cursor <span class="tag"></span></div>
+        <div class="st-b">The provider loads the stored <code>historyId</code> and asks Gmail
+        <i>"what changed since here?"</i> — <code>history.list</code> → new message IDs. The push's own
+        number is only ever an upper bound to sync toward.</div>
+      </div>
+      <div class="step">
+        <div class="st-h">Claim the message (dedupe)</div>
+        <div class="st-b"><code>try_claim(idempotency_key)</code> takes an exclusive lease. Key =
+        <code>(tenant, mailbox, provider_message_id)</code>. Already claimed/done → this is a
+        <b>duplicate</b>, short-circuit to terminal.</div>
+      </div>
+      <div class="step">
+        <div class="st-h">Size guard — <i>before</i> any download</div>
+        <div class="st-b">The provider reports the message size. <code>&gt; 50 MB</code>, or
+        <b>unknown/zero</b>, → dead-letter now (fail-closed: if we can't vouch it fits, we never pull it).</div>
+      </div>
+      <div class="step">
+        <div class="st-h">Parse the cheap envelope, then filter</div>
+        <div class="st-b">Sender/recipients/subject are parsed <i>before</i> the body. Filters run on this
+        cheap <code>Envelope</code>, so a dropped email costs no body download or extraction.</div>
+      </div>
+      <div class="step">
+        <div class="st-h">Extract → CleanEmail</div>
+        <div class="st-b">Fetch the full RFC822 (<code>format=raw</code>), MIME-parse it, pull fields,
+        stream attachments to the blob store, derive identity + thread key + bounce/auto flags.</div>
+      </div>
+      <div class="step">
+        <div class="st-h">Clean, then run your stages</div>
+        <div class="st-b">The default cleaner backfills <code>body_text</code> from HTML if empty. Your
+        <code>clean_fn</code> runs first, then <code>stages</code> transform or drop the email.</div>
+      </div>
+      <div class="step term">
+        <div class="st-h">Emit &amp; mark done — cursor advances</div>
+        <div class="st-b">An <code>EmailEvent</code> (schema 1.3, stamped with the
+        <code>idempotency_key</code>) reaches your consumer. <code>mark_done()</code> closes the claim and
+        the cursor commits forward. <b>Every</b> terminal outcome — emitted, dropped, duplicate,
+        dead-lettered — advances the cursor; only a transient retry does not.</div>
+      </div>
+    </div>
+
+    <div class="callout info">
+      <div class="h">Why this order matters</div>
+      <p>Claim → size-guard → filter all happen <i>before</i> the expensive fetch/extract. A duplicate,
+      an oversized message, or a filtered sender is disposed of cheaply, and each still moves the
+      bookmark forward so the stream never re-examines it.</p>
+    </div>
+
+    <!-- ============ PART 2: DEEP DIVES ============ -->
+    <h2 class="part">Part 2 · Deep dives</h2>
+
+    <!-- 1 INGESTION -->
+    <h3 id="ingest"><span class="num">01</span>Ingestion &amp; the cursor</h3>
+    <h4>How it works</h4>
+    <p>Gmail push (Pub/Sub) is a <b>wake-trigger</b>, not a delivery channel. The runtime decodes the
+    notification to <code>(emailAddress, historyId)</code> and buffers the watermark. Fetching is a
+    separate <b>delta poll</b>: from the durable cursor, Gmail's <code>history.list</code> returns the
+    IDs that changed since. Poll — not push — is authoritative, so lost or forged pushes cannot corrupt
+    the stream. A background sweep runs the same delta on a timer as a safety net.</p>
+    <p>The <b>cursor</b> is Gmail's <code>historyId</code>, stored per <code>(tenant, stream)</code> with
+    a monotonic <code>order</code>. It advances through <code>commit_if_ahead()</code> — a
+    compare-and-set that <b>rejects any value ≤ the stored one</b>. It can never slide backward, and it
+    advances on <i>every terminal disposition</i>, not just successful emits.</p>
+
+    <div class="qa">
+      <div class="q">If a push is forged or replayed, can an attacker inject or skip mail?</div>
+      <p class="a">No. The push only supplies a watermark to sync toward; the actual message list comes
+      from Gmail via the trusted delta. A forged <code>historyId</code> can at worst ask us to re-check
+      the inbox — the monotonic cursor and dedupe make redundant checks harmless.</p>
+      <div class="q">What happens on crash / restart mid-stream?</div>
+      <p class="a">On boot the pipeline reloads the stored cursor and resumes the delta from exactly
+      there. Nothing is missed (the cursor only advanced on terminal outcomes) and nothing is
+      re-delivered (dedupe claims persist in SQLite state).</p>
+      <div class="q">First run, with no cursor yet?</div>
+      <p class="a">Bootstrap arms the Gmail <code>watch()</code> and seeds the cursor with the
+      <code>historyId</code> that <code>watch</code> returns — so the first delta starts from "now" rather
+      than replaying history.</p>
+      <div class="q">The <code>historyId</code> aged out of Gmail's ~7-day window?</div>
+      <p class="a">Gmail raises a stale-history error; the provider re-seeds the cursor to the current
+      <code>historyId</code> from the profile and continues. Mail inside the lost window is skipped
+      rather than the stream jamming — a deliberate availability-first choice. (Honest note: that skip
+      isn't logged or metered today, so add a gap counter before you depend on it in production.)</p>
+      <div class="q">How is the "watch" kept alive?</div>
+      <p class="a">Gmail watches expire in ~7 days. A daemon <code>IntervalScheduler</code> re-calls
+      <code>watch()</code> daily (Gmail has no renew endpoint — renewal is re-watching). Scheduler
+      failures are swallowed so the loop never dies.</p>
+      <div class="q">Which folders does it watch — everything, or just the inbox?</div>
+      <p class="a"><b>INBOX only by default</b> (<code>label_ids=["INBOX"]</code>), and both the watch and
+      the delta filter on it. Mail that a Gmail rule files straight into another label won't trigger a
+      notification or the sweep unless you configure the labels you care about.</p>
+      <div class="q">What if pushes arrive out of order, or the same one twice?</div>
+      <p class="a">Harmless. A push only carries a watermark to sync toward; the real work is the delta
+      poll from the durable cursor. Order and duplicates wash out — the monotonic cursor and dedupe make
+      redundant or reordered nudges a no-op.</p>
+      <div class="q">A push and the timed sweep firing at the same moment — double work?</div>
+      <p class="a">They can overlap, but they run the same delta and every message is claimed once via
+      <code>try_claim</code>, so the second one just loses the race and exits. Worst case is a little wasted
+      API quota, never a double-emit.</p>
+    </div>
+
+    <!-- 2 EXTRACT -->
+    <h3 id="extract"><span class="num">02</span>Fetch &amp; extract → CleanEmail</h3>
+    <h4>How it works</h4>
+    <p>The pipeline fetches the message as <b><code>format=raw</code></b> — the complete RFC822 bytes,
+    base64url-encoded — and decodes them. That single blob is parsed with Python's standard
+    <code>email</code> library into a MIME tree, and the extractor reads structured fields off it:
+    sender/recipients, subject, dates, <code>body_text</code> / <code>body_html</code>, thread key,
+    attachments, and the classification flags. There is no reliance on Gmail's parsed-JSON view — the
+    raw bytes are the single source, which also lets us hash exact content.</p>
+    <p><b>Identity.</b> Two keys are derived. The <b class="tip" data-tip="A unique fingerprint for each email — tenant + mailbox + provider message id. If the same email shows up twice, you use this to handle it once.">idempotency_key</b> is
+    <code>(tenant, mailbox, provider_message_id)</code> — the dedupe/wire fingerprint. The
+    <b class="tip" data-tip="A stable id for the email: its real Message-ID when that looks trustworthy, otherwise a hash we compute from the provider ids.">canonical_id</b> is the RFC <code>Message-ID</code> when it's trustworthy (well-formed
+    <code>&lt;local@domain&gt;</code>), otherwise a stable <code>sha256(provider, provider_message_id,
+    mailbox)</code>.</p>
+
+    <div class="qa">
+      <div class="q">Why <code>format=raw</code> instead of Gmail's parsed <code>full</code> view?</div>
+      <p class="a">One fetch yields the exact on-the-wire bytes, so MIME parsing, body extraction, and
+      attachment hashing all operate on identical content — no divergence between "what Gmail parsed" and
+      "what we stored," and no second round-trip.</p>
+      <div class="q">How is the conversation thread carried?</div>
+      <p class="a">Gmail's <code>threadId</code> rides onto <code>CleanEmail.thread_key</code>. If a
+      provider ever supplies none, we fall back to a normalized subject (strip <code>Re:/Fwd:</code>,
+      lowercase, collapse whitespace) so a reply still groups with its root.</p>
+      <div class="q">What if the <code>Message-ID</code> is missing or malformed?</div>
+      <p class="a">It's treated as untrusted and <code>canonical_id</code> falls back to the stable hash.
+      Dedupe never depends on <code>canonical_id</code> anyway — it uses the provider-scoped
+      idempotency_key.</p>
+      <div class="q">Plain text or HTML — which body wins?</div>
+      <p class="a">The real <code>text/plain</code> part wins when present; HTML→text is only synthesized to
+      fill a blank <code>body_text</code>. So a proper multipart email delivers the sender's actual plain
+      text, not a re-derived approximation.</p>
+      <div class="q">Malformed or pathological MIME — does extraction crash?</div>
+      <p class="a">No. Python's <code>email</code> parser is lenient: missing headers, odd charsets, or
+      broken parts degrade to empty fields rather than throwing. A genuinely unusable payload (e.g. invalid
+      base64) is classified <i>permanent</i> and dead-lettered, not retried forever.</p>
+      <div class="q">Is the <code>From</code> address trusted for identity?</div>
+      <p class="a">It drives direction and canonical identity; <code>Return-Path</code> and <code>Sender</code>
+      are captured but not used as a trust signal, and V1 does no DKIM/SPF. So a spoofed <code>From</code>
+      isn't detected here — treat sender authenticity as the consumer's concern.</p>
+    </div>
+
+    <!-- 3 ATTACHMENTS -->
+    <h3 id="attach"><span class="num">03</span>Attachment handling</h3>
+    <div class="callout key">
+      <div class="h">The mechanism, precisely</div>
+      <p>In the <b>ingest pipeline</b> there is <b>no marker-then-fetch dance</b>. The whole message
+      already arrived as <code>format=raw</code> base64url bytes; attachment parts are just nodes in the
+      locally-parsed MIME tree. Each part is <b>streamed</b> out of those bytes in ~64 KB chunks,
+      decoded, SHA-256'd, and written to a content-addressed blob store. A separate Gmail
+      <code>messages.attachments.get</code> endpoint (the classic <i>attachmentId → base64 → decode</i>
+      flow) does exist, but it is wired only to the optional on-demand
+      <code>get_attachments(id)</code> API — not to ingestion.</p>
+    </div>
+    <h4>How it works</h4>
+    <div class="aflow">
+      <div class="row"><span class="node">MIME part</span><span class="arw">→</span>
+        <span class="node">classify real / inline</span><span class="arw">→</span>
+        <span class="node">allowlist check</span><span class="arw">→</span>
+        <span class="node hot">stream + SHA-256 (cap)</span><span class="arw">→</span>
+        <span class="node">scanner</span><span class="arw">→</span>
+        <span class="node hot">blob store (dedupe)</span></div>
+      <div class="row"><span class="tag">on violation, no policy →</span>
+        <span class="node bad">dead-letter whole message (fail-closed)</span></div>
+      <div class="row"><span class="tag">on violation, with policy →</span>
+        <span class="node">strip part + record on <code>stripped_attachments</code> + deliver</span></div>
+    </div>
+    <p>The per-attachment cap is <b>25 MB</b>, enforced <i>mid-stream</i>: the streamer raises the instant
+    the running byte-count crosses the cap, so an over-cap file is never fully buffered. Storage is
+    <b>content-addressed</b> — the blob key <i>is</i> the SHA-256 of the bytes — so the same attachment
+    across two messages is written once (dedupe is a file-exists check).</p>
+
+    <div class="qa">
+      <div class="q">Do we get a marker per attachment and then call an API to fetch it?</div>
+      <p class="a">Not in ingestion. The bytes come inline inside the raw message; we stream them out of
+      the MIME tree locally. The marker+<code>attachments.get</code>+base64 path is only used by the
+      opt-in on-demand retrieval API.</p>
+      <div class="q">Is the whole file loaded into memory to check its size?</div>
+      <p class="a">No. It's streamed in chunks while hashing; the size check trips mid-stream and aborts.
+      That's how "fail-closed on oversize" is physically guaranteed rather than checked after the fact.</p>
+      <div class="q">How does the message-level 50 MB guard relate to the 25 MB per-attachment cap?</div>
+      <p class="a">They're orthogonal. The 50 MB guard rejects the whole message <i>before</i> download
+      (and fails closed on unknown size). The 25 MB cap applies to each individual part during the MIME
+      walk.</p>
+      <div class="q">What happens to an over-cap or blocked attachment?</div>
+      <p class="a"><b>Default (no policy):</b> fail-closed — the entire message is dead-lettered
+      (quarantined, not silently dropped). <b>With an <code>attachments=</code> policy:</b>
+      strip-and-deliver — the offending part is removed, its metadata appended to
+      <code>email.stripped_attachments</code> with a reason
+      (<code>oversize</code> / <code>not_allowlisted</code> / <code>unreadable</code> /
+      <code>scanner</code>), and the message is delivered.</p>
+      <div class="q">"Real" vs "inline" — what's the distinction?</div>
+      <p class="a"><b>Real</b> = <code>Content-Disposition: attachment</code> (or a filename with no inline
+      disposition). <b>Inline</b> = <code>Content-Disposition: inline</code> or a <code>Content-ID</code>
+      (embedded logos, tracking pixels). A policy can apply different size/type rules to each class.</p>
+      <div class="q">Is there virus scanning?</div>
+      <p class="a">There's a <b>seam</b>: a swappable <code>AttachmentScanner.scan()</code> port. V1 ships
+      a no-op allow-all default and an empty allowlist (allow-all); a real AV/CDR scanner is the
+      designed-for extension point, deferred to a later plan.</p>
+      <div class="q">Is the content-type trusted, or sniffed from the bytes?</div>
+      <p class="a">Trusted from the MIME header — there's no magic-byte sniffing, so a <code>.exe</code>
+      mislabeled <code>text/plain</code> would pass a type allowlist. Real content inspection is exactly
+      what the scanner seam is for.</p>
+      <div class="q">If an inline image is stripped, does <code>body_html</code> get fixed?</div>
+      <p class="a">No — a stripped inline part leaves its <code>cid:</code> reference in the HTML for the
+      consumer to handle; rewriting inline-image references is a later plan (the seam is there).</p>
+      <div class="q">How durable is the blob write itself?</div>
+      <p class="a">The reference local store writes content-addressed straight to its final path; a crash
+      mid-write can leave a truncated blob that the exists-check won't heal. It's a dev-grade store — the
+      intended production swap is an S3/GCS adapter with temp-then-rename, behind the same
+      <code>BlobStore</code> port.</p>
+    </div>
+
+    <h4>Eager now vs on-demand later — do we even need blob storage?</h4>
+    <p>This is a real design axis, not a fixed answer. mailflow already ships <b>both</b> paths: the
+    ingest pipeline is <b>eager</b> (streams every attachment to a content-addressed blob store), while
+    <code>get_email/get_body/get_attachments(message_id)</code> are <b>lazy</b> — they re-fetch the whole
+    message live via <code>messages.get(format=raw)</code> and parse the bytes back out. Ingest keeps the
+    durable <code>provider_message_id</code>, so on-demand re-fetch needs <i>nothing</i> but that ID.</p>
+
+    <div class="callout info">
+      <div class="h">"After how many days can we still fetch on-demand?"</div>
+      <p>There is <b>no fixed API TTL.</b> A message and its attachments stay retrievable for
+      <b>as long as the message lives in the mailbox</b> — effectively indefinite for normal inbox mail.
+      The hard floors are: <b>~30 days</b> after it's moved to <b>Trash</b> or <b>Spam</b> (auto-purge),
+      <b>immediately</b> on a permanent delete or account deletion, and whenever a <b>retention / Vault
+      policy</b> expires it. Do <i>not</i> confuse this with the <b>~7-day history window</b> — that only
+      limits <i>delta detection</i> (which new IDs we can discover), never whether a known message can be
+      fetched. On-demand reads also require the OAuth token to still be valid at read time.</p>
+    </div>
+
+    <p>Why the design re-fetches the <i>whole message</i> rather than caching Gmail's per-part
+    <code>attachmentId</code>: a Gmail <code>attachmentId</code> is <b>not stable</b> — it's scoped to one
+    message fetch and can change, so you'd have to re-list the message to get a current one anyway. The
+    <b>messageId is the only durable handle</b>, which is exactly what ingest persists. (The
+    <code>attachments.get</code> endpoint is wired in the client but currently unused.)</p>
+
+    <table>
+      <tr><th>Property</th><th>Eager — store at ingest</th><th>Lazy — fetch on demand</th></tr>
+      <tr><td>Durability if source deleted</td><td>Survives trash/spam/delete/token-revoke</td><td><b>Lost</b> once the message leaves the mailbox</td></tr>
+      <tr><td>Storage cost</td><td>Pays to store every attachment</td><td>Near-zero</td></tr>
+      <tr><td>Content-addressed dedupe</td><td>One blob per unique SHA-256</td><td>Re-decoded per read; cross-message dedupe lost</td></tr>
+      <tr><td>AV / allowlist at ingest</td><td>Scanned once, gate before store</td><td>Deferred to read time — poison reaches you live</td></tr>
+      <tr><td>Read latency &amp; coupling</td><td>Local read, decoupled</td><td>Network fetch; every read needs a valid token + quota</td></tr>
+      <tr><td>Audit / reproducible hash</td><td>Bytes + hash frozen at ingest</td><td>Only while the message still exists</td></tr>
+    </table>
+
+    <div class="callout key">
+      <div class="h">Recommendation — a hybrid, and it's a small delta</div>
+      <p><b>Always ingest metadata + the durable re-fetch key</b> (<code>provider_message_id</code>,
+      filename, type, size, and the cheap SHA-256) and <b>fetch bytes on demand</b> — except for a
+      selectively eager-stored subset (small parts, allowlisted types, anything that must be AV-scanned or
+      audited). Pick <b>eager</b> as the default when you need durability past mailbox retention,
+      compliance/audit, at-ingest scanning, or low-latency frequent reads; pick <b>lazy</b> when
+      attachments are rarely opened, storage/PII-minimization matters, and messages are long-lived.</p>
+      <p><b>Two honest caveats about today's code</b> before you rely on "lazy = no storage": the
+      on-demand path <i>currently still writes blobs</i> (it passes the blob store into extraction), and
+      there is <b>no metadata-only ingest mode</b> yet — so true lazy is a small code change, not a config
+      flag.</p>
+    </div>
+
+    <!-- 4 CLEAN -->
+    <h3 id="clean"><span class="num">04</span>HTML → text cleaning</h3>
+    <h4>How it works</h4>
+    <p>Cleaning is a swappable <code>ContentCleaner</code> port. The default is deliberately <b>gentle and
+    idempotent</b>: if <code>body_text</code> is empty but <code>body_html</code> exists, it backfills the
+    text (drop <code>&lt;script&gt;/&lt;style&gt;</code> blocks and tags, unescape entities, collapse
+    whitespace). The same fallback also runs inside extraction, so an <b>HTML-only email never delivers a
+    blank body</b>. Aggressive stripping (quoted-reply / signature removal) is a deliberately-out-of-scope
+    opt-in for a later plan — the port exists so it slots in without a breaking change.</p>
+    <div class="qa">
+      <div class="q">Is my HTML ever mangled or aggressively rewritten?</div>
+      <p class="a">No. The default only <i>backfills missing plaintext</i>; it never touches existing
+      <code>body_text</code> and never mutates <code>body_html</code>. Because V1 delivers plain text
+      only (no HTML rendering), there is intentionally no HTML sanitizer.</p>
+      <div class="q">Any risk on a huge or malformed HTML body?</div>
+      <p class="a">The backfill is regex-based tag stripping with no hard timeout, so a pathological or very
+      large HTML body carries some worst-case CPU cost on the single worker. Fine for ordinary mail; a
+      proper parser/sanitizer is the later-plan path if you ever render HTML.</p>
+    </div>
+
+    <!-- 5 FILTER -->
+    <h3 id="filter"><span class="num">05</span>Filtering</h3>
+    <h4>How it works</h4>
+    <p>Filters evaluate against the cheap <code>Envelope</code> <b>before the body is parsed</b> — so
+    dropping mail is nearly free. A filter chain returns the <b>first decisive KEEP/DROP</b>; anything
+    else is <code>UNCERTAIN</code> and falls through to the next filter. Empty configs are safe no-ops.
+    Eleven built-in kinds ship, plus your own <code>lambda env: …</code> predicate.</p>
+    <table>
+      <tr><th>Family</th><th>Kinds</th><th>Semantics</th></tr>
+      <tr><td>Block</td><td><code>blacklist</code> · <code>block_sender</code> · <code>internal_domain</code> · <code>no_personal</code> · <code>list_mail</code></td><td>DROP on match, else fall through</td></tr>
+      <tr><td>Allow (strict)</td><td><code>only_domain</code> · <code>only_sender</code></td><td>DROP everything that doesn't match</td></tr>
+      <tr><td>Allow (soft)</td><td><code>whitelist</code></td><td>KEEP on match &amp; stop; non-match falls through</td></tr>
+      <tr><td>Content</td><td><code>subject</code> · <code>to</code> · <code>cc</code></td><td>regex / address match → DROP</td></tr>
+      <tr><td>Custom</td><td><code>lambda env: bool</code></td><td>True = keep, False = drop</td></tr>
+    </table>
+    <div class="qa">
+      <div class="q">Difference between <code>whitelist</code> and <code>only_domain</code>?</div>
+      <p class="a"><code>whitelist</code> keeps a match and stops the chain but lets non-matches continue
+      to other filters. <code>only_domain</code> is a strict allow-list — it actively <b>drops</b>
+      anything not in the set.</p>
+      <div class="q">Are user-supplied regexes safe to run?</div>
+      <p class="a">They run via <code>re.search</code> with no timeout, so a catastrophic (ReDoS) pattern
+      could stall the single worker. Keep subject/to/cc patterns simple and anchored — this is trusted-input
+      territory, not a place for arbitrary attacker-controlled regex.</p>
+      <div class="q">What if a custom predicate throws?</div>
+      <p class="a">It's treated like any processing error — retried, then dead-lettered — not silently
+      swallowed. Write predicates to be total (guard against missing fields) so a bug doesn't quietly
+      quarantine mail.</p>
+      <div class="q">How are addresses matched — case, sub-addressing, IDN?</div>
+      <p class="a">Exact-address matches are lowercased; regexes are case-sensitive unless you add
+      <code>(?i)</code>. Sub-addressing (<code>+tags</code>) and internationalized (punycode/IDN) domains
+      are <b>not</b> normalized — match on the exact form you expect to see.</p>
+    </div>
+
+    <!-- 6 CLASSIFY -->
+    <h3 id="classify"><span class="num">06</span>Classification seam</h3>
+    <h4>How it works</h4>
+    <p>Every <code>CleanEmail</code> carries two booleans derived at extract time and shipped on the event
+    (schema 1.3). <code>is_auto_submitted</code> is true when an <code>Auto-Submitted</code> header is
+    present and isn't literally <code>no</code> (RFC 3834 — vacation/auto-replies). <code>is_bounce</code>
+    is a thin heuristic: a daemon sender (<code>mailer-daemon</code>/<code>postmaster</code>), a null
+    <code>Return-Path</code> (<code>&lt;&gt;</code>), or a <code>multipart/report; delivery-status</code>
+    body (RFC 3464 DSN).</p>
+    <div class="qa">
+      <div class="q">Is this full bounce/DSN parsing?</div>
+      <p class="a">No — it's a <b>seam</b> exposing simple yes/no flags so consumers can route NDRs and
+      auto-replies today. Full RFC 3464 classification is deliberately a later plan.</p>
+      <div class="q">How reliable are the flags — false positives?</div>
+      <p class="a">They're heuristics: a real person at <code>postmaster@</code>, or a manually forwarded
+      delivery report, can trip <code>is_bounce</code>. Treat the flags as routing <i>hints</i>, not ground
+      truth — don't hard-auto-delete solely on them.</p>
+      <div class="q">Can a sender spoof these flags?</div>
+      <p class="a">Yes — <code>Auto-Submitted</code> and <code>Return-Path</code> are sender-set and
+      unauthenticated, and V1 does no DKIM/SPF. So don't use the flags as a security control, only as a
+      convenience for routing well-behaved mail.</p>
+    </div>
+
+    <!-- 7 DEDUPE -->
+    <h3 id="dedupe"><span class="num">07</span>Dedupe &amp; at-least-once</h3>
+    <h4>How it works</h4>
+    <p>Delivery is honestly <b class="tip" data-tip="Every email reaches you at least once; after a retry it may occasionally arrive twice, so you remove duplicates using its id.">at-least-once</b>: on failure and replay the same email can reach you
+    twice, so every event is stamped with the <code>idempotency_key</code> for you to dedupe on.
+    Internally, a dedupe store guards work with a four-call lifecycle:</p>
+    <ul>
+      <li><code>try_claim(key, lease)</code> — take an exclusive lease <i>before</i> any work; a lost
+      claim means "duplicate", short-circuit.</li>
+      <li><code>record_attempt(key)</code> — bump the retry counter.</li>
+      <li><code>mark_done(key, ttl)</code> — terminal; the claim sticks for a 60-day TTL so replays are
+      recognised.</li>
+      <li><code>release(key)</code> — transient failure; hand the claim back so a later run retries.</li>
+    </ul>
+    <div class="qa">
+      <div class="q">Why not exactly-once?</div>
+      <p class="a">Exactly-once across a network + crashes is impractical; the honest, documented contract
+      is at-least-once + a stable idempotency_key. The same shape backs both the in-memory store and the
+      SQLite one, so a future Redis/Firestore adapter with lease-expiry drops in without changing callers.</p>
+      <div class="q">What if processing outlives the claim's lease?</div>
+      <p class="a">In V1 it can't cause a double-process: the shipped stores don't actually expire leases,
+      and there's a single worker, so no one steals the claim. Lease-expiry is intentionally left for a real
+      distributed store — the port shape already anticipates it.</p>
+      <div class="q">What should the consumer actually do with the idempotency_key?</div>
+      <p class="a">Treat it as the <b>natural key</b> and upsert/dedupe on it. Because transport delivery is
+      at-least-once, the same event can legitimately arrive twice; keying on the idempotency_key collapses
+      those to one.</p>
+    </div>
+
+    <!-- 8 RELIABILITY -->
+    <h3 id="reliab"><span class="num">08</span>Reliability &amp; the DLQ</h3>
+    <h4>How it works — one taxonomy, three reactions</h4>
+    <p>Every failure is sorted into one of three types, and each reacts differently:</p>
+    <div class="lane">
+      <div class="box auth"><div class="bh">Auth · 401</div>
+        <p>Force <b>one</b> token refresh, retry the message <b>once</b>. A second failure → DLQ. Bounded
+        by straight-line control flow, not a counter — no refresh loop.</p></div>
+      <div class="box perm"><div class="bh">Permanent · 403 / 404 / 410 / bad-base64</div>
+        <p>Will never succeed. Dead-letter <b>immediately</b> — no retry. This is what stops "poison
+        loops" on deleted or garbled mail.</p></div>
+      <div class="box trans"><div class="bh">Transient · 429 / 5xx / network</div>
+        <p>Backoff and retry up to <b>3</b> attempts: exponential <code>2^n</code> + jitter, honoring
+        <code>Retry-After</code>. Then dead-letter.</p></div>
+    </div>
+    <p><b>Storm containment.</b> Concurrency is capped by a bounded semaphore (default 8 in-flight); when
+    saturated the client <b>sheds load</b> — raises a transient error immediately rather than queueing —
+    so a flood of "slow down" responses can't pile up and crash the run.</p>
+    <p><b>Durable DLQ + redrive.</b> A dead-letter persists a full record (including the base64 RFC822
+    bytes) to a <code>DeadLetterStore</code>. <code>redrive()</code> rebuilds each message and runs it
+    through a <b>fresh pipeline</b> with a throwaway dedupe store, so a previously-quarantined message
+    gets a clean second chance once the root cause is fixed; the original idempotency_key rides along so
+    downstream still dedupes. Poison isolation is per-message — one bad email is quarantined, never
+    crashing the batch. (Counting contract: only <code>add_dead_letter()</code> increments the DLQ
+    counter, so one poison message is counted exactly once.)</p>
+    <div class="qa">
+      <div class="q">Why does an unknown-size message get dead-lettered instead of downloaded?</div>
+      <p class="a">Fail-closed: if we can't confirm it's under budget, we refuse to pull it. Better to
+      quarantine and inspect than to blow past the size limit on a message that lied about its size.</p>
+      <div class="q">Can one broken email stall the whole inbox?</div>
+      <p class="a">No. It's isolated to the DLQ, the cursor advances past it (dead-lettered is terminal),
+      and processing continues. You replay it later via <code>redrive()</code>.</p>
+      <div class="q">What if the DLQ store itself fails to persist a record?</div>
+      <p class="a">The message is <i>not</i> marked done, so it stays reclaimable and re-dead-letters on a
+      later run — no silent loss. Durability is ordered so the quarantine write happens before the claim is
+      closed.</p>
+      <div class="q">A dropped-by-filter email isn't in the DLQ — recoverable if I fix the filter later?</div>
+      <p class="a">No. A filter drop is terminal and the cursor has moved past it, so correcting a filter
+      afterwards needs a bounded re-scan/backfill, not a DLQ redrive. Tune filters conservatively.</p>
+      <div class="q">Could a giant <code>Retry-After</code> freeze everything?</div>
+      <p class="a">Backoff sleeps on the single worker thread, so a very large server-supplied
+      <code>Retry-After</code> would stall the run. Worth a hard cap on the honored value in production.</p>
+    </div>
+
+    <!-- 9 STATE -->
+    <h3 id="state"><span class="num">09</span>State &amp; persistence</h3>
+    <h4>How it works</h4>
+    <p>One knob — <code>state=</code> — selects durability. <code>"memory"</code> is stateless (cursor,
+    dedupe, and blobs live in RAM; you dedupe on <code>canonical_id</code> yourself), good for demos and
+    tests. <code>"sqlite:///mailflow.db"</code> persists the <b>cursor</b>, the <b>dedupe claims</b>, and
+    the <b>DLQ</b> to one pure-stdlib SQLite file, with attachments written to a sibling blob directory.
+    Restart the process and it resumes from the stored cursor, skips already-done messages, and honours
+    stored attempt counts — no external database required.</p>
+    <div class="qa">
+      <div class="q">Can two processes run against the same SQLite file?</div>
+      <p class="a">Not a supported configuration. V1 is single-worker — one connection guarded by a lock.
+      The monotonic cursor + dedupe keep it <i>correct</i> if you tried it, but you'd hit lock contention
+      and wasted double-fetches. Run one instance; restarts of that one instance are safe.</p>
+      <div class="q">How durable is it on a hard crash or power loss?</div>
+      <p class="a">Commits survive an ordinary process restart (that's the point of SQLite state).
+      Hardening for power-cut durability (WAL/synchronous) and strict blob↔DB atomicity is a
+      production-adapter concern, not something the reference SQLite store promises.</p>
+      <div class="q">Can we swap SQLite for Postgres / Redis / S3 later?</div>
+      <p class="a">Yes — cursor, dedupe, DLQ, and blob are all <b>ports</b>. A real backend drops in via
+      <code>overrides=</code> (or a new state scheme) without touching pipeline code. That swappability is
+      the whole reason the seams exist.</p>
+    </div>
+
+    <!-- 10 SECRETS -->
+    <h3 id="secrets"><span class="num">10</span>Secrets &amp; token rotation</h3>
+    <h4>How it works</h4>
+    <p>Credentials come through a <code>SecretProvider</code> (V1 keeps it simple — one delegated OAuth
+    refresh token per mailbox, resolved from an <code>env://</code> ref). When Google <b>rotates</b> the
+    refresh token, the client compares before/after and, if a <code>rotation_sink</code> is wired, hands
+    the new token to it to persist (the file sink writes <code>0600</code>). Scope is verified at startup
+    by default — a missing <code>gmail.readonly</code> fails fast rather than mid-run.</p>
+    <div class="callout warn">
+      <div class="h">Known gap — worth stating up front</div>
+      <p>Rotation persistence is only <b>half-wired</b>. The sink is called on rotation and writes the new
+      token, but nothing reads it back at startup — the library re-initializes from the original configured
+      token. So a rotated token is effectively <b>lost on restart</b> unless the consuming app loads the
+      persisted value itself (or you back the secret with a rotating store). Close this loop before relying
+      on long-lived unattended runs.</p>
+    </div>
+    <div class="qa">
+      <div class="q">Concurrent 401s — is there a refresh storm?</div>
+      <p class="a">Each in-flight request can trigger its own single refresh (there's no shared refresh
+      lock), so a burst of simultaneous 401s could hit the token endpoint a few times. Harmless at
+      single-worker scale; a coalescing lock would be the fix if you parallelize.</p>
+      <div class="q">Does the startup scope check ever pass without really checking?</div>
+      <p class="a">On older <code>google-auth</code> that doesn't report granted scopes it <b>fails open</b>
+      — it trusts the requested scopes rather than the actual grant. A documented caveat; on current
+      libraries it verifies the real grant and fails fast on a missing <code>gmail.readonly</code>.</p>
+    </div>
+
+    <!-- 11 API -->
+    <h3 id="api"><span class="num">11</span>Consumption API</h3>
+    <h4>How it works</h4>
+    <p>One front door: <code>connect(provider, …)</code> returns a <code>Mailflow</code> handle. You pick
+    how to consume and layer optional knobs — <code>filters</code> (which mail), <code>fields</code>
+    (project to a trimmed dict), <code>clean_fn</code> + <code>stages</code> (transform/drop),
+    <code>attachments</code> (policy), <code>state</code>, <code>overrides</code>.</p>
+    <table>
+      <tr><th>Mode</th><th>Shape</th><th>Gmail</th><th>Memory</th></tr>
+      <tr><td><code>stream()</code></td><td>generator, yields as they arrive</td><td>✓ (daemon)</td><td>✓ (one pass)</td></tr>
+      <tr><td><code>fetch_new()</code></td><td>one pass → list</td><td>—</td><td>✓ only</td></tr>
+      <tr><td><code>on_email=</code> + <code>run()</code></td><td>blocking push callback</td><td>✓</td><td>✓</td></tr>
+      <tr><td><code>get_email/body/attachments(id)</code></td><td>on-demand live pull, stores nothing</td><td>✓ only</td><td>—</td></tr>
+    </table>
+    <p>Order is enforced: <b>filters</b> see the cheap envelope pre-body; <b>clean_fn</b> runs first among
+    processors; <b>stages</b> see the full <code>CleanEmail</code> and drop it by returning
+    <code>None</code>/<code>False</code>. <code>fields=[…]</code> projects the delivered object to a
+    trimmed dict (accepting <code>"from"</code> as an alias for <code>from_</code>).</p>
+    <div class="qa">
+      <div class="q">Slow consumer on a live <code>stream()</code> — backpressure?</div>
+      <p class="a">The live path buffers into an effectively unbounded queue, so a consumer that drains
+      slower than mail arrives grows memory. Keep the consumer fast, or batch/offload — there's no built-in
+      backpressure yet.</p>
+      <div class="q">What if my <code>stage</code> or <code>on_email</code> callback throws?</div>
+      <p class="a">It's caught and treated as a processing failure (retried, then dead-lettered), so it
+      won't crash the loop — but it also won't surface as an exception to your caller. Watch the DLQ, and
+      keep callbacks defensive.</p>
+      <div class="q">Lifecycle — clean shutdown, or calling <code>stream()</code> twice?</div>
+      <p class="a">The live loop runs on a daemon thread with no graceful-stop or reentrancy guard today, so
+      run one stream per handle and rely on process exit to stop it. A <code>close()</code>/context-manager
+      seam is a reasonable near-term addition.</p>
+    </div>
+
+    <!-- 12 OBSERVABILITY -->
+    <h3 id="observ"><span class="num">12</span>Observability</h3>
+    <h4>How it works</h4>
+    <p>Every message produces a <code>DecisionTrace</code> — including drops — logged through the stdlib
+    logger (<code>mailflow.pipeline</code>) with its disposition, stage, and reason, so
+    <i>"why was my email dropped?"</i> is always answerable. A <code>RunReport.counters()</code> returns a
+    plain dict (fetched / emitted / dropped / duplicate / dead_lettered / attachments_stripped) — a
+    dependency-free metrics seam, no Prometheus/OTel required. <code>health()</code> probes the cursor,
+    dedupe, and blob stores (the dedupe probe does an atomic claim+release on a reserved key so it never
+    corrupts real state).</p>
+    <div class="qa">
+      <div class="q">Are the counters and run reports persisted?</div>
+      <p class="a">No — <code>RunReport</code> is per-run and in-memory; the live runtime doesn't aggregate
+      it across runs. <code>counters()</code> is a <i>pull</i> seam you scrape into your own metrics
+      system; nothing survives a restart on its own.</p>
+      <div class="q">Would I actually know if the watch silently died?</div>
+      <p class="a">Not easily today — the renewal scheduler swallows errors and <code>health()</code>
+      doesn't probe the subscription, so an expired watch still reports "healthy" while the timed sweep is
+      the only backstop. Add renewal logging + a watch-liveness (and cursor-momentum) check before
+      production alerting.</p>
+      <div class="q">Log volume at scale?</div>
+      <p class="a">One INFO line per message (with the drop reason). At high throughput you'll want level
+      control / sampling and a JSON formatter to feed a log pipeline — the trace content is there, the
+      shipping policy is yours.</p>
+    </div>
+
+    <!-- ============ PART 3: LIMITS ============ -->
+    <h2 class="part">Part 3 · Straight talk</h2>
+    <h3 id="limits">Honest limitations &amp; deliberate deferrals</h3>
+    <p>What a reviewer should know is <i>intentionally</i> not in V1, so nothing reads as an accidental
+    gap:</p>
+    <table>
+      <tr><th>Area</th><th>Status in V1</th><th>Why</th></tr>
+      <tr><td>Push authenticity (OIDC-JWT verifier)</td><td>Implemented &amp; tested, but <b>not wired</b> into the live pull runtime</td><td>Poll is authoritative; the push only wakes the poller, so an unverified push can't corrupt the stream. The seam is ready to wire.</td></tr>
+      <tr><td>Token rotation without a sink</td><td>Rotated token lost on restart</td><td>Single-tenant POC default; wire a <code>rotation_sink</code> in production.</td></tr>
+      <tr><td>Stale-history window (&gt;7 days down)</td><td>Re-seeds &amp; <b>skips</b> the gap</td><td>Availability-first — never jam the stream. Bounded backfill is a later plan.</td></tr>
+      <tr><td>Attachment AV/CDR scanning</td><td>No-op scanner + empty allowlist (allow-all)</td><td>The safety <b>seam</b> ships; a real scanner is deferred.</td></tr>
+      <tr><td>Aggressive cleaning / HTML sanitizer</td><td>Gentle backfill only; no sanitizer</td><td>V1 delivers plain text only; the <code>ContentCleaner</code> port allows later add-ons.</td></tr>
+      <tr><td>Outlook / Microsoft Graph</td><td>Adapter in tree, <b>not run live</b></td><td>Gmail is the second-provider conformance proof; Outlook is a fast-follow.</td></tr>
+      <tr><td>Concurrency &amp; ordering</td><td>Single worker, availability-first</td><td>No fencing/leases/strict-ordering; duplicates handled by idempotency_key.</td></tr>
+    </table>
+
+    <footer>
+      <p><b>Scope:</b> shipped Gmail V1 on <code>anam/library</code>, wire schema 1.3 · synchronous ·
+      single-worker · poll-authoritative.</p>
+      <p><b>Companion:</b> <code>examples/feature-explorer-v2.html</code> — the interactive
+      compose-your-pipeline view of the same feature set.</p>
+      <p><b>Reading note:</b> this document is conceptual by design — it explains mechanisms and
+      guarantees, not line-by-line implementation. The source of truth is the code under
+      <code>src/mailflow/</code>.</p>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

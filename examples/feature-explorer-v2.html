@@ -246,7 +246,6 @@
     <span class="chip" title="&gt;50MB or unknown size → DLQ before download">size&nbsp;guard</span>
     <span class="chip" title="transient → backoff retry (≤3) → dead-letter · permanent → DLQ now">retry&nbsp;→&nbsp;DLQ</span>
     <span class="chip" title="duplicates possible — dedupe on EmailEvent.idempotency_key">at-least-once</span>
-    <span class="chip" title="exponential backoff w/ jitter + bounded concurrency (load-shed)">storm&nbsp;containment</span>
     <span class="chip" title="Gmail fetch-time 401 forces ONE token refresh + one retry before dead-lettering">401&nbsp;→&nbsp;refresh-once</span>
     <span class="chip" title="poison / over-cap messages persist to a DeadLetterStore for memory + gmail today (Graph Event Hubs/Service Bus wiring pending) — redrive() or `mailflow redrive` re-submits them through a fresh pipeline">durable&nbsp;DLQ&nbsp;+&nbsp;redrive</span>
     <span class="chip" title="mark_done(key, ttl_seconds) now really expires — mf.purge_expired() or `mailflow purge` deletes done claims past their ttl so the dedupe store doesn't grow forever">ttl&nbsp;purge</span>

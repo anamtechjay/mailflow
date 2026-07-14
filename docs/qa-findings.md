@@ -228,3 +228,87 @@ test-count coverage. No new unit test added for the fake-transport gap itself (w
 teaching `_FakeGraphTransport` Graph's real OData type-validation rules — logged here as a
 follow-up idea, not actioned, since the live check already proves the real fix). Full narrative in
 `docs/mailflow-final-report.md` §4 and `docs/testing-guide.md` §8.1.
+
+---
+
+## Review 2026-06-30 — V1 readiness verification (full P0 audit)
+
+> Note: this pass ran on `anam/library` before the production-hardening branch existed. Several
+> items it lists as deferred-to-fast-follow (VR1/C1-sweep-cursor, VR3/B3-B4 Graph transport
+> thinness) remain open per the `docs/library-viability-audit.md` cross-check below (tracked
+> there as C16/C18/C14). VR4/C1-subscription-expiry and VR2/A7-thread-key have not been
+> independently re-verified against current code.
+
+Reviewer: V1 verification pass per `docs/architecture-review/v1-verification-prompt.md` — one agent
+per checklist item (A×12, B×6, C×2, D×1 = 21), each citing `file:line`. Judged against the **locked
+P0 bar** in `features.md` (scope locked 2026-06-29: **Gmail-only live; Outlook/Graph deferred to
+fast-follow**), not the verification prompt's pre-lock wording (which still lists A9/C1/C2/A1-Graph).
+
+### Verdict: 🟢 **V1 GO — 0 in-scope blockers.**
+
+Every freeze-now **contract** is frozen correctly; every **Gmail** (the V1 live provider) behavior
+path is correct and tested; the **second-provider proof (D1)** is a real working Gmail adapter with a
+passing e2e test (`tests/test_gmail_e2e.py`, 21 passed), not a paper audit. **The Gmail part is done
+— V1 is considered done for now.** All ✅ items: A1(Gmail) A2 A3 A4 A5 A6 A8 A10 A11 A12 · B1 B2
+B3(Gmail) B4(Gmail) B5 · D1.
+
+The findings below are **the complete set of non-✅ marks** — every one resolves to deferred
+Outlook/Graph work or an explicitly out-of-V1 item. None gate V1.
+
+### Deferred — Outlook/Graph fast-follow (NOT V1 gaps; Gmail path unaffected)
+
+| ID | Sev | Finding | Evidence | Scope |
+|----|-----|---------|----------|-------|
+| **VR1** | 🟡 | **B6 — Graph sweep cursor is not page-atomic** (genuine data-loss bug, Graph-only). `delta_sweep` returns one end-of-sequence `deltaLink` and `GraphProvider.sweep` stamps that *same* value on *every* message (only `order` increments). The pipeline commits per terminal disposition, so the end-of-sweep resume token becomes durable after the **first** message is processed — a crash mid-sweep silently drops the fetched-but-unprocessed messages 2..N (Graph resumes past them; dedupe can't save what's never re-delivered). Gmail is correct (per-message historyId cursor is genuinely atomic). | `graph/provider.py:113`, `graph/client.py:75-95`, `core/pipeline.py:148` | **Deferred (Outlook fast-follow)** — flag as a real correctness bug to fix *before* Outlook goes live. Fix: carry the previous resume token on all but the last message of the sweep; emit `new_delta` only on the final one (~5 lines). |
+| **VR2** | 🟢 | **A7 — Graph drops `conversationId` thread key.** Contract is frozen (`CleanEmail.thread_key` exists) and Gmail populates it + subject fallback correctly; `GraphExtractor.extract` requests `conversationId` in `$select` but never maps it, so every Graph `thread_key` defaults to `""` with no subject fallback. A7's V1 bar (Contract + Gmail) is met. | `core/models.py:215`, `graph/extractor.py:74-108`, `graph/client.py:16` | **Deferred (Outlook fast-follow)** — cheap fix: map `conversationId` → `thread_key` with `normalize_subject(subject)` fallback in `GraphExtractor.extract` (2 lines) + a Graph-side thread-key test. |
+| **VR3** | 🟢 | **B3/B4 — Graph client thinner than Gmail.** Graph `_request` retries **429 only** (not 503/5xx), uses a flat `Retry-After` (no exponential/jitter), has **no concurrency cap**, and a Graph **410** on a per-message GET re-raises as plain `GraphError` → pipeline catch-all bounded-retry rather than straight-to-DLQ Permanent. Gmail fully satisfies B3 and B4. | `graph/client.py:31-53`, `core/pipeline.py:198` | **Deferred (Outlook fast-follow)** — align Graph transport to Gmail: retry `429 or >=500`, exponential+jitter backoff, `BoundedSemaphore`, and map 410→Permanent. |
+| **VR4** | 🟢 | **C1 — Graph subscription expiry requests 8640 min** (> the ~4230 ceiling; comment's 10080/7d premise is wrong for message subscriptions). Graph would reject every subscription. Gmail unaffected (daily `watch()`). | `graph/config.py:38` | **Deferred (Outlook live blocker)** — one-liner `subscription_minutes` `8640 → ≤4230`. Already tracked as C1 in `features.md`. |
+| **VR5** | 🟢 | **C2 — Graph size-probe absent.** No extended-property (`singleValueExtendedProperty` / PR_MESSAGE_SIZE) probe exists; size is derived from delta JSON and there is no streaming byte-cap. The **B1 fail-closed guard backstops it in V1** (`pipeline.py:170-176` dead-letters unknown/zero size before download, provider-agnostic). | `graph/provider.py:117-124`, `core/pipeline.py:170-176` | **Deferred (Outlook live blocker)** — verify the extended-property probe on a live delta call, or add a streaming download cap. Already tracked as C2 in `features.md`. |
+
+### Out of V1 scope (dropped from P0, not a gap)
+
+| ID | Finding | Where it lands |
+|----|---------|----------------|
+| **VR6** | **A9 — Store erasure + encryption-context absent.** `BlobStore.put_stream` has no `encryption_context` arg and no `erase()` exists (the only `delete()` is `DeadLetterStore.delete` for redrive cleanup, not GDPR erasure). | **P2** — GDPR DSAR tooling / KMS encryption. Dropped from P0 per Decision #8 (2026-06-29); `core/ports.py:127`. |
+| **VR7** | **A1 (Graph) — Graph still fetches by notification payload** (`get_message(user_id, message_id)` from the push), where Gmail re-derives from the durable cursor (wake-signal-only). | **Outlook fast-follow** — the deferred Outlook fetch-rewire; `graph/provider.py:126-131`. Gmail already complies. |
+
+### Note
+
+The verification prompt (`v1-verification-prompt.md`) predates the 2026-06-29 scope lock, so it lists
+A9, C1, C2, and the A1-Graph rewire as if they were V1 blockers. They are **not** under the locked
+P0 bar — recorded here as deferred so they aren't re-flagged as V1 gaps on the next pass. When the
+Outlook adapter is taken live, work VR1–VR5 + VR7 as the fast-follow batch (VR1 first — it's the only
+genuine data-loss bug among them).
+
+---
+
+## Review 2026-07-14 — `docs/library-viability-audit.md` cross-check against production-hardening
+
+`anam/library` (merged into `feat/cleanup` this pass) carried a separate 18-finding (C1-C18)
+multi-agent viability audit dated 2026-07-02, run against pre-hardening commit `90b6ac5`. Cross-
+checked each finding against the current tree:
+
+**Fixed by the production-hardening pass** (10/18): C1 (mid-batch cursor loss — `pipeline.py`
+low-water-mark), C2 (dedupe `release()` erasing attempts — REL-3/I5/P1 above), C3 (no lease expiry
+— `expires_at`/REL-2), C4 (`sqlite:///mf.db` root-path crash — CFG-3), C5/C6 (docs contradicting
+`on_filtered` default — stale docs since deleted), C8 (inline body misclassified as attachment —
+MIME-3), C10 (bogus charset `LookupError` — E-1/mime.py `_decode_text`), C12 (bootstrap re-seeding
+cursor every restart — REL-5/INT-4), C17 (Event Hub checkpoint advancing past failures — REL-8).
+
+**Partially fixed** (3/18): C11 (Gmail per-message cursor loss fixed by the low-water-mark, but
+`provider.py` still stamps every message in a batch with the same batch-final historyId — a
+residual loss window if an earlier message in the same batch commits before a later one fails),
+C13 (rotated refresh token now loaded back at startup; the persist-write is still non-atomic),
+C15 (a real `dlq_store` is now wired for memory/Gmail; Graph's live path still has no `dlq_store`
+param and `GmailProvider.fetch` still drops `PermanentError` silently with no record).
+
+**Still present** (5/18, all Graph/live-path or concurrency): C7 (`stream()` hangs forever if the
+live thread dies on startup, no stop API), C9 (`message/rfc822` forwarded-attachment parts leak
+into the outer message), C14 (no thread-safety across Pub/Sub callback + sweep/renew threads), C16
+(Graph `run_service` never renews subscriptions — silent halt within ~6 days), C18 (delta-sweep
+stamps every message with the final `deltaLink` — same class of bug as VR1 above, unfixed).
+
+**Scope verdict**: the flagship Gmail pull-path correctness bugs are closed. Graph/Azure live-path
+gaps (C7, C9, C14, C16, C18, partial C11/C13/C15) are real and un-actioned — **Phase gap** if a
+Graph live-adapter hardening pass is scoped next, not a regression from this pass (Graph live
+delivery was explicitly out of scope for production-hardening per the 2026-07-13 plan).
