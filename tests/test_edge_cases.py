@@ -154,7 +154,7 @@ def test_get_email_propagates_fetcher_error() -> None:
 
 def test_resolve_state_unknown_scheme_raises() -> None:
     with pytest.raises(NotImplementedError):
-        resolve_state("postgres://localhost/db")
+        resolve_state("mysql://localhost/db")
 
 
 def test_resolve_state_sqlite_empty_path_raises() -> None:

@@ -228,18 +228,15 @@ def test_rfc2047_encoded_subject_decoded() -> None:
     assert "café" in e.subject
 
 
-@pytest.mark.xfail(
-    reason="FINDING E-1: a text/plain body declaring an UNKNOWN charset raises "
-           "LookupError in EmailMessage.get_content() — the extractor does not fall back "
-           "to errors='replace', so a malformed-charset email poisons to the DLQ instead of "
-           "being delivered with a best-effort body.",
-    strict=True, raises=LookupError)
 def test_unknown_charset_does_not_crash() -> None:
+    # FIXED (MIME-2): an unknown declared charset no longer raises LookupError; the
+    # extractor/envelope fall back to a permissive UTF-8-with-replacement decode so the
+    # mail is delivered with a best-effort body. See tests/qa/test_mime2_charset_fallback.py.
     raw = raw_no_defaults(
         "From: a@x.com\r\nSubject: hi\r\nMessage-ID: <m@x>\r\n"
         "Content-Type: text/plain; charset=x-totally-made-up",
         body="still readable")
-    e = extract(raw)                                 # SHOULD not raise (currently does)
+    e = extract(raw)                                 # no longer raises
     assert "still readable" in e.body_text
 
 

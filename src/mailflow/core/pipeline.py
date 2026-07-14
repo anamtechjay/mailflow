@@ -12,7 +12,7 @@ from __future__ import annotations
 import base64
 import logging
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Callable, Literal, cast
 
 from pydantic import BaseModel
 
@@ -33,8 +33,10 @@ from mailflow.core.observability import (
     DeadLetterRecord,
     DecisionTrace,
     HealthReport,
+    Observers,
     RunReport,
     health as _health,
+    notify_observers,
 )
 from mailflow.core.ports import (
     AuthRefresher,
@@ -98,6 +100,7 @@ class Pipeline:
         cleaner: ContentCleaner | None = None,
         auth_refresher: AuthRefresher | None = None,
         dlq_store: DeadLetterStore | None = None,
+        observers: Observers | None = None,
     ) -> None:
         _assert_port(provider, MailboxProvider, "provider")
         _assert_port(parser, EnvelopeParser, "parser")
@@ -132,21 +135,39 @@ class Pipeline:
         self.cleaner = cleaner
         self.auth_refresher = auth_refresher
         self.dlq_store = dlq_store
+        self._observers = observers or Observers()
 
     def run_once(self) -> RunReport:
         report = RunReport()
         self.provider.connect()
         for stream in self.provider.sync_streams():
             self._run_stream(stream, report)
+        if self._observers.on_report is not None:
+            # notify_observers takes Callable[[object], None]; ReportObserver is the
+            # narrower Callable[[RunReport], None], which mypy strict correctly refuses
+            # to widen implicitly (Callable is contravariant in its parameter). The cast
+            # is safe: notify_observers only ever calls this with a RunReport (the `arg`
+            # passed on this very line).
+            notify_observers(
+                cast("Callable[[object], None]", self._observers.on_report),
+                report, logger=_log,
+            )
         return report
 
     def _run_stream(self, stream: StreamRef, report: RunReport) -> None:
         cursor = self.cursor_store.get(self.config.tenant, stream)
+        blocked = False  # REL-1: once a message is non-terminal, hold the cursor at/behind it
         for msg in self.provider.fetch(stream, cursor):
             report.fetched += 1
             disposition = self._process(msg, report)
-            # §8.1: advance the bookmark on ANY terminal disposition, via monotonic CAS (§8.3).
-            if disposition is not None:
+            # §8.1 + REL-1 low-water-mark: advance the bookmark only through the *contiguous
+            # prefix* of terminal dispositions, via monotonic CAS (§8.3). A non-terminal
+            # (transient-retry) message must be re-fetched next run, so the cursor must not move
+            # past it — nor past any later message in the same batch, or that earlier message
+            # would be silently skipped.
+            if disposition is None:
+                blocked = True
+            elif not blocked:
                 self.cursor_store.commit_if_ahead(self.config.tenant, stream, msg.cursor)
 
     def _process(self, msg: RawMessage, report: RunReport) -> Disposition | None:
@@ -386,6 +407,12 @@ class Pipeline:
             trace.disposition.value, trace.stage, trace.canonical_id,
             trace.stream, trace.matched_filter, trace.reason,
         )
+        if self._observers.on_trace is not None:
+            # See the analogous cast in run_once() for why this is needed/safe.
+            notify_observers(
+                cast("Callable[[object], None]", self._observers.on_trace),
+                trace, logger=_log,
+            )
 
     def _record_stripped(self, report: RunReport, trace: DecisionTrace) -> None:
         """Record one stripped-attachment trace via RunReport.record_stripped().
