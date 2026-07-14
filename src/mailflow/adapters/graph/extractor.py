@@ -97,6 +97,10 @@ class GraphExtractor:
             "attachments": _attachments(data),
             "categories": [str(c) for c in data.get("categories", []) or []],
             "folder": msg.stream.folder or "",
+            # A7: Graph's conversation id is the threading key (parity with Gmail's
+            # threadId). Fetched into MESSAGE_SELECT; map it so conversation grouping
+            # works on the Graph poll/Event-Hubs path, not just Gmail.
+            "thread_key": str(data.get("conversationId", "") or ""),
             "list_id": env.list_id,
             "list_unsubscribe": env.list_unsubscribe,
             "auto_submitted": env.auto_submitted,

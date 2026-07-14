@@ -21,6 +21,7 @@ from mailflow.adapters.graph.runtime import (
 )
 from mailflow.adapters.graph.subscriptions import GraphSubscriptionManager
 from mailflow.adapters.graph.transport import HttpTransport, TokenProvider
+from mailflow.core.observability import Observers
 from mailflow.core.pipeline import Pipeline, PipelineConfig
 from mailflow.core.ports import (
     BlobStore,
@@ -53,6 +54,7 @@ def build_graph_runtime(
     checkpointer: Checkpointer | None = None,
     subscription_manager: GraphSubscriptionManager | None = None,
     lifecycle_handler: GraphLifecycleHandler | None = None,
+    observers: Observers | None = None,
 ) -> GraphEventHubsRuntime:
     client = GraphClient(
         base_url=graph_cfg.base_url,
@@ -79,6 +81,7 @@ def build_graph_runtime(
         config=PipelineConfig(tenant=tenant, max_attempts=graph_cfg.max_attempts),
         classifier=classifier,
         cleaner=cleaner,
+        observers=observers,
     )
     # When a subscription manager is supplied, wire lifecycle handling: a 'missed'
     # event requests a delta sweep of the affected stream and re-runs the pipeline,

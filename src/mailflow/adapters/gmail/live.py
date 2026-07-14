@@ -26,6 +26,7 @@ from mailflow.adapters.gmail.runtime import GmailPubSubRuntime
 from mailflow.adapters.gmail.scheduler import IntervalScheduler
 from mailflow.adapters.gmail.watch import GmailWatchManager, WatchHandle
 from mailflow.core.errors import AuthError
+from mailflow.core.observability import Observers
 from mailflow.core.ports import (
     BlobStore,
     ContentCleaner,
@@ -196,6 +197,28 @@ def run_consume_loop(
             future.result()
 
 
+def resolve_refresh_token(
+    *,
+    secret_provider: SecretProvider,
+    ref: str,
+    rotation_sink: TokenRotationSink | None,
+) -> str:
+    """SEC-4: prefer a persisted (rotated) refresh token over the configured one.
+
+    Google rotates the OAuth refresh token; a prior run persists the new value via
+    `rotation_sink.on_refresh`, but the env/config referenced by `ref` still holds the
+    OLD token. On startup we therefore ask the sink for a persisted token first and use
+    it when present, falling back to the configured value otherwise. `load` is optional
+    on the `TokenRotationSink` port, so a sink that doesn't implement it (or has nothing
+    saved) simply yields the configured token — no behavior change for those."""
+    loader = getattr(rotation_sink, "load", None)
+    if callable(loader):
+        persisted = loader(ref)
+        if persisted:
+            return str(persisted)
+    return secret_provider.get(ref)
+
+
 def run_service(
     *,
     gmail_cfg: GmailConfig,
@@ -216,6 +239,7 @@ def run_service(
     dlq_store: DeadLetterStore | None = None,
     attachment_policy: AttachmentPolicy | None = None,
     on_filtered: Literal["tag", "drop"] = "tag",
+    observers: Observers | None = None,
 ) -> None:
     """Full live entrypoint: resolve OAuth secrets, build the token provider + httpx
     transport, start the Gmail watch (seeding the cursor), wire the runtime via the
@@ -223,7 +247,11 @@ def run_service(
     token_provider = OAuthTokenProvider(
         client_id=gmail_cfg.client_id,
         client_secret=secret_provider.get(gmail_cfg.client_secret_ref),
-        refresh_token=secret_provider.get(gmail_cfg.oauth_refresh_token_ref),
+        refresh_token=resolve_refresh_token(
+            secret_provider=secret_provider,
+            ref=gmail_cfg.oauth_refresh_token_ref,
+            rotation_sink=rotation_sink,
+        ),
         token_uri=gmail_cfg.token_uri,
         scopes=gmail_cfg.scopes,
         rotation_sink=rotation_sink,
@@ -253,6 +281,7 @@ def run_service(
         cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
         filters=filters, cleaner=cleaner, dlq_store=dlq_store,
         attachment_policy=attachment_policy, on_filtered=on_filtered,
+        observers=observers,
     )
 
     # Reliability: renew the watch (else it expires ~7 days) + a safety-net sweep, both

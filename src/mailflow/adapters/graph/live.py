@@ -23,6 +23,7 @@ from mailflow.adapters.graph.runtime import (
     EventHubCheckpointer,
     GraphEventHubsRuntime,
 )
+from mailflow.core.observability import Observers
 from mailflow.core.ports import (
     BlobStore,
     ContentCleaner,
@@ -190,6 +191,7 @@ def run_service(
     checkpoint_blob_account_url: str | None = None,
     checkpoint_connection_string: str | None = None,
     checkpoint_container: str | None = None,
+    observers: Observers | None = None,
 ) -> None:
     """Full live entrypoint: resolve the app secret, build the MSAL token provider +
     httpx transport, wire the runtime via the composition root, then run the consume
@@ -213,6 +215,7 @@ def run_service(
         blob_store=blob_store,
         filters=filters,
         cleaner=cleaner,
+        observers=observers,
     )
     run_consume_loop(
         runtime=runtime,

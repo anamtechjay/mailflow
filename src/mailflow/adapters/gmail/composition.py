@@ -12,6 +12,7 @@ from mailflow.adapters.gmail.config import GmailConfig, PubSubConfig
 from mailflow.adapters.gmail.provider import GmailProvider
 from mailflow.adapters.gmail.runtime import GmailPubSubRuntime
 from mailflow.adapters.gmail.transport import HttpTransport, RefreshableTokenProvider
+from mailflow.core.observability import Observers
 from mailflow.core.pipeline import Pipeline, PipelineConfig
 from mailflow.core.ports import (
     BlobStore,
@@ -47,6 +48,7 @@ def build_gmail_runtime(
     dlq_store: DeadLetterStore | None = None,
     attachment_policy: AttachmentPolicy | None = None,
     on_filtered: Literal["tag", "drop"] = "tag",
+    observers: Observers | None = None,
 ) -> GmailPubSubRuntime:
     client = GmailClient(
         base_url=gmail_cfg.base_url,
@@ -73,5 +75,6 @@ def build_gmail_runtime(
         cleaner=cleaner,
         auth_refresher=token_provider,
         dlq_store=dlq_store,
+        observers=observers,
     )
     return GmailPubSubRuntime(provider=provider, pipeline=pipeline)

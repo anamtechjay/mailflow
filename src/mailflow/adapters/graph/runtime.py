@@ -14,6 +14,7 @@ from mailflow.adapters.graph.notifications import (
     parse_notification_payload,
 )
 from mailflow.adapters.graph.provider import GraphProvider
+from mailflow.core.observability import RunReport
 
 
 @runtime_checkable
@@ -83,7 +84,12 @@ class GraphEventHubsRuntime:
             if notes:
                 for note in notes:
                     self.provider.submit(note)
-                self.pipeline.run_once()
+                report = self.pipeline.run_once()
+                # REL-8: if the run left any fetched message non-terminal (a transient
+                # failure to be retried), do NOT checkpoint — hold the event so Event
+                # Hubs redelivers it. Dedupe makes re-running already-done siblings safe.
+                if isinstance(report, RunReport) and not report.all_terminal():
+                    continue
             elif self.lifecycle_handler is not None:
                 # lifecycle signals share the hub; react so ingestion doesn't stop
                 # silently (renew/recreate/resync) — spec §8.5.

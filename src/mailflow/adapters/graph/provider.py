@@ -112,6 +112,7 @@ class GraphProvider:
                 received_at=datetime.now(timezone.utc),
                 cursor=Cursor(value=new_delta, order=self._order),
                 raw_bytes=raw_bytes,
+                thread_key=str(data.get("conversationId", "") or ""),  # A7 parity w/ Gmail
             )
 
     def message_size(self, msg: RawMessage) -> int | None:
@@ -159,4 +160,5 @@ class GraphProvider:
             received_at=datetime.now(timezone.utc),
             cursor=Cursor(value=f"{stream.key}#{self._order}", order=self._order),
             raw_bytes=raw_bytes,
+            thread_key=str(data.get("conversationId", "") or ""),  # A7 parity w/ Gmail
         )
