@@ -4,8 +4,10 @@ dropped?"."""
 
 from __future__ import annotations
 
+import logging
+from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from pydantic import BaseModel, Field
 
@@ -104,6 +106,16 @@ class RunReport(BaseModel):
         self.dlq.append(dead_letter)
         self.dead_lettered += 1
 
+    def all_terminal(self) -> bool:
+        """True iff every fetched message reached a terminal disposition
+        (emitted/dropped/duplicate/dead_lettered) in this run — i.e. none was left
+        pending for a transient retry. A notification-transport runtime uses this to
+        decide whether it is safe to ack/checkpoint the source event (REL-8): if a
+        message is still pending, holding the checkpoint lets the event redeliver,
+        and dedupe makes re-running any already-terminal siblings harmless."""
+        terminal = self.emitted + self.dropped + self.duplicates + self.dead_lettered
+        return self.fetched <= terminal
+
     def counters(self) -> dict[str, int]:
         """Dependency-free metrics seam: disposition counters keyed by the canonical
         Disposition names, for a metrics exporter to scrape after run_once()."""
@@ -117,6 +129,33 @@ class RunReport(BaseModel):
         }
 
 
+ReportObserver = Callable[["RunReport"], None]
+TraceObserver = Callable[["DecisionTrace"], None]
+
+
+@dataclass(frozen=True)
+class Observers:
+    """Optional consumer callbacks. on_trace fires once per message decision
+    (emitted/dropped/duplicate/dead_lettered); on_report fires once per run_once()."""
+
+    on_report: ReportObserver | None = None
+    on_trace: TraceObserver | None = None
+
+    def any(self) -> bool:
+        return self.on_report is not None or self.on_trace is not None
+
+
+def notify_observers(
+    callback: "Callable[[object], None]", arg: object, *, logger: "logging.Logger"
+) -> None:
+    """Invoke a consumer callback defensively — a buggy callback must never break
+    ingestion. Logs and swallows any exception; never re-raises."""
+    try:
+        callback(arg)
+    except Exception:  # noqa: BLE001 - consumer code; isolate it from the pipeline
+        logger.warning("observer callback %r raised", callback, exc_info=True)
+
+
 _PROBE_TENANT = "__healthcheck__"
 _PROBE_KEY = "__healthcheck__"
 _PROBE_STREAM = StreamRef(mailbox="__healthcheck__", folder=None)
@@ -128,11 +167,24 @@ class HealthReport(BaseModel):
 
 
 def health(
-    *, cursor_store: CursorStore, dedupe_store: DedupeStore, blob_store: BlobStore
+    *,
+    cursor_store: CursorStore,
+    dedupe_store: DedupeStore,
+    blob_store: BlobStore,
+    last_activity_at: float | None = None,
+    now: float | None = None,
+    max_idle_seconds: float | None = None,
 ) -> HealthReport:
     """Probe the core store dependencies via their ports. Reads are harmless; the
     dedupe probe claims+releases a reserved key so it never corrupts real state. A
     deep blob write-probe is deferred — blob is a structural (port) check here.
+
+    OBS-4 ingestion liveness: when `now` and `max_idle_seconds` are supplied, an
+    `ingestion` check is added — reachable stores are NOT enough, since the consume
+    loop can stall (e.g. Graph subscriptions lapse) while every store stays reachable,
+    a false all-clear. The check is `stale` when the loop has produced no activity
+    (`last_activity_at`, wall clock) within the idle budget, or has never been active.
+    With no liveness args the check is omitted (backward compatible).
 
     The ports import is function-local: ports.py imports DeadLetterRecord from this
     module, so a top-level `from mailflow.core.ports import ...` would be a cycle."""
@@ -159,5 +211,15 @@ def health(
 
     checks["blob"] = "ok" if isinstance(blob_store, BlobStore) \
         else "error: does not satisfy BlobStore port"
+
+    if now is not None and max_idle_seconds is not None:
+        if last_activity_at is None:
+            checks["ingestion"] = "stale: no activity recorded yet"
+        else:
+            idle = now - last_activity_at
+            checks["ingestion"] = (
+                "ok" if idle <= max_idle_seconds
+                else f"stale: no activity for {idle:.0f}s (budget {max_idle_seconds:.0f}s)"
+            )
 
     return HealthReport(healthy=all(v == "ok" for v in checks.values()), checks=checks)
