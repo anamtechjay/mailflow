@@ -7,6 +7,8 @@ file must see the prior cursor and prior 'done' claims. The §8 invariants
 
 from __future__ import annotations
 
+import sqlite3
+
 from mailflow.core.models import Cursor, StreamRef
 from mailflow.stores.sqlite import SqliteCursorStore, SqliteDedupeStore
 
@@ -86,3 +88,60 @@ def test_dedupe_done_persists_across_new_instance(tmp_path) -> None:
     first.mark_done("k1", 60)
     # restart: a new instance must still see k1 as done (not re-claimable)
     assert SqliteDedupeStore(path).try_claim("k1", 300) is False
+
+
+# ---- dedupe: TTL purge (mark_done's ttl_seconds now actually expires rows) ----
+
+def test_purge_expired_removes_only_expired_done_claims(tmp_path) -> None:
+    clock = {"now": 1_000.0}
+    store = SqliteDedupeStore(str(tmp_path / "d.db"), clock=lambda: clock["now"])
+    store.try_claim("expired", 300)
+    store.mark_done("expired", ttl_seconds=60)   # expires at t=1060
+    store.try_claim("fresh", 300)
+    store.mark_done("fresh", ttl_seconds=600)    # expires at t=1600
+    store.try_claim("not-done", 300)
+
+    clock["now"] = 1_100.0
+    removed = store.purge_expired()
+
+    assert removed == 1
+    assert store.try_claim("expired", 300) is True
+    assert store.try_claim("fresh", 300) is False
+    assert store.try_claim("not-done", 300) is False
+
+
+def test_purge_expired_persists_across_new_instance(tmp_path) -> None:
+    path = str(tmp_path / "d.db")
+    clock = {"now": 1_000.0}
+    first = SqliteDedupeStore(path, clock=lambda: clock["now"])
+    first.try_claim("expired", 300)
+    first.mark_done("expired", ttl_seconds=60)
+
+    reopened = SqliteDedupeStore(path, clock=lambda: 1_100.0)
+    assert reopened.purge_expired() == 1
+
+
+# ---- dedupe: legacy pre-lease/pre-ttl db migration (finding I1) ----
+
+def test_dedupe_migrates_legacy_claims_table_missing_claimed_column(tmp_path) -> None:
+    """A `claims` table created before the lease-expiry feature existed had only
+    (key, done, attempts) -- no `claimed` column. Opening it with SqliteDedupeStore
+    must migrate the table (adding `claimed` alongside `claimed_at`/`expires_at`)
+    rather than crashing on the first try_claim()."""
+    path = str(tmp_path / "legacy.db")
+    raw = sqlite3.connect(path)
+    raw.execute(
+        "CREATE TABLE claims ("
+        "key TEXT PRIMARY KEY, "
+        "done INTEGER NOT NULL DEFAULT 0, "
+        "attempts INTEGER NOT NULL DEFAULT 0"
+        ")"
+    )
+    raw.commit()
+    raw.close()
+
+    store = SqliteDedupeStore(path)
+    assert store.try_claim("k1", 300) is True
+
+    cols = {row[1] for row in store._conn.execute("PRAGMA table_info(claims)")}
+    assert "claimed" in cols

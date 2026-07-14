@@ -31,6 +31,7 @@ class StoresConfig(BaseModel):
     cursor: ComponentConfig = Field(default_factory=lambda: ComponentConfig(kind="memory"))
     dedupe: ComponentConfig = Field(default_factory=lambda: ComponentConfig(kind="memory"))
     blob: ComponentConfig = Field(default_factory=lambda: ComponentConfig(kind="memory"))
+    dead_letter: ComponentConfig = Field(default_factory=lambda: ComponentConfig(kind="memory"))
 
 
 class MailflowConfig(BaseModel):

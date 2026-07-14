@@ -117,3 +117,198 @@ change here). Graph/Outlook subscription lifecycle is a separate deferred plan.
 | **G1** | 🟢 | No direct `run_service` integration test: the A1 characterization test reconstructs `run_service`'s renew closure (`lambda: renew_watches(...)`) test-locally rather than invoking `run_service`, and A2 tests the extracted guard in isolation. So the live.py guard rewire + the actual lambda's `watch_manager`/`handles` capture have no direct test — a deletion or mis-wire there would keep the suite green. Inherent to "testable without the blocking Pub/Sub consume loop" (which needs the Google SDK). | `tests/test_gmail_reliability.py` (A1 closure), `src/mailflow/adapters/gmail/live.py:257-261` (guard) | **Deferred** — needs a recorded/seam-mocked `run_service` integration harness; out of this unit-hardening pass's scope. |
 | **G2** | 🟢 | Asymmetric guard coverage: the renew-scheduling guard was decomposed into the tested `should_schedule_renew` predicate, but the sibling sweep-scheduling guard `if gmail_cfg.sweep_seconds > 0:` was left inline + untested (its runtime behaviour is covered by A3, but the arming decision is not). | `src/mailflow/adapters/gmail/live.py` sweep-guard | **Hardening** — extract a `should_schedule_sweep` predicate for symmetry if the sweep arming logic grows. |
 | **G3** | 🟢 | A3's cursor-monotonic assertion is a guard-rail, not an independent test of `commit_if_ahead`'s strict rejection: both push and sweep operate at historyId 200, so it proves "no regression under overlap" but never drives a *lower* order through `commit_if_ahead`. The dedupe (emit-once) assertion carries the real weight. | `tests/test_gmail_e2e.py` overlap test | **Note** — strict-monotonic rejection is covered elsewhere; this assertion is a deliberate guard-rail. |
+
+---
+
+## Review 2026-06-30 — Extraction layer edge-case & failure-case pass
+
+Reviewer: added `tests/test_extract_edge_cases.py` — 54 edge/failure tests over the extractor,
+identity surrogate, attachment handling, and classification seam (the parts that take untrusted,
+malformed wire input). Outcome: **52 pass, 2 documented `xfail`s** surfacing the two defects below.
+Full suite 405 passed / 2 xfailed; mypy --strict clean. The 52 passing tests confirm the extractor is
+robust to: missing Message-ID/From/Subject/Date, malformed Date, empty/headers-only body, duplicate
+From, base64/quoted-printable/RFC2047 bodies, nested multipart, inline-vs-real attachments,
+no-filename attachments, content-addressed dedup, policy strip-on-oversize, and the bounce/
+auto-submitted heuristics.
+
+| ID | Sev | Finding | Evidence | Scope |
+|----|-----|---------|----------|-------|
+| **E-1** | 🟡 | Unknown-charset body crashes extraction: a `text/plain` part declaring an unregistered charset (`charset=x-totally-made-up`) raises `LookupError` from `EmailMessage.get_content()` — the extractor does not fall back to `errors='replace'`. A malformed-charset email therefore poisons to the DLQ instead of being delivered with a best-effort body. Real spam / misconfigured senders hit this. | `extract/mime.py` `_walk_body` → `part.get_content()` (~line 199/202); `tests/test_extract_edge_cases.py::test_unknown_charset_does_not_crash` (xfail) | **Phase gap** — wrap `get_content()` to catch `LookupError` and decode bytes with `errors='replace'`. Cheap, high-value robustness fix. |
+| **E-2** | 🟢 | Inconsistent `is_inline` across paths: the kept `Attachment` uses `is_inline = is_inline_media and not is_attachment`; policy mode uses `inline_for_policy = is_inline_media and disp != "attachment"`. A part with a `Content-ID` AND a `name=` but no `Content-Disposition` is `is_inline=False` when delivered yet `is_inline=True` when stripped — same part, two answers. | `extract/mime.py` `_walk_body` (meta is_inline ~line 210 vs `inline_for_policy` ~line 217) | **Hardening** — derive `is_inline` once and share it between the kept-Attachment and StrippedAttachment paths. Low severity (real inline parts carry `Content-Disposition: inline`, on which both paths agree). |
+
+---
+
+## Review 2026-07-06 — Logging destinations & observability sinks
+
+New feature (local): `enable_logging()` + NullHandler default; `connect(log_file=, log_level=,
+on_report=, on_trace=)`; `Observers` threaded into Pipeline (fires from `_record` per trace and
+`run_once` per report) and all three live providers. Callbacks are guarded (throwing callback
+logged + swallowed, ingestion unaffected). Defaults off → backwards compatible.
+**CONTRACT DECISION:** deliberate core edit (`observability.py`, `pipeline.py`) — non-emitted
+dispositions are only visible in the pipeline, so an emitter wrapper cannot capture the audit.
+
+---
+
+## Review 2026-07-07 — QA automation suite
+
+New test-only build (local, uncommitted): ~76 pytest tests across `tests/qa/test_f01_*`
+through `test_f17_*`, four `test_scenarios_*` files, and this phase's `test_property_invariants.py`,
+driven by a shared harness (`tests/_harness/fakes.py::build_memory_pipeline`,
+`tests/_harness/email_builder.py`, `tests/_harness/corpus.py`) per the coverage map in
+`docs/qa-partA-coverage.md`. Full fast suite: **637 passed, 4 deselected (slow), 2 xfailed**
+(the two pre-existing `E-1`-adjacent xfails from the 2026-06-30 extraction-edge-case pass).
+`mypy --strict` clean (86 source files; `packages = ["mailflow"]` scopes to `src/`, tests are
+not mypy-checked, consistent with prior phases). `hypothesis` installed cleanly (6.156.1), added
+to `dev` extras.
+
+**CI tiers** (as designed across Phases 0-5, none of this is wired into an actual CI config file —
+that's a follow-up, not part of this pass):
+- **commit** (every push): `pytest -m "not slow and not live"` + `mypy` — the 637-test fast suite
+  above, sub-6s, no external dependencies.
+- **nightly**: `pytest -m slow` — bulk-volume (`test_bulk_10k_emitted_once`), subprocess-restart,
+  and other large/slow scenario tests.
+- **gated** (manual/scheduled, requires real credentials): `pytest -m live` — no test currently
+  carries this marker; it's registered in `pyproject.toml` ahead of the first live-provider test
+  (Plan 2/3 territory) so that test doesn't also need a `pyproject.toml` edit.
+
+### Findings surfaced while building the property/fuzz tests (not patched — logged only)
+
+| ID | Sev | Finding | Evidence | Scope verdict |
+|----|-----|---------|----------|---------------|
+| **P1** | 🟡 Important | Retry-exhaustion is unreachable via `InMemoryDedupeStore`: `release()` deletes the attempt record entirely, so the next `try_claim` on the same key resets `attempts` to 0 on the following `record_attempt()` call — attempts never accumulate past 1 across separate `run_once()` calls (the real-world redelivery path), so dead-lettering-by-attempt-exhaustion at the default `max_attempts` can never be driven through the public store contract. Corroborates existing finding **I5** (2026-06-09 review) via an independent code path (found while designing the exactly-once property test, which needed to reason about repeated claims of the same key). | `src/mailflow/stores/memory.py` (`release`/`record_attempt`); `src/mailflow/core/pipeline.py` `_retry_or_dead_letter` (the `attempts >= max_attempts` branch) | **Deferred/duplicate of I5** — same root cause, not a new gap; do not action separately from I5. |
+| **P2** | ⚪ Low/doc | `Envelope.date_utc` is never populated by `MimeEnvelopeParser.parse_envelope` (only `MimeExtractor.extract_bytes` parses `Date`, per the note already in `tests/qa/test_f03_parse.py`) — any envelope-level (pre-extract) assertion about `date_utc` is trivially `None`. Documentation-only; no test gap since Phase 1/QA already places date-parsing assertions against the extractor, not the parser. | `src/mailflow/extract/envelope.py` (`parse_envelope` builds `Envelope(...)` with no `date_utc` field set); contrast `src/mailflow/extract/mime.py` `Date` try/except | **Doc note** — no action; matches the already-adopted test placement. |
+| **P3** | ⚪ Low | `MimeEnvelopeParser.parse_envelope`'s `_snippet()` calls `body.get_content()` on the preferred text/html part with no charset fallback: a `text/plain` part declaring an unregistered charset (e.g. `charset=x-totally-made-up`) raises `LookupError` out of `parse_envelope` itself, before extraction even runs. This is the same defect class as **E-1** (2026-06-30 review, which documented it in `extract/mime.py`) but on the pre-filter parse path — confirmed empirically (hand-crafted input) while scoping the "known exception" allowlist for `test_parser_never_crashes_on_random_bytes`; not found by the random-bytes fuzz itself (~7500 examples), since hitting it needs syntactically valid header structure that pure `st.binary()` essentially never produces. | `src/mailflow/extract/envelope.py` `_snippet` (`body.get_content()`); test allowlists `LookupError` accordingly rather than failing the fuzz run | **Phase gap (narrow), extends E-1** — same fix (`errors="replace"` fallback) would resolve both `mime.py` and `envelope.py` in one pass; low real-world frequency (malformed charset declarations), not patched here per scope (tests/docs only). |
+
+## Resolution 2026-07-07 — REL-3: I5 + P1 fixed (silent unbounded retry, poison never DLQs)
+
+**I5** and **P1** are now **FIXED**, not deferred. Confirmed red first: a poison message whose
+extraction always raises `TransientError`, driven across 5 separate `Pipeline`/`run_once()` calls
+(the real redelivery path) over shared `InMemoryDedupeStore`/`InMemoryCursorStore` at the default
+`max_attempts=3`, never dead-lettered — `attempts` reset to 0 on every redelivery because
+`release()` deleted the whole claim record. Reproducer: `tests/qa/test_rel3_retry_exhaustion.py`.
+
+**Fix**: `InMemoryDedupeStore`/`SqliteDedupeStore` `release()` now clears only the `claimed` flag
+(memory: `_ClaimRecord.claimed = False`; sqlite: `UPDATE claims SET claimed = 0 WHERE key=? AND
+done=0`) and keeps the record — `attempts` is no longer wiped. `try_claim` now succeeds when the
+key is absent OR present-but-not-claimed-and-not-done. **CONTRACT DECISION**: `attempts` is a
+LIFETIME counter per key (accumulates across claim/release cycles, i.e. across redeliveries), not
+a per-in-process-claim counter. External store method shapes (`try_claim`/`record_attempt`/
+`mark_done`/`release`) are unchanged, so a real Firestore/Redis adapter can still add lease expiry
+without touching callers.
+
+**Test encoding the OLD (buggy) contract, updated**: `tests/qa/test_f01_dedupe.py
+::test_release_resets_attempt_count` asserted attempts reset to 0 after release+re-claim; renamed
+to `test_release_keeps_lifetime_attempt_count` and now asserts attempts carry over (3rd
+`record_attempt()` after a release+re-claim returns 3, not 1). No other test asserted the old
+delete-on-release shape (`tests/test_sqlite_stores.py::test_dedupe_release_frees_undone_claim` /
+`test_dedupe_release_keeps_done_claim` only assert claim-freed/claim-still-blocked behavior, which
+is unchanged and still passes).
+
+---
+
+## Review 2026-07-13 — Live Graph mailbox smoke check (manual, not a unit-test pass)
+
+Reviewer: ad-hoc live verification against the real `techjaystest4@nsrecycle.com` Exchange
+Online mailbox (app-only Graph creds), run outside pytest to sanity-check the Graph adapter
+against actual API behavior the fake transport can't model. Not a coverage review of existing
+tests — a live-data check that happened to surface a real bug.
+
+### Actionable now — genuine bug, fixed
+
+| ID | Sev | Finding | Evidence | Fix |
+|----|-----|---------|----------|-----|
+| **G1** | 🔴 Critical | `GraphClient.list_attachments` requested `$select=id,name,contentType,size,isInline,contentId` on `/messages/{id}/attachments`. `contentId` is a property of the `fileAttachment` subtype only, not the base `microsoft.graph.attachment` type this list endpoint returns — Graph responded `400: Could not find a property named 'contentId' on type 'microsoft.graph.attachment'` on **every** message with an attachment. This is called from `GraphProvider._attach`, inside `provider.fetch()`, i.e. **before** `Pipeline._process`'s own try/except — so in the live notification-fed path this would crash `run_once()` outright (not merely dead-letter one message) the first time any attachment-bearing mail arrived. `_FakeGraphTransport` never modeled this Graph `$select`-on-polymorphic-type validation rule, so no existing unit test could catch it — confirmed by live reproduction, not by test failure. | `src/mailflow/adapters/graph/client.py:68-71` (pre-fix); reproduced live via direct Graph REST call, HTTP 400 | Fixed: dropped `contentId` from the `$select` (`GraphExtractor._attachments`, `src/mailflow/adapters/graph/extractor.py:54`, already does `a.get("contentId") or ""` — tolerates its absence). Re-ran `tests/qa/test_f17_fetch.py` (3/3 pass, no regression) plus a live `Pipeline.run_once()` against 10 real messages (4-attachment cases included): `RunReport: fetched=10 emitted=10 dropped=0 duplicates=0 dead_lettered=0`. |
+
+### Scope verdict
+
+**Phase gap in the live/Azure-API sense, not the unit-test sense** — the unit suite is deliberately
+100% offline (§1 of `testing-guide.md`), so this was never going to be caught there; it's a gap in
+*fixture fidelity* (the fake transport doesn't model Graph's per-type `$select` validation), not in
+test-count coverage. No new unit test added for the fake-transport gap itself (would require
+teaching `_FakeGraphTransport` Graph's real OData type-validation rules — logged here as a
+follow-up idea, not actioned, since the live check already proves the real fix). Full narrative in
+`docs/mailflow-final-report.md` §4 and `docs/testing-guide.md` §8.1.
+
+---
+
+## Review 2026-06-30 — V1 readiness verification (full P0 audit)
+
+> Note: this pass ran on `anam/library` before the production-hardening branch existed. Several
+> items it lists as deferred-to-fast-follow (VR1/C1-sweep-cursor, VR3/B3-B4 Graph transport
+> thinness) remain open per the `docs/library-viability-audit.md` cross-check below (tracked
+> there as C16/C18/C14). VR4/C1-subscription-expiry and VR2/A7-thread-key have not been
+> independently re-verified against current code.
+
+Reviewer: V1 verification pass per `docs/architecture-review/v1-verification-prompt.md` — one agent
+per checklist item (A×12, B×6, C×2, D×1 = 21), each citing `file:line`. Judged against the **locked
+P0 bar** in `features.md` (scope locked 2026-06-29: **Gmail-only live; Outlook/Graph deferred to
+fast-follow**), not the verification prompt's pre-lock wording (which still lists A9/C1/C2/A1-Graph).
+
+### Verdict: 🟢 **V1 GO — 0 in-scope blockers.**
+
+Every freeze-now **contract** is frozen correctly; every **Gmail** (the V1 live provider) behavior
+path is correct and tested; the **second-provider proof (D1)** is a real working Gmail adapter with a
+passing e2e test (`tests/test_gmail_e2e.py`, 21 passed), not a paper audit. **The Gmail part is done
+— V1 is considered done for now.** All ✅ items: A1(Gmail) A2 A3 A4 A5 A6 A8 A10 A11 A12 · B1 B2
+B3(Gmail) B4(Gmail) B5 · D1.
+
+The findings below are **the complete set of non-✅ marks** — every one resolves to deferred
+Outlook/Graph work or an explicitly out-of-V1 item. None gate V1.
+
+### Deferred — Outlook/Graph fast-follow (NOT V1 gaps; Gmail path unaffected)
+
+| ID | Sev | Finding | Evidence | Scope |
+|----|-----|---------|----------|-------|
+| **VR1** | 🟡 | **B6 — Graph sweep cursor is not page-atomic** (genuine data-loss bug, Graph-only). `delta_sweep` returns one end-of-sequence `deltaLink` and `GraphProvider.sweep` stamps that *same* value on *every* message (only `order` increments). The pipeline commits per terminal disposition, so the end-of-sweep resume token becomes durable after the **first** message is processed — a crash mid-sweep silently drops the fetched-but-unprocessed messages 2..N (Graph resumes past them; dedupe can't save what's never re-delivered). Gmail is correct (per-message historyId cursor is genuinely atomic). | `graph/provider.py:113`, `graph/client.py:75-95`, `core/pipeline.py:148` | **Deferred (Outlook fast-follow)** — flag as a real correctness bug to fix *before* Outlook goes live. Fix: carry the previous resume token on all but the last message of the sweep; emit `new_delta` only on the final one (~5 lines). |
+| **VR2** | 🟢 | **A7 — Graph drops `conversationId` thread key.** Contract is frozen (`CleanEmail.thread_key` exists) and Gmail populates it + subject fallback correctly; `GraphExtractor.extract` requests `conversationId` in `$select` but never maps it, so every Graph `thread_key` defaults to `""` with no subject fallback. A7's V1 bar (Contract + Gmail) is met. | `core/models.py:215`, `graph/extractor.py:74-108`, `graph/client.py:16` | **Deferred (Outlook fast-follow)** — cheap fix: map `conversationId` → `thread_key` with `normalize_subject(subject)` fallback in `GraphExtractor.extract` (2 lines) + a Graph-side thread-key test. |
+| **VR3** | 🟢 | **B3/B4 — Graph client thinner than Gmail.** Graph `_request` retries **429 only** (not 503/5xx), uses a flat `Retry-After` (no exponential/jitter), has **no concurrency cap**, and a Graph **410** on a per-message GET re-raises as plain `GraphError` → pipeline catch-all bounded-retry rather than straight-to-DLQ Permanent. Gmail fully satisfies B3 and B4. | `graph/client.py:31-53`, `core/pipeline.py:198` | **Deferred (Outlook fast-follow)** — align Graph transport to Gmail: retry `429 or >=500`, exponential+jitter backoff, `BoundedSemaphore`, and map 410→Permanent. |
+| **VR4** | 🟢 | **C1 — Graph subscription expiry requests 8640 min** (> the ~4230 ceiling; comment's 10080/7d premise is wrong for message subscriptions). Graph would reject every subscription. Gmail unaffected (daily `watch()`). | `graph/config.py:38` | **Deferred (Outlook live blocker)** — one-liner `subscription_minutes` `8640 → ≤4230`. Already tracked as C1 in `features.md`. |
+| **VR5** | 🟢 | **C2 — Graph size-probe absent.** No extended-property (`singleValueExtendedProperty` / PR_MESSAGE_SIZE) probe exists; size is derived from delta JSON and there is no streaming byte-cap. The **B1 fail-closed guard backstops it in V1** (`pipeline.py:170-176` dead-letters unknown/zero size before download, provider-agnostic). | `graph/provider.py:117-124`, `core/pipeline.py:170-176` | **Deferred (Outlook live blocker)** — verify the extended-property probe on a live delta call, or add a streaming download cap. Already tracked as C2 in `features.md`. |
+
+### Out of V1 scope (dropped from P0, not a gap)
+
+| ID | Finding | Where it lands |
+|----|---------|----------------|
+| **VR6** | **A9 — Store erasure + encryption-context absent.** `BlobStore.put_stream` has no `encryption_context` arg and no `erase()` exists (the only `delete()` is `DeadLetterStore.delete` for redrive cleanup, not GDPR erasure). | **P2** — GDPR DSAR tooling / KMS encryption. Dropped from P0 per Decision #8 (2026-06-29); `core/ports.py:127`. |
+| **VR7** | **A1 (Graph) — Graph still fetches by notification payload** (`get_message(user_id, message_id)` from the push), where Gmail re-derives from the durable cursor (wake-signal-only). | **Outlook fast-follow** — the deferred Outlook fetch-rewire; `graph/provider.py:126-131`. Gmail already complies. |
+
+### Note
+
+The verification prompt (`v1-verification-prompt.md`) predates the 2026-06-29 scope lock, so it lists
+A9, C1, C2, and the A1-Graph rewire as if they were V1 blockers. They are **not** under the locked
+P0 bar — recorded here as deferred so they aren't re-flagged as V1 gaps on the next pass. When the
+Outlook adapter is taken live, work VR1–VR5 + VR7 as the fast-follow batch (VR1 first — it's the only
+genuine data-loss bug among them).
+
+---
+
+## Review 2026-07-14 — `docs/library-viability-audit.md` cross-check against production-hardening
+
+`anam/library` (merged into `feat/cleanup` this pass) carried a separate 18-finding (C1-C18)
+multi-agent viability audit dated 2026-07-02, run against pre-hardening commit `90b6ac5`. Cross-
+checked each finding against the current tree:
+
+**Fixed by the production-hardening pass** (10/18): C1 (mid-batch cursor loss — `pipeline.py`
+low-water-mark), C2 (dedupe `release()` erasing attempts — REL-3/I5/P1 above), C3 (no lease expiry
+— `expires_at`/REL-2), C4 (`sqlite:///mf.db` root-path crash — CFG-3), C5/C6 (docs contradicting
+`on_filtered` default — stale docs since deleted), C8 (inline body misclassified as attachment —
+MIME-3), C10 (bogus charset `LookupError` — E-1/mime.py `_decode_text`), C12 (bootstrap re-seeding
+cursor every restart — REL-5/INT-4), C17 (Event Hub checkpoint advancing past failures — REL-8).
+
+**Partially fixed** (3/18): C11 (Gmail per-message cursor loss fixed by the low-water-mark, but
+`provider.py` still stamps every message in a batch with the same batch-final historyId — a
+residual loss window if an earlier message in the same batch commits before a later one fails),
+C13 (rotated refresh token now loaded back at startup; the persist-write is still non-atomic),
+C15 (a real `dlq_store` is now wired for memory/Gmail; Graph's live path still has no `dlq_store`
+param and `GmailProvider.fetch` still drops `PermanentError` silently with no record).
+
+**Still present** (5/18, all Graph/live-path or concurrency): C7 (`stream()` hangs forever if the
+live thread dies on startup, no stop API), C9 (`message/rfc822` forwarded-attachment parts leak
+into the outer message), C14 (no thread-safety across Pub/Sub callback + sweep/renew threads), C16
+(Graph `run_service` never renews subscriptions — silent halt within ~6 days), C18 (delta-sweep
+stamps every message with the final `deltaLink` — same class of bug as VR1 above, unfixed).
+
+**Scope verdict**: the flagship Gmail pull-path correctness bugs are closed. Graph/Azure live-path
+gaps (C7, C9, C14, C16, C18, partial C11/C13/C15) are real and un-actioned — **Phase gap** if a
+Graph live-adapter hardening pass is scoped next, not a regression from this pass (Graph live
+delivery was explicitly out of scope for production-hardening per the 2026-07-13 plan).

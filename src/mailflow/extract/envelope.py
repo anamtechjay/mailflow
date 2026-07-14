@@ -82,5 +82,17 @@ class MimeEnvelopeParser:
         body = parsed.get_body(preferencelist=("plain", "html"))
         if body is None:
             return ""
-        text = str(body.get_content())
+        # MIME-2: an unknown/bogus declared charset makes get_content() raise
+        # LookupError (and malformed bytes raise UnicodeError). Fall back to a
+        # permissive UTF-8-with-replacement decode of the transfer-decoded payload so
+        # a foreign-charset message is not lost at the (pre-extraction) envelope stage.
+        try:
+            text = str(body.get_content())
+        except (LookupError, UnicodeError):
+            payload = body.get_payload(decode=True)
+            text = (
+                bytes(payload).decode("utf-8", errors="replace")
+                if isinstance(payload, (bytes, bytearray))
+                else str(body.get_payload())
+            )
         return text.strip().replace("\r\n", " ").replace("\n", " ")[: self.snippet_chars]

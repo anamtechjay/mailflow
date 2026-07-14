@@ -66,8 +66,11 @@ class GraphClient:
         return items[0] if items else None
 
     def list_attachments(self, user_id: str, message_id: str) -> list[dict[str, Any]]:
+        # contentId is NOT a property of the base 'attachment' type this list endpoint
+        # returns (only fileAttachment has it) -- selecting it 400s: "Could not find a
+        # property named 'contentId' on type 'microsoft.graph.attachment'."
         url = (f"{self.base_url}/users/{user_id}/messages/{message_id}/attachments"
-               f"?$select=id,name,contentType,size,isInline,contentId")
+               f"?$select=id,name,contentType,size,isInline")
         data = self._request("GET", url).json()
         items = (data or {}).get("value", []) if isinstance(data, dict) else []
         return [a for a in items if isinstance(a, dict)]

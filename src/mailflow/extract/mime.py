@@ -3,11 +3,47 @@ policy so headers come back parsed and unfolded."""
 
 from __future__ import annotations
 
+import re
 from email import message_from_bytes
 from email.message import EmailMessage
 from email.policy import default as default_policy
 from email.utils import getaddresses, parsedate_to_datetime
 from typing import Any
+
+
+def _safe_filename(name: str | None) -> str:
+    """Sanitize an attachment filename to a safe leaf name (MIME-7).
+
+    A hostile message can set `filename="../../etc/passwd"` (or a Windows/UNC path);
+    an app that does `open(att.filename, "wb")` would then write outside its intended
+    directory. We keep only the final path segment (splitting on both separators) and
+    reject pure-traversal leaves, so the surfaced name can never contain a directory
+    component or `..`. Content is unaffected — only the label is cleaned."""
+    if not name:
+        return ""
+    leaf = re.split(r"[\\/]", name)[-1].strip().lstrip("\x00")
+    if leaf in ("", ".", ".."):
+        return ""
+    return leaf
+
+
+def _decode_text(part: EmailMessage) -> str:
+    """Decode a text part's content, tolerating an unknown/bogus charset (MIME-2).
+
+    `part.get_content()` raises `LookupError` when the declared charset is not a
+    registered codec (e.g. `x-totally-made-up`, legacy `unknown-8bit`), and can raise
+    `UnicodeError` on malformed bytes. Rather than let that escape (where it is
+    misclassified as transient → retried forever / lost), fall back to decoding the
+    transfer-decoded payload as UTF-8 with replacement — a best-effort body that still
+    delivers the mail."""
+    try:
+        content = part.get_content()
+        return content if isinstance(content, str) else str(content)
+    except (LookupError, UnicodeError):
+        payload = part.get_payload(decode=True)
+        if isinstance(payload, (bytes, bytearray)):
+            return bytes(payload).decode("utf-8", errors="replace")
+        return str(part.get_payload())
 
 from mailflow.core.classification import derive_auto_submitted, derive_is_bounce
 from mailflow.core.events import SCHEMA_VERSION
@@ -190,16 +226,21 @@ class MimeExtractor:
             ctype = part.get_content_type()
             disp = (part.get_content_disposition() or "").lower()
             cid = part.get("content-id")
-            filename = part.get_filename()
+            filename = _safe_filename(part.get_filename())
 
+            # MIME-3: a text/plain|text/html part with no filename and no Content-ID is
+            # the message body even when it carries `Content-Disposition: inline`
+            # (mutt/Mailman send the body that way). Without this it is misclassified as
+            # inline media and the app receives an empty email.
+            is_plain_body = ctype in ("text/plain", "text/html") and not filename and cid is None
             is_attachment = disp == "attachment" or (bool(filename) and disp != "inline")
-            is_inline_media = disp == "inline" or cid is not None
+            is_inline_media = (cid is not None) or (disp == "inline" and not is_plain_body)
 
             if not is_attachment and not is_inline_media and ctype == "text/plain" and not body_text:
-                body_text = part.get_content()
+                body_text = _decode_text(part)
                 continue
             if not is_attachment and not is_inline_media and ctype == "text/html" and not body_html:
-                body_html = part.get_content()
+                body_html = _decode_text(part)
                 continue
 
             if is_attachment or is_inline_media:

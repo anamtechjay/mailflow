@@ -152,6 +152,34 @@ mf.get_attachments(message_id)          # -> list[Attachment]
 - `"sqlite:///path/mf.db"` — persists cursor + dedupe to one file; a restart resumes where
   it stopped. Pure stdlib `sqlite3`, no extra dependency.
 
+## Logs & observability
+
+mailflow ships **silent** (a `NullHandler`). Turn logs on where you want them:
+
+```python
+from mailflow import connect
+
+# 1) Send diagnostic logs to a rotating file (or omit log_file for stderr):
+mf = connect("gmail", credentials=creds, mailbox="me",
+             log_file="mailflow.log", log_level="INFO")
+
+# 2) Pass your own function(s) that receive every per-email decision as structured data:
+def audit(trace):            # DecisionTrace: canonical_id, disposition, matched_filter, reason
+    db.insert(trace.model_dump())
+
+def metrics(report):         # RunReport: emitted / dropped / duplicates / dead_lettered
+    statsd.gauge("mailflow.emitted", report.emitted)
+
+mf = connect("gmail", credentials=creds, mailbox="me",
+             on_trace=audit, on_report=metrics)
+```
+
+`on_trace` fires once per message (including **dropped/filtered/duplicate/dead-lettered** — so a
+"missing" email is always explained by its `matched_filter` + `reason`). `on_report` fires once per
+run with the counters. A callback that raises is logged and swallowed — it never interrupts
+ingestion. Both default to off; combine them freely with `log_file`. For full control, ignore these
+and attach your own handler to `logging.getLogger("mailflow")`.
+
 ### Running tests / types (this checkout, Windows)
 
 ```bash
@@ -221,6 +249,113 @@ for the RBAC path. Subscriptions are created/renewed by `SubscriptionReconciler`
 lifecycle events (`reauthorizationRequired`/`subscriptionRemoved`/`missed`) are handled
 by `GraphLifecycleHandler`; `GraphProvider.sweep` delta-replays a folder on catch-up.
 See `docs/superpowers/plans/2026-06-15-mailflow-graph-eventhubs-live-flow.md`.
+
+## Live: Outlook via Event Grid → Azure Service Bus (no Event Hubs)
+
+Alternative to Event Hubs: ingest Outlook via **Microsoft Graph change notifications delivered
+to Azure Service Bus queues** (via Event Grid Partner Topic). This removes the Event Hubs dependency;
+use it when Event Hubs slots are constrained or you prefer direct Service Bus integration.
+
+The ingress chain: **Outlook → Microsoft Graph → Event Grid Partner Topic → Service Bus queue → mailflow**.
+Install the Service Bus extra:
+
+```bash
+pip install -e ".[servicebus,graph]"
+```
+
+Provision Service Bus + Event Grid Partner Topic per `docs/azure-servicebus-setup.md`, then
+configure the graph subscription and run:
+
+Ingress — `run_service` builds the Graph token provider + a Service Bus receiver internally
+and blocks, feeding each Event Grid CloudEvent through the Graph pipeline:
+
+```python
+from mailflow.adapters.graph import GraphConfig
+from mailflow.adapters.servicebus.config import ServiceBusConfig
+from mailflow.adapters.servicebus.live import run_service
+from mailflow.secrets import EnvSecretProvider
+from mailflow.emit.memory import MemoryEmitter
+from mailflow.stores.memory import InMemoryBlobStore, InMemoryCursorStore, InMemoryDedupeStore
+
+graph_cfg = GraphConfig.model_validate({
+    "tenant_id": "<tenant-guid>", "client_id": "<app-guid>",
+    "client_secret_ref": "env://GRAPH_CLIENT_SECRET",
+    "mailboxes": ["ops@acme.com"],
+})
+servicebus_cfg = ServiceBusConfig(
+    fully_qualified_namespace="<SB_NAMESPACE>.servicebus.windows.net",
+    entity_name="mailflow-graph",
+    connection_string_ref="env://SB_CONNECTION_STRING",
+)
+
+run_service(                       # blocks, consuming the Service Bus queue
+    graph_cfg=graph_cfg, servicebus_cfg=servicebus_cfg, tenant="acme",
+    secret_provider=EnvSecretProvider(),
+    emitter=MemoryEmitter(), dlq_emitter=MemoryEmitter(),
+    cursor_store=InMemoryCursorStore(), dedupe_store=InMemoryDedupeStore(),
+    blob_store=InMemoryBlobStore(),
+    connection_string="<sb-connection-string>",   # OR credential=DefaultAzureCredential()
+)
+```
+
+Egress — separately, `ServiceBusEmitter` is a drop-in `Emitter` you can plug into ANY provider
+(gmail/graph/memory) via `connect(..., overrides={"emitter": ...})`, to publish outbound
+`EmailEvent`s to a Service Bus queue instead of the default in-memory sink:
+
+```python
+from mailflow import connect
+from mailflow.adapters.servicebus import ServiceBusEmitter
+from mailflow.adapters.servicebus.live import AzureServiceBusSender
+from azure.servicebus import ServiceBusClient
+
+sb_client = ServiceBusClient.from_connection_string("<servicebus-conn>")  # OR credential=...
+sender = sb_client.get_queue_sender(queue_name="mailflow-egress")
+
+mf = connect(
+    "gmail", credentials=creds, mailbox="me",
+    overrides={"emitter": ServiceBusEmitter(sender=AzureServiceBusSender(sender=sender))},
+)
+mf.run()
+```
+
+**Contract Decision 1 (CD-1):** DLQ ownership follows the pipeline model—`Pipeline` performs
+per-message dead-lettering before handing off to the emitter; the runtime completes (acks)
+after `run_once()` finishes. One poison message ⇒ exactly one mailflow DLQ record.
+
+**Contract Decision 2 (CD-2):** Microsoft Graph's Event Grid integration may report `created`
+events for messages irregularly. If `"created"` subscription is rejected, fall back to
+`"updated"` alone and rely on `GraphProvider.sweep` timer (daily delta-replay) for new-mail
+catch-up. See `docs/azure-servicebus-setup.md` step 3.
+
+### Choosing the Graph transport: `delivery=`
+
+Same Graph mail, your choice of transport — only one argument changes:
+
+```python
+# Event Hubs (default) — needs the [graph] extra
+mf = connect("graph", delivery="eventhub", credentials={
+    "tenant_id": "<tenant-guid>", "client_id": "<app-guid>",
+    "client_secret_ref": "env://GRAPH_CLIENT_SECRET", "mailboxes": ["ops@acme.com"],
+    "namespace": "evh-mailflow", "hub": "graph-notifications", "tenant_domain": "acme.com",
+    "connection_string": "<eventhub-connection-string>",   # or omit + pass credential=
+})
+
+# Service Bus (Event Grid Partner Topic → Service Bus) — needs the [servicebus,graph] extras
+mf = connect("graph", delivery="servicebus", credentials={
+    "tenant_id": "<tenant-guid>", "client_id": "<app-guid>",
+    "client_secret_ref": "env://GRAPH_CLIENT_SECRET", "mailboxes": ["ops@acme.com"],
+    "fully_qualified_namespace": "<ns>.servicebus.windows.net", "entity_name": "mailflow-graph",
+    "connection_string": "<servicebus-connection-string>",  # or omit + pass credential=
+})
+
+for email in mf.stream():   # identical downstream, whichever transport you chose
+    my_app.save(email)
+```
+
+`delivery` defaults to `"eventhub"`, so existing `connect("graph", …)` code is unchanged. It
+applies only to the `"graph"` provider. Install the matching extra:
+`pip install -e ".[graph]"` for Event Hubs, `pip install -e ".[servicebus,graph]"` for Service
+Bus. Provisioning for the Service Bus path is in `docs/azure-servicebus-setup.md`.
 
 ## Live: Gmail via Pub/Sub
 

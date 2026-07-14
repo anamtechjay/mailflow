@@ -25,8 +25,15 @@ from typing import Any, Callable, Iterator, Literal, Mapping, TypeVar
 
 from mailflow.config.schema import SecurityConfig
 from mailflow.config.state import resolve_state
+from mailflow.core.errors import ConfigError
 from mailflow.core.models import Attachment, CleanEmail, Envelope, Recipient, StreamRef
-from mailflow.core.observability import HealthReport, health as _health
+from mailflow.core.observability import (
+    HealthReport,
+    Observers,
+    ReportObserver,
+    TraceObserver,
+    health as _health,
+)
 from mailflow.core.pipeline import Pipeline, PipelineConfig
 from mailflow.core.ports import BlobStore, CursorStore, DedupeStore, Emitter, Filter
 from mailflow.emit.callback import CallbackEmitter, QueueEmitter
@@ -38,10 +45,12 @@ from mailflow.extract.mime import MimeExtractor
 from mailflow.extract.policy import AttachmentPolicy, AttachmentRule, normalize_attachment_policy
 from mailflow.filters.chain import FilterChain
 from mailflow.filters.deterministic import FunctionFilter
+from mailflow.logging_setup import enable_logging
 from mailflow.providers.memory import MemoryProvider, SeedEmail
 from mailflow.registry import (
     build_blob_store,
     build_cursor_store,
+    build_dead_letter_store,
     build_dedupe_store,
     build_filter,
 )
@@ -103,6 +112,15 @@ def normalize_filters(items: list[FilterSpec] | None) -> list[Filter]:
         else:
             out.append(item)
     return out
+
+
+def _require(credentials: dict[str, Any], key: str, *, provider: str) -> str:
+    """Fetch a required credential, raising a clear ConfigError (not a raw KeyError)
+    when it's missing or blank. Kept provider-agnostic so gmail/graph builders share it."""
+    value = credentials.get(key)
+    if not value:
+        raise ConfigError(f"{provider} credentials missing required key {key!r}")
+    return str(value)
 
 
 class Mailflow:
@@ -205,6 +223,19 @@ class Mailflow:
             blob_store=self._blob_store,
         )
 
+    def purge_expired(self) -> int:
+        """Delete dedupe records past their done_ttl_seconds (housekeeping — call this
+        periodically, e.g. from a cron/scheduled job, to bound the dedupe store's growth;
+        see docs/mailflow-final-report.md for why this matters in production)."""
+        if self._dedupe_store is None:
+            raise RuntimeError("purge_expired() requires the store-backed handle")
+        purge = getattr(self._dedupe_store, "purge_expired", None)
+        if purge is None:
+            raise NotImplementedError(
+                f"{type(self._dedupe_store).__name__} does not support purge_expired()"
+            )
+        return int(purge())
+
 
 def _pick_emitter(on_email: OnEmail | None) -> tuple[Emitter, QueueEmitter | None]:
     if on_email is not None:
@@ -220,6 +251,7 @@ def connect(
     mailbox: str | None = None,
     seed: dict[StreamRef, list[SeedEmail]] | None = None,
     state: str = "memory",
+    state_ref: str | None = None,
     filters: list[FilterSpec] | None = None,
     fields: list[str] | None = None,
     stages: list[Stage] | None = None,
@@ -231,18 +263,33 @@ def connect(
     verify_scope_on_startup: bool = _DEFAULT_VERIFY_SCOPE,
     attachments: AttachmentPolicy | AttachmentRule | dict[str, Any] | None = None,
     on_filtered: Literal["tag", "drop"] = "tag",
+    delivery: Literal["eventhub", "servicebus"] = "eventhub",
+    log_file: str | None = None,
+    log_level: str | int = "INFO",
+    on_report: ReportObserver | None = None,
+    on_trace: TraceObserver | None = None,
 ) -> Mailflow:
-    """Wire a runnable Mailflow for the given provider. `provider` is "memory" | "gmail"
-    (graph is wired but not exposed here yet). `filters` is the unified list (spec §3);
+    """Wire a runnable Mailflow for the given provider. `provider` is
+    "memory" | "gmail" | "graph". For "graph", `delivery` selects the transport:
+    "eventhub" (default, Azure Event Hubs) or "servicebus" (Event Grid → Service Bus).
+    `filters` is the unified list (spec §3);
     `fields` selects which data is delivered (spec §4a); `stages`/`clean_fn` post-process
     each CleanEmail (spec §5-6); `attachments` is the per-class strip policy (spec §lib)."""
     pol = normalize_attachment_policy(attachments)
+    if log_file is not None:
+        enable_logging(level=log_level, file=log_file)
+    observers = Observers(on_report=on_report, on_trace=on_trace)
+    if state_ref is not None:
+        state = (secret_provider or EnvSecretProvider()).get(state_ref)
     stores = resolve_state(state)
     ov = overrides or {}
     # §A10: caller-supplied components replace the defaults for their role, before build.
     cursor_store = ov.get("cursor_store") or build_cursor_store(stores.cursor.kind, stores.cursor.params)
     dedupe_store = ov.get("dedupe_store") or build_dedupe_store(stores.dedupe.kind, stores.dedupe.params)
     blob_store = ov.get("blob_store") or build_blob_store(stores.blob.kind, stores.blob.params)
+    dlq_store = ov.get("dlq_store") or build_dead_letter_store(
+        stores.dead_letter.kind, stores.dead_letter.params
+    )
     cleaner = ov["cleaner"] if "cleaner" in ov else ThinContentCleaner()
     project = make_projection(fields) if fields is not None else None
     # if both fields + on_email are set, the callback receives the projected dict (§4a).
@@ -273,6 +320,8 @@ def connect(
             blob_store=blob_store,
             cleaner=cleaner,
             config=PipelineConfig(tenant=tenant, on_filtered=on_filtered),
+            observers=observers,
+            dlq_store=dlq_store,
         )
         return Mailflow(
             provider_kind="memory", emitter=emitter, cursor_store=cursor_store,
@@ -288,6 +337,7 @@ def connect(
             filters=chain, cleaner=cleaner, rotation_sink=ov.get("rotation_sink"),
             verify_scope_on_startup=verify_scope_on_startup,
             attachment_policy=pol, on_filtered=on_filtered,
+            observers=observers, dlq_store=dlq_store,
         )
         fetcher = _build_gmail_fetcher(
             credentials=credentials or {}, mailbox=mailbox,
@@ -300,7 +350,41 @@ def connect(
             dedupe_store=dedupe_store, blob_store=blob_store,
         )
 
-    raise ValueError(f"unknown/unsupported provider {provider!r} (use 'memory' or 'gmail')")
+    if provider == "graph":
+        if delivery not in ("eventhub", "servicebus"):
+            raise ValueError(
+                f"unknown delivery {delivery!r} for provider 'graph' "
+                "(use 'eventhub' or 'servicebus')"
+            )
+        if delivery == "servicebus":
+            live = _build_graph_servicebus_live(
+                credentials=credentials or {}, mailbox=mailbox, tenant=tenant,
+                emitter=pipe_emitter, secret_provider=secret_provider or EnvSecretProvider(),
+                cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
+                filters=chain, cleaner=cleaner, on_filtered=on_filtered,
+                observers=observers,
+            )
+        else:  # "eventhub" (default) — unchanged behavior
+            live = _build_graph_live(
+                credentials=credentials or {}, mailbox=mailbox, tenant=tenant,
+                emitter=pipe_emitter, secret_provider=secret_provider or EnvSecretProvider(),
+                cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
+                filters=chain, cleaner=cleaner,
+                observers=observers,
+            )
+        fetcher = _build_graph_fetcher(          # transport-agnostic (direct Graph REST fetch)
+            credentials=credentials or {}, mailbox=mailbox,
+            secret_provider=secret_provider or EnvSecretProvider(), cleaner=cleaner,
+        )
+        return Mailflow(
+            provider_kind="graph", emitter=emitter, cursor_store=cursor_store,
+            live_run=live, queue=queue, fetcher=fetcher, project=project,
+            dedupe_store=dedupe_store, blob_store=blob_store,
+        )
+
+    raise ValueError(
+        f"unknown/unsupported provider {provider!r} (use 'memory', 'gmail', or 'graph')"
+    )
 
 
 def _build_gmail_fetcher(
@@ -318,9 +402,9 @@ def _build_gmail_fetcher(
     mailboxes = [mailbox] if mailbox else list(credentials.get("mailboxes", []))
     mbx = mailboxes[0] if mailboxes else "me"
     cfg = GmailConfig(
-        client_id=str(credentials["client_id"]),
-        client_secret_ref=str(credentials["client_secret_ref"]),
-        oauth_refresh_token_ref=str(credentials["oauth_refresh_token_ref"]),
+        client_id=_require(credentials, "client_id", provider="gmail"),
+        client_secret_ref=_require(credentials, "client_secret_ref", provider="gmail"),
+        oauth_refresh_token_ref=_require(credentials, "oauth_refresh_token_ref", provider="gmail"),
         mailboxes=[mbx],
     )
     token = OAuthTokenProvider(
@@ -363,6 +447,8 @@ def _build_gmail_live(
     verify_scope_on_startup: bool = _DEFAULT_VERIFY_SCOPE,
     attachment_policy: AttachmentPolicy | None = None,
     on_filtered: Literal["tag", "drop"] = "tag",
+    observers: Observers | None = None,
+    dlq_store: Any = None,
 ) -> Callable[[], None]:
     """Return a blocking callable that runs the live Gmail consume loop. The Gmail SDK is
     imported lazily inside run_service, so importing this module needs no `gmail` extra."""
@@ -371,15 +457,15 @@ def _build_gmail_live(
 
     mailboxes = [mailbox] if mailbox else list(credentials.get("mailboxes", []))
     gmail_cfg = GmailConfig(
-        client_id=str(credentials["client_id"]),
-        client_secret_ref=str(credentials["client_secret_ref"]),
-        oauth_refresh_token_ref=str(credentials["oauth_refresh_token_ref"]),
+        client_id=_require(credentials, "client_id", provider="gmail"),
+        client_secret_ref=_require(credentials, "client_secret_ref", provider="gmail"),
+        oauth_refresh_token_ref=_require(credentials, "oauth_refresh_token_ref", provider="gmail"),
         mailboxes=mailboxes,
     )
     pubsub_cfg = PubSubConfig(
-        project_id=str(credentials["project_id"]),
-        topic=str(credentials["topic"]),
-        subscription=str(credentials["subscription"]),
+        project_id=_require(credentials, "project_id", provider="gmail"),
+        topic=_require(credentials, "topic", provider="gmail"),
+        subscription=_require(credentials, "subscription", provider="gmail"),
     )
 
     def live() -> None:
@@ -389,7 +475,197 @@ def _build_gmail_live(
             cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
             filters=filters, cleaner=cleaner, rotation_sink=rotation_sink,
             verify_scope=verify_scope_on_startup, attachment_policy=attachment_policy,
-            on_filtered=on_filtered,
+            on_filtered=on_filtered, observers=observers, dlq_store=dlq_store,
         )
 
     return live
+
+
+def _graph_config(credentials: dict[str, Any], mailbox: str | None) -> Any:
+    """Build just the GraphConfig (transport-agnostic app credentials). Shared by the
+    Event Hubs and Service Bus delivery paths. No SDK import — pydantic config only."""
+    from mailflow.adapters.graph.config import GraphConfig
+
+    mailboxes = [mailbox] if mailbox else list(credentials.get("mailboxes", []))
+    return GraphConfig(
+        tenant_id=_require(credentials, "tenant_id", provider="graph"),
+        client_id=_require(credentials, "client_id", provider="graph"),
+        client_secret_ref=_require(credentials, "client_secret_ref", provider="graph"),
+        mailboxes=mailboxes,
+    )
+
+
+def _graph_configs(credentials: dict[str, Any], mailbox: str | None) -> tuple[Any, Any]:
+    """Build (GraphConfig, EventHubConfig) from the credentials dict (spec §graph). The
+    Azure/MSAL SDKs are NOT imported here — only pydantic config objects are built, so
+    wiring a Graph handle needs no `graph` extra until it is actually run."""
+    from mailflow.adapters.graph.config import EventHubConfig
+
+    graph_cfg = _graph_config(credentials, mailbox)
+    eventhub = EventHubConfig(
+        namespace=str(credentials["namespace"]),
+        hub=str(credentials["hub"]),
+        tenant_domain=str(credentials.get("tenant_domain", "")),
+        consumer_group=str(credentials.get("consumer_group", "$Default")),
+    )
+    return graph_cfg, eventhub
+
+
+def _build_graph_live(
+    *,
+    credentials: dict[str, Any],
+    mailbox: str | None,
+    tenant: str,
+    emitter: Emitter,
+    secret_provider: Any,
+    cursor_store: CursorStore,
+    dedupe_store: Any,
+    blob_store: Any,
+    filters: list[Filter],
+    cleaner: Any = None,
+    observers: Observers | None = None,
+) -> Callable[[], None]:
+    """Return a blocking callable that runs the live Graph (Event Hubs) consume loop —
+    parity with `_build_gmail_live`. The MSAL/Azure SDKs are imported lazily inside
+    run_service, so importing/wiring this needs no `graph` extra."""
+    from mailflow.adapters.graph.live import run_service
+
+    graph_cfg, eventhub = _graph_configs(credentials, mailbox)
+
+    def live() -> None:
+        run_service(
+            graph_cfg=graph_cfg, eventhub=eventhub, tenant=tenant,
+            secret_provider=secret_provider, emitter=emitter, dlq_emitter=MemoryEmitter(),
+            cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
+            filters=filters, cleaner=cleaner,
+            connection_string=credentials.get("connection_string"),
+            checkpoint_connection_string=credentials.get("checkpoint_connection_string"),
+            checkpoint_container=credentials.get("checkpoint_container"),
+            checkpoint_blob_account_url=credentials.get("checkpoint_blob_account_url"),
+            observers=observers,
+        )
+
+    return live
+
+
+def _servicebus_configs(credentials: dict[str, Any], mailbox: str | None) -> tuple[Any, Any]:
+    """Build (GraphConfig, ServiceBusConfig) from the credentials dict for the Service Bus
+    delivery path. No SDK import — pydantic configs only. The SB connection is passed to
+    run_service as `connection_string` (like the Event Hubs path), so `connection_string_ref`
+    stays optional here."""
+    from mailflow.adapters.servicebus.config import ServiceBusConfig
+
+    graph_cfg = _graph_config(credentials, mailbox)
+    servicebus = ServiceBusConfig(
+        fully_qualified_namespace=str(credentials["fully_qualified_namespace"]),
+        entity_name=str(credentials["entity_name"]),
+        connection_string_ref=str(credentials.get("connection_string_ref", "")),
+    )
+    return graph_cfg, servicebus
+
+
+def _build_graph_servicebus_live(
+    *,
+    credentials: dict[str, Any],
+    mailbox: str | None,
+    tenant: str,
+    emitter: Emitter,
+    secret_provider: Any,
+    cursor_store: CursorStore,
+    dedupe_store: Any,
+    blob_store: Any,
+    filters: list[Filter],
+    cleaner: Any = None,
+    on_filtered: Literal["tag", "drop"] = "tag",
+    observers: Observers | None = None,
+) -> Callable[[], None]:
+    """Return a blocking callable that runs the live Graph → Event Grid → Service Bus consume
+    loop — parity with `_build_graph_live` (Event Hubs). The azure/msal SDKs import lazily
+    inside servicebus.live.run_service, so importing/wiring this needs no extra."""
+    from mailflow.adapters.servicebus.live import run_service
+
+    graph_cfg, servicebus_cfg = _servicebus_configs(credentials, mailbox)
+
+    def live() -> None:
+        run_service(
+            graph_cfg=graph_cfg, servicebus_cfg=servicebus_cfg, tenant=tenant,
+            secret_provider=secret_provider, emitter=emitter, dlq_emitter=MemoryEmitter(),
+            cursor_store=cursor_store, dedupe_store=dedupe_store, blob_store=blob_store,
+            filters=filters, cleaner=cleaner, on_filtered=on_filtered,
+            connection_string=credentials.get("connection_string"),
+            credential=credentials.get("credential"),
+            observers=observers,
+        )
+
+    return live
+
+
+def _build_graph_fetcher(
+    *, credentials: dict[str, Any], mailbox: str | None, secret_provider: Any,
+    cleaner: Any = None,
+) -> Callable[[str], CleanEmail]:
+    """Build a fetch-by-message-id closure for Graph (spec §4): messages.get(JSON) +
+    attachment metadata -> GraphEnvelopeParser + GraphExtractor -> CleanEmail. The Graph
+    client (and its MSAL token) is constructed lazily on first use so wiring the handle
+    performs no network I/O."""
+    import json
+    from datetime import datetime, timezone
+
+    from mailflow.adapters.graph.extractor import GraphExtractor
+    from mailflow.adapters.graph.parser import GraphEnvelopeParser
+    from mailflow.core.models import Cursor, RawMessage
+
+    graph_cfg = _graph_config(credentials, mailbox)
+    mbx = graph_cfg.mailboxes[0]
+    parser = GraphEnvelopeParser()
+    extractor = GraphExtractor()
+    cache: dict[str, Any] = {}
+
+    def _client() -> Any:
+        if "c" not in cache:
+            from mailflow.adapters.graph.client import GraphClient
+            from mailflow.adapters.graph.live import HttpxTransport, MsalTokenProvider
+
+            token = MsalTokenProvider(
+                tenant_id=graph_cfg.tenant_id, client_id=graph_cfg.client_id,
+                client_secret=secret_provider.get(graph_cfg.client_secret_ref),
+                scope=graph_cfg.scope,
+            )
+            cache["c"] = GraphClient(
+                base_url=graph_cfg.base_url, token_provider=token, transport=HttpxTransport(),
+            )
+        return cache["c"]
+
+    def fetch(message_id: str) -> CleanEmail:
+        client = _client()
+        data: dict[str, Any] = client.get_message(mbx, message_id)
+        data["_attachments"] = (
+            client.list_attachments(mbx, message_id) if data.get("hasAttachments") else []
+        )
+        raw = json.dumps(data).encode()
+        stream = StreamRef(mailbox=mbx, folder=str(data.get("parentFolderId", "") or ""))
+        received = _parse_graph_dt(data.get("receivedDateTime")) or datetime.now(timezone.utc)
+        msg = RawMessage(
+            provider="graph", provider_message_id=message_id, stream=stream,
+            size_bytes=len(raw), received_at=received,
+            cursor=Cursor(value="fetch", order=0), raw_bytes=raw,
+        )
+        env = parser.parse_envelope(msg, tenant="default")
+        email = extractor.extract(msg, env)
+        if cleaner is not None:
+            email = cleaner.clean(email)
+        return email
+
+    return fetch
+
+
+def _parse_graph_dt(value: Any) -> Any:
+    """Parse a Graph ISO-8601 timestamp (trailing 'Z') to an aware datetime, or None."""
+    from datetime import datetime
+
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None

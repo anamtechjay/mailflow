@@ -21,7 +21,10 @@ def bootstrap_watches(
     for mailbox in mailboxes:
         stream = StreamRef(mailbox=mailbox, folder=None)
         handle = watch_manager.ensure_watch(stream)
-        if handle.history_id:
+        # REL-5 / INT-4: seed the cursor only on first-ever start. On a restart a cursor
+        # already exists; re-seeding to the watch's CURRENT historyId would advance the
+        # monotonic cursor past every message that arrived during downtime -> silent loss.
+        if handle.history_id and cursor_store.get(tenant, stream) is None:
             cursor_store.commit_if_ahead(
                 tenant, stream, Cursor(value=handle.history_id, order=int(handle.history_id))
             )
