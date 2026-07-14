@@ -36,9 +36,9 @@ packages = ["mailflow"]
 python_version = "3.12"
 strict = true
 
-# Optional `graph`-extra SDKs: imported only locally inside live.py. They ship no
-# stubs and are absent from the unit-test environment, so don't fail strict mode on
-# missing imports for them.
+# Optional `graph`/`servicebus`/`postgres`-extra SDKs: imported only locally inside
+# live.py / the store modules. They ship no stubs and are absent from the
+# unit-test environment, so don't fail strict mode on missing imports for them.
 [[tool.mypy.overrides]]
-module = ["msal", "httpx", "azure.*", "google.*", "google_auth_oauthlib.*"]
+module = ["msal", "httpx", "azure.*", "google.*", "google_auth_oauthlib.*", "psycopg", "psycopg.*"]
 ignore_missing_imports = true

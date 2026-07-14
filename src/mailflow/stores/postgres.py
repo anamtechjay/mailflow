@@ -79,7 +79,7 @@ class PostgresCursorStore:
             (tenant, stream.key, cursor.value, cursor.order),
         )
         self._conn.commit()
-        return cur.rowcount == 1
+        return bool(cur.rowcount == 1)
 
 
 class PostgresDedupeStore:
@@ -120,7 +120,7 @@ class PostgresDedupeStore:
             (key, now, now, now, lease_seconds),
         )
         self._conn.commit()
-        return cur.rowcount == 1
+        return bool(cur.rowcount == 1)
 
     def record_attempt(self, key: str) -> int:
         self._conn.execute(

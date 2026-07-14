@@ -13,10 +13,11 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 
-import psycopg
 import pytest
 
 from mailflow.core.models import Cursor, StreamRef
+
+psycopg = pytest.importorskip("psycopg")
 
 DSN = os.environ.get("MAILFLOW_TEST_POSTGRES_DSN", "")
 
