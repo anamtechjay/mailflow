@@ -81,3 +81,24 @@ def test_connect_graph_builds_live_and_fetcher_without_network() -> None:
 def test_connect_unknown_provider_raises() -> None:
     with pytest.raises(ValueError):
         connect("outlook", credentials={}, mailbox="x")
+
+
+# --- purge_expired() delegates dedupe-store housekeeping through the facade ---
+
+
+def test_purge_expired_delegates_to_dedupe_store() -> None:
+    stream = StreamRef(mailbox="ops@acme.com", folder="Inbox")
+    raw = b"Message-ID: <m1@x>\r\nFrom: a@partner.com\r\nSubject: hi\r\n\r\nhello"
+    mf = connect("memory", seed={stream: [SeedEmail("m1", raw)]}, tenant="acme")
+    mf.fetch_new()  # processes m1 -> dedupe_store.mark_done("...", ttl_seconds=...)
+
+    # in-memory default ttl is 60 days out, so nothing is expired yet -- purge is a no-op,
+    # but this proves the method exists and returns an int without raising.
+    assert mf.purge_expired() == 0
+
+
+def test_purge_expired_requires_store_backed_handle() -> None:
+    mf = connect("memory", seed={})
+    mf._dedupe_store = None  # simulate a handle without a store-backed dedupe
+    with pytest.raises(RuntimeError, match="purge_expired"):
+        mf.purge_expired()

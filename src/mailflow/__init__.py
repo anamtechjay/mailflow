@@ -1,5 +1,9 @@
 """mailflow — email ingestion toolkit (core spine)."""
 
+from mailflow.logging_setup import install_null_handler as _install_null_handler
+
+_install_null_handler()
+
 from mailflow.builder import build_from_config
 from mailflow.config.schema import MailflowConfig
 from mailflow.core.events import SCHEMA_VERSION, EmailEvent

@@ -37,6 +37,11 @@ from mailflow.stores.memory import (
     InMemoryDeadLetterStore,
     InMemoryDedupeStore,
 )
+from mailflow.stores.postgres import (
+    PostgresCursorStore,
+    PostgresDeadLetterStore,
+    PostgresDedupeStore,
+)
 from mailflow.stores.sqlite import (
     SqliteCursorStore,
     SqliteDeadLetterStore,
@@ -45,7 +50,7 @@ from mailflow.stores.sqlite import (
 
 PROVIDER_KINDS = {"memory", "graph", "gmail"}
 EMITTER_KINDS = {"memory", "stdout", "pubsub"}
-STORE_KINDS = {"memory", "sqlite", "local"}
+STORE_KINDS = {"memory", "sqlite", "local", "postgres"}
 FILTER_KINDS = {
     "whitelist", "blacklist", "internal_domain", "subject", "list_mail", "no_personal",
     "only_domain", "only_sender", "block_sender", "to", "cc",
@@ -105,6 +110,8 @@ def build_cursor_store(kind: str, params: dict[str, Any]) -> CursorStore:
         return InMemoryCursorStore()
     if kind == "sqlite":
         return SqliteCursorStore(str(params["path"]))
+    if kind == "postgres":
+        return PostgresCursorStore(str(params["dsn"]))
     raise ValueError(f"unknown cursor store kind {kind!r}")
 
 
@@ -113,6 +120,8 @@ def build_dedupe_store(kind: str, params: dict[str, Any]) -> DedupeStore:
         return InMemoryDedupeStore()
     if kind == "sqlite":
         return SqliteDedupeStore(str(params["path"]))
+    if kind == "postgres":
+        return PostgresDedupeStore(str(params["dsn"]))
     raise ValueError(f"unknown dedupe store kind {kind!r}")
 
 
@@ -121,6 +130,8 @@ def build_dead_letter_store(kind: str, params: dict[str, Any]) -> DeadLetterStor
         return InMemoryDeadLetterStore()
     if kind == "sqlite":
         return SqliteDeadLetterStore(str(params["path"]))
+    if kind == "postgres":
+        return PostgresDeadLetterStore(str(params["dsn"]))
     raise ValueError(f"unknown dead-letter store kind {kind!r}")
 
 
