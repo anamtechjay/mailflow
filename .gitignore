@@ -11,6 +11,7 @@ dist/
 *.db
 /attachments/
 .playwright-mcp/
+*.log
 # stray local screenshots from manual UI runs
 /inbox-*.png
 # Root credentials dir only (google-sa.json) — anchored so it does NOT match the

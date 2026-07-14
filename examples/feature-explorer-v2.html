@@ -95,6 +95,7 @@
   .seg-row{display:flex; flex-wrap:wrap; gap:18px; margin-bottom:22px}
   .seg{flex:1 1 200px}
   .seg .seg-lbl{font-family:"JetBrains Mono",monospace; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-bottom:7px}
+  .seg .seg-lbl span{text-transform:none; letter-spacing:0; opacity:.7}
   .seg .opts{display:flex; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:3px; gap:3px}
   .seg button{
     flex:1; border:0; background:transparent; color:var(--mut); cursor:pointer;
@@ -103,6 +104,7 @@
   .seg button:hover:not(.on):not(:disabled){color:var(--ink)}
   .seg button.on{background:linear-gradient(180deg,var(--amber),var(--amber-d)); color:#1a1206; font-weight:700; box-shadow:0 2px 10px rgba(255,180,84,.22)}
   .seg button:disabled{opacity:.32; cursor:not-allowed; text-decoration:line-through}
+  .seg.dimmed{opacity:.45}
 
   /* feature groups */
   .fgroup{margin-bottom:24px}
@@ -125,6 +127,8 @@
   .feat-name code{font-family:"JetBrains Mono",monospace; font-size:12.5px; color:var(--amber); background:rgba(255,180,84,.08); padding:1px 6px; border-radius:5px; font-weight:500}
   .stag{font-family:"JetBrains Mono",monospace; font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--mint); border:1px solid rgba(90,209,180,.3); border-radius:5px; padding:1px 6px}
   .gonly{font-family:"JetBrains Mono",monospace; font-size:9.5px; color:var(--blue); border:1px solid rgba(121,192,255,.3); border-radius:5px; padding:1px 6px}
+  .gonly.graph{color:var(--purp); border-color:rgba(210,168,255,.3)}
+  .newtag{font-family:"JetBrains Mono",monospace; font-size:9.5px; color:var(--mint); border:1px solid rgba(90,209,180,.35); border-radius:5px; padding:1px 6px}
   .feat-desc{font-size:12.8px; color:var(--mut); margin-top:3px}
   .ex-btn{flex:none; background:transparent; border:1px solid var(--line); color:var(--mut); border-radius:7px; cursor:pointer; font-family:"JetBrains Mono",monospace; font-size:11px; padding:5px 9px; transition:.2s}
   .ex-btn:hover{border-color:var(--amber-d); color:var(--amber)}
@@ -176,7 +180,7 @@
   footer code{font-family:"JetBrains Mono",monospace; font-size:12px; color:var(--amber)}
   .note{font-style:italic; color:var(--dim); margin-top:14px}
 
-  /* ---- "configuring attachments" section ---- */
+  /* ---- "configuring attachments" / "cli" sections ---- */
   .cfg{margin-top:42px; border-top:1px solid var(--line); padding-top:26px}
   .cfg-lead{color:var(--mut); font-size:14.5px; max-width:880px; margin:0 0 18px}
   .cfg-lead code,.cfg .knob code,.warn code,.note2 code{font-family:"JetBrains Mono",monospace; font-size:12px; color:var(--amber); background:rgba(255,180,84,.08); padding:1px 5px; border-radius:5px}
@@ -191,7 +195,12 @@
   .warn b{color:var(--red)}
   .note2{font-size:12.8px; color:var(--mut); margin:14px 0 0; line-height:1.55}
   .note2 b{color:var(--ink)}
-  @media (max-width:980px){ .cfg-grid{grid-template-columns:1fr} }
+  .cli-table{width:100%; border-collapse:collapse; margin:0 0 18px; font-size:12.8px}
+  .cli-table th,.cli-table td{text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top}
+  .cli-table th{font-family:"JetBrains Mono",monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); font-weight:600}
+  .cli-table td code{font-family:"JetBrains Mono",monospace; font-size:12px; color:var(--amber); background:rgba(255,180,84,.08); padding:1px 6px; border-radius:5px; white-space:nowrap}
+  .cli-table td{color:var(--mut)}
+  @media (max-width:980px){ .cfg-grid{grid-template-columns:1fr} .cli-table{font-size:12px} }
 
   @media (max-width:980px){
     .grid{grid-template-columns:1fr}
@@ -239,11 +248,13 @@
     <span class="chip" title="duplicates possible — dedupe on EmailEvent.idempotency_key">at-least-once</span>
     <span class="chip" title="exponential backoff w/ jitter + bounded concurrency (load-shed)">storm&nbsp;containment</span>
     <span class="chip" title="Gmail fetch-time 401 forces ONE token refresh + one retry before dead-lettering">401&nbsp;→&nbsp;refresh-once</span>
-    <span class="chip" title="poison / over-cap messages persist to a DeadLetterStore — redrive() re-submits them through a fresh pipeline">durable&nbsp;DLQ&nbsp;+&nbsp;redrive</span>
+    <span class="chip" title="poison / over-cap messages persist to a DeadLetterStore for memory + gmail today (Graph Event Hubs/Service Bus wiring pending) — redrive() or `mailflow redrive` re-submits them through a fresh pipeline">durable&nbsp;DLQ&nbsp;+&nbsp;redrive</span>
+    <span class="chip" title="mark_done(key, ttl_seconds) now really expires — mf.purge_expired() or `mailflow purge` deletes done claims past their ttl so the dedupe store doesn't grow forever">ttl&nbsp;purge</span>
     <span class="chip" title="default (no policy): 25 MB per-attachment cap, fail-closed → DLQ; with connect(attachments=…): over-cap / not-allowlisted / scanner-blocked / unreadable parts are stripped and recorded on email.stripped_attachments (strip-and-deliver) — see Configuring attachments below">attachment&nbsp;cap</span>
     <span class="chip" title="content-addressed: the same attachment across two messages is stored exactly once">blob&nbsp;dedupe</span>
     <span class="chip" title="Gmail OAuth scope verified at startup (default on) — fails fast if gmail.readonly is missing; opt out with connect(verify_scope_on_startup=False)">scope&nbsp;check</span>
-    <span class="chip" title="structured logging + a dependency-free metrics seam (RunReport.counters()) + a health() probe">metrics&nbsp;+&nbsp;health</span>
+    <span class="chip" title="structured logging + a dependency-free metrics seam (RunReport.counters()) + a health() probe — see the Observability group below">metrics&nbsp;+&nbsp;health</span>
+    <span class="chip" title="Postgres cursor/dedupe/DLQ stores retry a momentarily-unreachable server with exponential backoff before giving up">postgres&nbsp;retry</span>
   </div>
 
   <div class="grid">
@@ -257,6 +268,22 @@
           <div class="opts" id="segProvider">
             <button data-v="memory" class="on">memory · demo</button>
             <button data-v="gmail">gmail · live</button>
+            <button data-v="graph">graph · live</button>
+          </div>
+        </div>
+        <div class="seg" id="segDeliveryWrap">
+          <div class="seg-lbl">Delivery <span>(graph only)</span></div>
+          <div class="opts" id="segDelivery">
+            <button data-v="eventhub" class="on">event hubs</button>
+            <button data-v="servicebus">service bus</button>
+          </div>
+        </div>
+        <div class="seg">
+          <div class="seg-lbl">State</div>
+          <div class="opts" id="segState">
+            <button data-v="memory" class="on">memory</button>
+            <button data-v="sqlite">sqlite</button>
+            <button data-v="postgres">postgres</button>
           </div>
         </div>
         <div class="seg">
@@ -356,14 +383,46 @@ mf = <span class="c-fn">connect</span>(<span class="c-str">"gmail"</span>, crede
     <div class="warn"><b>Strip-and-deliver is opt-in; the default remains fail-closed.</b> Without an <code>attachments=</code> policy, a single over-cap, scanner-blocked, or unreadable part dead-letters the <i>entire</i> message — it is quarantined, not dropped per-part. With a policy, the offending part is stripped and its metadata appended to <code>email.stripped_attachments</code>; the message is then delivered normally. A non-empty <code>allowlist</code> runs on <i>every</i> non-body part (real <i>and</i> inline) — include the inline types you expect in ordinary mail (e.g. <code>image/png</code>, <code>image/jpeg</code>), or a routine logo will be stripped.</div>
   </section>
 
+  <section class="cfg">
+    <div class="col-h"><h2>Command-line operations</h2><span class="hint">// the `mailflow` CLI — auth · check · redrive · purge</span></div>
+    <p class="cfg-lead">Everything above is the <code>connect()</code> library surface for your own process. A few things are operational tasks instead — a human or a cron job running them against a <code>state=</code> location, not something your ingestion code calls. The <code>mailflow</code> CLI (installed alongside the package) covers these.</p>
+
+    <table class="cli-table">
+      <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>mailflow auth gmail</code></td><td>One-time OAuth consent flow → writes <code>GMAIL_REFRESH_TOKEN</code> to <code>.env</code>.</td></tr>
+        <tr><td><code>mailflow auth graph</code></td><td>One-time Microsoft delegated OAuth consent → writes <code>GRAPH_REFRESH_TOKEN</code>.</td></tr>
+        <tr><td><code>mailflow check gmail</code></td><td>Verifies the saved Gmail credentials (+ Pub/Sub) actually work.</td></tr>
+        <tr><td><code>mailflow check graph [--app-only]</code></td><td>Verifies Graph credentials — delegated <code>/me</code>, or app-only client-credentials against a named mailbox.</td></tr>
+        <tr><td><code>mailflow redrive --state … --tenant … [--limit N]</code></td><td>Re-submits every durable dead-letter at that <code>state=</code> location through a fresh pipeline. Still-failing messages stay in the DLQ; recovered ones are deleted from it.</td></tr>
+        <tr><td><code>mailflow purge --state …</code></td><td>Deletes dedupe records past their <code>done_ttl_seconds</code> at that <code>state=</code> location — the CLI form of <code>mf.purge_expired()</code>, meant for a cron/scheduled job.</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="cfg-code"><span class="c-com"># one-time setup</span>
+$ mailflow auth gmail
+$ mailflow check gmail
+
+<span class="c-com"># operational housekeeping — run redrive after fixing a root cause,</span>
+<span class="c-com"># run purge on a schedule (e.g. daily cron) to bound dedupe-store growth</span>
+$ mailflow redrive --state sqlite:///mailflow.db --tenant acme --limit 50
+examined=3 resubmitted=2 still_dead_lettered=1
+
+$ mailflow purge --state postgresql://user:pass@host:5432/mailflow
+purged 214 expired dedupe record(s)</pre>
+
+    <p class="note2"><b>Same <code>state=</code> location, both sides.</b> Point the CLI at the exact <code>state=</code> string your <code>connect()</code> call uses (or its <code>state_ref=</code>-resolved equivalent) — the CLI reads and writes the same cursor/dedupe/DLQ tables your running process does.</p>
+  </section>
+
   <footer>
     <h3>How to read this</h3>
     <ul>
-      <li><b>One front door:</b> <code>connect(provider, ...)</code> returns a handle. You pick a <b>Source</b> and how you <b>Consume</b>, then layer optional features.</li>
+      <li><b>One front door:</b> <code>connect(provider, ...)</code> returns a handle. You pick a <b>Source</b> (memory / gmail / graph), a <b>State</b> location, and how you <b>Consume</b>, then layer optional features.</li>
       <li><b>The four knobs compose:</b> <code>filters</code> (which emails) · <code>fields</code> (which data) · <code>stages</code> + <code>clean_fn</code> (process each). They run in pipeline order shown above.</li>
-      <li><b>Filters</b> see the cheap <code>Envelope</code> before the body is parsed; <b>stages</b> see the full <code>CleanEmail</code> and can drop it by returning <code>None</code>.</li>
-      <li><b>State:</b> <code>"memory"</code> is stateless (dedupe on <code>canonical_id</code> yourself); <code>"sqlite:///…"</code> persists cursor + dedupe and durably stores attachments, and resumes after a restart.</li>
-      <li><b>The "always on" row is not optional — it's the point.</b> Dedupe, ordered cursor, size guard, retry→DLQ, durable dead-lettering + redrive, and 401→refresh-once run automatically — you don't wire reliability, the pipeline guarantees it. Attachments stream, cap, and dedupe automatically too; what you <i>can</i> tune is the attachment <b>policy</b> (per-class size / type / scanning, and strip-vs-dead-letter) via the <code>Attachment policy</code> toggle — i.e. <code>connect(attachments=…)</code>. See <b>Configuring attachments</b> below.</li>
+      <li><b>Filters</b> see the cheap <code>Envelope</code> before the body is parsed; <b>stages</b> see the full <code>CleanEmail</code> and can drop it by returning <code>None</code>. A filter match doesn't have to mean "gone" — see <code>on_filtered</code> in the Filtering group.</li>
+      <li><b>State:</b> <code>"memory"</code> is stateless (dedupe on <code>canonical_id</code> yourself); <code>"sqlite:///…"</code> and <code>"postgresql://…"</code> both persist cursor + dedupe + durable DLQ and resume after a restart — Postgres additionally survives multiple worker processes sharing one store. <code>state_ref=</code> resolves the DSN via a <code>SecretProvider</code> at connect-time so a password never sits in code.</li>
+      <li><b>The "always on" row is not optional — it's the point.</b> Dedupe, ordered cursor, size guard, retry→DLQ, durable dead-lettering + redrive (memory/gmail), TTL purge, and 401→refresh-once run automatically — you don't wire reliability, the pipeline guarantees it. Attachments stream, cap, and dedupe automatically too; what you <i>can</i> tune is the attachment <b>policy</b> (per-class size / type / scanning, and strip-vs-dead-letter) via the <code>Attachment policy</code> toggle — i.e. <code>connect(attachments=…)</code>. See <b>Configuring attachments</b> below.</li>
+      <li><b>Operational tasks live in the CLI, not your code.</b> Redriving dead-letters and purging expired dedupe records are things a human or a cron job does against a <code>state=</code> location — see <b>Command-line operations</b> below.</li>
     </ul>
     <p class="note">Generated for sharing — a single self-contained HTML file, no build step. Code shown reflects the current <code>feature/library</code> build — wire event schema 1.3.</p>
   </footer>
@@ -373,7 +432,8 @@ mf = <span class="c-fn">connect</span>(<span class="c-str">"gmail"</span>, crede
 /* ----------------------------------------------------------------------
    FEATURE CATALOG — single source of truth.
    Each feature: id, group, name, code (kwarg shown), stage, desc, example.
-   gmailOnly features are disabled on the memory source.
+   liveOnly features need a live provider (gmail or graph); gmailOnly
+   features are Gmail-specific even among live providers.
 ---------------------------------------------------------------------- */
 const FEATURES = [
   // ---- Filtering ----
@@ -441,6 +501,16 @@ const FEATURES = [
    example:`filters=[lambda env: "urgent" in env.subject.lower()]
 # your callable gets the Envelope. return True to keep, False to drop`},
 
+  {id:"on_filtered_drop", group:"Filtering", name:"Drop matched mail (vs. tag)", code:'on_filtered="drop"', stage:"filter",
+   desc:"Default is tag: a filter match is still delivered, marked disposition=\"filtered\". Toggle to silently drop instead.",
+   example:`mf = connect("memory", seed=seed, tenant="acme",
+    filters=[{"kind": "blacklist", "domains": ["spam.com"]}],
+    on_filtered="drop",     # default is "tag": deliver anyway, tagged
+)
+# with the default "tag": a match arrives with
+#   email.disposition == "filtered", email.filter_reason, email.matched_filter
+# so you can archive/route it instead of losing it silently.`},
+
   // ---- Processing ----
   {id:"fields", group:"Processing", name:"Field projection", code:"fields=[…]", stage:"deliver",
    desc:"Receive a trimmed dict instead of a full CleanEmail.",
@@ -486,41 +556,80 @@ mf = connect("memory", seed=seed, tenant="acme", stages=[route])
 # new on feature/library.`},
 
   // ---- State ----
-  {id:"state_sqlite", group:"State", name:"Persistent SQLite state", code:'state="sqlite:///…"', stage:"deliver",
-   desc:"Persist cursor + dedupe; resume after restart.",
-   example:`mf = connect("gmail", credentials=creds, mailbox="me",
-    state="sqlite:///mailflow.db")
-# cursor + dedupe persist to one file (pure stdlib sqlite3).
-# default "memory" is stateless -> dedupe on email.canonical_id yourself`},
+  {id:"state_ref", group:"State", name:"Secret-ref DSN resolution", code:'state_ref="env://…"', stage:"deliver",
+   desc:"Resolve the state= DSN via a SecretProvider at connect-time — a real password never has to sit literally in code or a plain env-var read.",
+   example:`import os
+os.environ["POSTGRES_DSN"] = "postgresql://user:pass@host:5432/mailflow"
 
-  // ---- Live / Gmail ----
-  {id:"rotation_sink", group:"Live · Gmail", name:"Token rotation sink", code:'overrides={"rotation_sink":…}', stage:"provider", gmailOnly:true,
-   desc:"Persist a rotated OAuth refresh token (A8).",
+mf = connect("gmail", credentials=creds, mailbox="me",
+    state_ref="env://POSTGRES_DSN",   # wins over a plain state= if both are given
+)
+# same env:// indirection GMAIL_CLIENT_SECRET/GRAPH_CLIENT_SECRET already use.
+# new on feature/library.`},
+
+  // ---- Observability ----
+  {id:"log_file", group:"Observability", name:"Structured logging", code:'log_file=…', stage:"deliver",
+   desc:"The library ships silent (a NullHandler) — attach a real handler here. JSON or text, file or stream.",
+   example:`mf = connect("memory", seed=seed, tenant="acme",
+    log_file="mailflow.log", log_level="INFO")
+# rotating file handler on the "mailflow" logger; omit log_file for stderr.
+# new on feature/library.`},
+
+  {id:"on_report", group:"Observability", name:"Run report callback", code:'on_report=…', stage:"deliver",
+   desc:"Called once per pass with a RunReport — counts of emitted / dropped / duplicate / dead_lettered.",
+   example:`def on_run_report(report):
+    print(f"emitted={report.emitted} dropped={report.dropped} "
+          f"dead_lettered={report.dead_lettered}")
+
+mf = connect("memory", seed=seed, tenant="acme", on_report=on_run_report)
+# fires after every run_once() / live-loop tick. new on feature/library.`},
+
+  {id:"on_trace", group:"Observability", name:"Per-message decision trace", code:'on_trace=…', stage:"deliver",
+   desc:"Called once per message with a DecisionTrace (disposition, stage, reason) — wire your own metrics/logging.",
+   example:`def on_decision(trace):
+    print(trace.disposition, trace.stage, trace.canonical_id, trace.reason)
+
+mf = connect("memory", seed=seed, tenant="acme", on_trace=on_decision)
+# fires for every terminal AND non-terminal outcome. new on feature/library.`},
+
+  // ---- Live / Gmail & Graph ----
+  {id:"rotation_sink", group:"Live · Gmail & Graph", name:"Token rotation sink", code:'overrides={"rotation_sink":…}', stage:"provider", gmailOnly:true,
+   desc:"Persist a rotated OAuth refresh token (A8). Gmail-specific.",
    example:`from mailflow.adapters.gmail.rotation import FileTokenRotationSink
 
 mf = connect("gmail", credentials=creds, mailbox="me",
     overrides={"rotation_sink": FileTokenRotationSink("tokens.json")})
 # if Google rotates the refresh token, the new one is saved (0600)`},
 
-  {id:"on_demand", group:"Live · Gmail", name:"On-demand retrieval", code:"mf.get_email(id)", stage:"deliver", gmailOnly:true,
-   desc:"Pull any part live by message id — store nothing.",
+  {id:"on_demand", group:"Live · Gmail & Graph", name:"On-demand retrieval", code:"mf.get_email(id)", stage:"deliver", liveOnly:true,
+   desc:"Pull any part live by message id — store nothing. Works against Gmail or Graph.",
    example:`email = mf.get_email("<message_id>")      # full CleanEmail
 body  = mf.get_body("<message_id>")       # str
 files = mf.get_attachments("<message_id>")  # list[Attachment]`},
+
+  // ---- Maintenance ----
+  {id:"purge_expired", group:"Maintenance", name:"Purge expired dedupe records", code:"mf.purge_expired()", stage:"deliver",
+   desc:"Delete dedupe claims past their done_ttl_seconds — call periodically (cron/scheduled job) so the store doesn't grow forever. Also available as `mailflow purge` from the CLI.",
+   example:`removed = mf.purge_expired()
+print(f"purged {removed} expired dedupe record(s)")
+# works against any state= backend that supports it (memory/sqlite/postgres).
+# new on feature/library.`},
 ];
 
-const GROUPS = ["Filtering","Processing","Classification","Attachments","State","Live · Gmail"];
+const GROUPS = ["Filtering","Processing","Classification","Attachments","State","Observability","Live · Gmail & Graph","Maintenance"];
 
 /* ---- state ---- */
 const active = new Set();
 let provider = "memory";
+let delivery = "eventhub";
+let stateKind = "memory";
 let consume  = "stream";
 
 /* ====================================================================
    PYTHON SYNTAX HIGHLIGHTER (tiny, dependency-free)
 ==================================================================== */
 const KW = ["from","import","for","in","if","else","return","None","True","False","lambda","def","as","not","and","or","with"];
-const FN = ["connect","SeedEmail","StreamRef","FileTokenRotationSink","route","stream","fetch_new","run","get_email","get_body","get_attachments","model_copy","print","startswith","endswith","lower","strip","len","save"];
+const FN = ["connect","SeedEmail","StreamRef","FileTokenRotationSink","route","stream","fetch_new","run","get_email","get_body","get_attachments","purge_expired","model_copy","print","startswith","endswith","lower","strip","len","save","on_run_report","on_decision"];
 const HLRE = new RegExp(
   "(#.*)$"
   + "|([bfru]?\"(?:\\\\.|[^\"\\\\])*\"|[bfru]?'(?:\\\\.|[^'\\\\])*')"
@@ -546,6 +655,7 @@ function genLines(){
   const L=[]; const add=(t,f="base")=>L.push({text:t,feat:f});
   const has = id => active.has(id);
   const usesFields = has("fields");
+  const isLive = (provider==="gmail" || provider==="graph");
 
   // imports
   add("from mailflow import connect");
@@ -554,6 +664,7 @@ function genLines(){
     add("from mailflow.providers.memory import SeedEmail");
   }
   if(has("rotation_sink")) add("from mailflow.adapters.gmail.rotation import FileTokenRotationSink","rotation_sink");
+  if(has("state_ref")) add("import os","state_ref");
   add("");
 
   // sample data for memory source
@@ -562,6 +673,15 @@ function genLines(){
     add('       b"To: ops@acme.com\\r\\nSubject: Re: Invoice 42\\r\\n\\r\\nHello!")');
     add('inbox = StreamRef(mailbox="ops@acme.com", folder="Inbox")');
     add("");
+  }
+
+  // state_ref env-var line (before connect(), same style as sample data)
+  if(has("state_ref")){
+    const dsnLine = stateKind==="postgres"
+      ? 'os.environ["POSTGRES_DSN"] = "postgresql://user:pass@host:5432/mailflow"'
+      : 'os.environ["MAILFLOW_STATE_DSN"] = "sqlite:///mailflow.db"';
+    add(dsnLine,"state_ref");
+    add("","state_ref");
   }
 
   // helper defs
@@ -585,6 +705,17 @@ function genLines(){
     add("    return email","classify");
     add("","classify");
   }
+  if(has("on_report")){
+    add("def on_run_report(report):              # fires once per pass","on_report");
+    add('    print(f"emitted={report.emitted} dropped={report.dropped} "',"on_report");
+    add('          f"dead_lettered={report.dead_lettered}")',"on_report");
+    add("","on_report");
+  }
+  if(has("on_trace")){
+    add("def on_decision(trace):                 # fires once per message","on_trace");
+    add("    print(trace.disposition, trace.stage, trace.canonical_id, trace.reason)","on_trace");
+    add("","on_trace");
+  }
   if(consume==="push"){
     add("def handle(email):                     # receives "+(usesFields?"a dict":"a CleanEmail"),"consume");
     add("    save(email)                        # YOUR storage — the library keeps none","consume");
@@ -596,7 +727,7 @@ function genLines(){
   if(provider==="memory"){
     add('    "memory",');
     add("    seed={inbox: [SeedEmail(\"m1\", raw)]},");
-  } else {
+  } else if(provider==="gmail"){
     add('    "gmail",',"prov");
     add("    credentials={","prov");
     add('        "client_id": "1234.apps.googleusercontent.com",',"prov");
@@ -606,6 +737,24 @@ function genLines(){
     add('        "topic": "gmail-notifications", "subscription": "mailflow",',"prov");
     add("    },","prov");
     add('    mailbox="me",',"prov");
+  } else { // graph
+    add('    "graph",',"prov");
+    add("    credentials={","prov");
+    add('        "tenant_id": "<tenant-guid>",',"prov");
+    add('        "client_id": "<app-guid>",',"prov");
+    add('        "client_secret_ref": "env://GRAPH_CLIENT_SECRET",',"prov");
+    add('        "mailboxes": ["ops@acme.com"],',"prov");
+    if(delivery==="servicebus"){
+      add('        "fully_qualified_namespace": "<ns>.servicebus.windows.net",',"prov");
+      add('        "entity_name": "mailflow-graph",',"prov");
+      add('        "connection_string": "<servicebus-connection-string>",',"prov");
+    } else {
+      add('        "namespace": "evh-mailflow", "hub": "graph-notifications",',"prov");
+      add('        "tenant_domain": "acme.com",',"prov");
+      add('        "connection_string": "<eventhub-connection-string>",',"prov");
+    }
+    add("    },","prov");
+    if(delivery==="servicebus") add('    delivery="servicebus",',"delivery");
   }
   add('    tenant="acme",');
 
@@ -628,6 +777,7 @@ function genLines(){
     filt.forEach(([t,f])=>add("        "+t,f));
     add("    ],");
   }
+  if(has("on_filtered_drop")) add('    on_filtered="drop",',"on_filtered_drop");
 
   if(has("fields"))       add('    fields=["subject", "from", "body_text"],',"fields");
   if(has("clean_fn"))     add("    clean_fn=tidy,","clean_fn");
@@ -636,7 +786,20 @@ function genLines(){
   if(has("classify")) stageNames.push("route");
   if(stageNames.length)   add("    stages=["+stageNames.join(", ")+"],", has("stages")?"stages":"classify");
   if(has("attachments"))  add('    attachments={"max_bytes": 10_000_000, "allowlist": ["application/pdf"]},',"attachments");
-  if(has("state_sqlite")) add('    state="sqlite:///mailflow.db",',"state_sqlite");
+
+  // state=/state_ref=
+  if(has("state_ref")){
+    const ref = stateKind==="postgres" ? "env://POSTGRES_DSN" : "env://MAILFLOW_STATE_DSN";
+    add(`    state_ref="${ref}",`,"state_ref");
+  } else if(stateKind==="sqlite"){
+    add('    state="sqlite:///mailflow.db",',"state_sqlite");
+  } else if(stateKind==="postgres"){
+    add('    state="postgresql://user:pass@host:5432/mailflow",',"state_postgres");
+  }
+
+  if(has("log_file"))     add('    log_file="mailflow.log", log_level="INFO",',"log_file");
+  if(has("on_report"))    add("    on_report=on_run_report,","on_report");
+  if(has("on_trace"))     add("    on_trace=on_decision,","on_trace");
   if(consume==="push")    add("    on_email=handle,","consume");
   if(has("rotation_sink"))add('    overrides={"rotation_sink": FileTokenRotationSink("tokens.json")},',"rotation_sink");
   add(")");
@@ -662,6 +825,14 @@ function genLines(){
     add('body  = mf.get_body("<message_id>")',"on_demand");
     add('files = mf.get_attachments("<message_id>")',"on_demand");
   }
+
+  // maintenance: purge_expired
+  if(has("purge_expired")){
+    add("","purge_expired");
+    add("# housekeeping — call periodically (cron), or use `mailflow purge` instead","purge_expired");
+    add("removed = mf.purge_expired()","purge_expired");
+    add('print(f"purged {removed} expired dedupe record(s)")',"purge_expired");
+  }
   return L;
 }
 
@@ -684,7 +855,7 @@ function renderCode(flashFeat){
 
 function litStages(){
   const lit = new Set();
-  if(provider==="gmail") lit.add("provider");
+  if(provider==="gmail" || provider==="graph") lit.add("provider");
   FEATURES.forEach(f=>{ if(active.has(f.id)) lit.add(f.stage); });
   document.querySelectorAll(".stage").forEach(s=>{
     s.classList.toggle("lit", lit.has(s.dataset.stage));
@@ -703,13 +874,16 @@ function buildCards(){
     inGroup.forEach(f=>{
       const card=document.createElement("div");
       card.className="feat"; card.dataset.id=f.id;
+      const gonlyTag = f.gmailOnly ? '<span class="gonly">gmail</span>'
+                     : f.liveOnly  ? '<span class="gonly">gmail</span><span class="gonly graph">graph</span>'
+                     : '';
       card.innerHTML = `
         <div class="feat-head">
           <button class="sw" aria-label="toggle ${f.name}"></button>
           <div class="feat-meta">
             <div class="feat-name">${f.name} <code>${esc(f.code)}</code>
               <span class="stag">${f.stage}</span>
-              ${f.gmailOnly?'<span class="gonly">gmail</span>':''}</div>
+              ${gonlyTag}</div>
             <div class="feat-desc">${f.desc}</div>
           </div>
           <button class="ex-btn">snippet</button>
@@ -733,31 +907,58 @@ function buildCards(){
   });
 }
 
-/* fix highlight inside the multi-line example <pre> (re-run per line) */
-function rehighlightExamples(){
-  document.querySelectorAll(".ex-wrap code").forEach(c=>{
-    // already escaped+highlighted line-by-line below
-  });
-}
-
 /* segmented controls */
 function applyConstraints(){
-  // fetch_new is memory-only; disable for gmail
+  // fetch_new is memory-only; disable for any live provider
   const fbtn = document.querySelector('#segConsume [data-v="fetch_new"]');
-  fbtn.disabled = (provider==="gmail");
-  if(provider==="gmail" && consume==="fetch_new"){ setConsume("stream"); }
-  // gmail-only features
+  const isLive = (provider==="gmail" || provider==="graph");
+  fbtn.disabled = isLive;
+  if(isLive && consume==="fetch_new"){ setConsume("stream"); }
+
+  // gmail-only features (rotation_sink)
   FEATURES.filter(f=>f.gmailOnly).forEach(f=>{
     const card=document.querySelector(`.feat[data-id="${f.id}"]`);
     const off = (provider!=="gmail");
     card.classList.toggle("disabled",off);
     if(off && active.has(f.id)){ active.delete(f.id); card.classList.remove("active"); }
   });
+  // live-only features (on_demand) — gmail OR graph
+  FEATURES.filter(f=>f.liveOnly).forEach(f=>{
+    const card=document.querySelector(`.feat[data-id="${f.id}"]`);
+    const off = !isLive;
+    card.classList.toggle("disabled",off);
+    if(off && active.has(f.id)){ active.delete(f.id); card.classList.remove("active"); }
+  });
+
+  // delivery segment only meaningful for graph
+  const segDeliveryWrap = document.getElementById("segDeliveryWrap");
+  const deliveryButtons = document.querySelectorAll("#segDelivery button");
+  const graphSelected = (provider==="graph");
+  segDeliveryWrap.classList.toggle("dimmed", !graphSelected);
+  deliveryButtons.forEach(b=>b.disabled = !graphSelected);
+  if(!graphSelected && delivery!=="eventhub"){ setDelivery("eventhub"); }
+
+  // state_ref only meaningful once a persistent state backend is chosen
+  const stateRefCard = document.querySelector('.feat[data-id="state_ref"]');
+  const stateOff = (stateKind==="memory");
+  stateRefCard.classList.toggle("disabled", stateOff);
+  if(stateOff && active.has("state_ref")){ active.delete("state_ref"); stateRefCard.classList.remove("active"); }
 }
 function setProvider(v){
   provider=v;
   document.querySelectorAll("#segProvider button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
-  applyConstraints(); renderCode(v==="gmail"?"prov":null);
+  applyConstraints(); renderCode(v!=="memory"?"prov":null);
+}
+function setDelivery(v){
+  delivery=v;
+  document.querySelectorAll("#segDelivery button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  renderCode("delivery");
+}
+function setState(v){
+  stateKind=v;
+  document.querySelectorAll("#segState button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  applyConstraints();
+  renderCode(v==="postgres"?"state_postgres":v==="sqlite"?"state_sqlite":null);
 }
 function setConsume(v){
   consume=v;
@@ -765,6 +966,8 @@ function setConsume(v){
   renderCode("consume");
 }
 document.querySelectorAll("#segProvider button").forEach(b=>b.addEventListener("click",()=>setProvider(b.dataset.v)));
+document.querySelectorAll("#segDelivery button").forEach(b=>b.addEventListener("click",()=>{ if(!b.disabled) setDelivery(b.dataset.v); }));
+document.querySelectorAll("#segState button").forEach(b=>b.addEventListener("click",()=>setState(b.dataset.v)));
 document.querySelectorAll("#segConsume button").forEach(b=>b.addEventListener("click",()=>{ if(!b.disabled) setConsume(b.dataset.v); }));
 
 /* editor actions */

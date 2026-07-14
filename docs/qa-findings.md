@@ -135,3 +135,96 @@ auto-submitted heuristics.
 |----|-----|---------|----------|-------|
 | **E-1** | 🟡 | Unknown-charset body crashes extraction: a `text/plain` part declaring an unregistered charset (`charset=x-totally-made-up`) raises `LookupError` from `EmailMessage.get_content()` — the extractor does not fall back to `errors='replace'`. A malformed-charset email therefore poisons to the DLQ instead of being delivered with a best-effort body. Real spam / misconfigured senders hit this. | `extract/mime.py` `_walk_body` → `part.get_content()` (~line 199/202); `tests/test_extract_edge_cases.py::test_unknown_charset_does_not_crash` (xfail) | **Phase gap** — wrap `get_content()` to catch `LookupError` and decode bytes with `errors='replace'`. Cheap, high-value robustness fix. |
 | **E-2** | 🟢 | Inconsistent `is_inline` across paths: the kept `Attachment` uses `is_inline = is_inline_media and not is_attachment`; policy mode uses `inline_for_policy = is_inline_media and disp != "attachment"`. A part with a `Content-ID` AND a `name=` but no `Content-Disposition` is `is_inline=False` when delivered yet `is_inline=True` when stripped — same part, two answers. | `extract/mime.py` `_walk_body` (meta is_inline ~line 210 vs `inline_for_policy` ~line 217) | **Hardening** — derive `is_inline` once and share it between the kept-Attachment and StrippedAttachment paths. Low severity (real inline parts carry `Content-Disposition: inline`, on which both paths agree). |
+
+---
+
+## Review 2026-07-06 — Logging destinations & observability sinks
+
+New feature (local): `enable_logging()` + NullHandler default; `connect(log_file=, log_level=,
+on_report=, on_trace=)`; `Observers` threaded into Pipeline (fires from `_record` per trace and
+`run_once` per report) and all three live providers. Callbacks are guarded (throwing callback
+logged + swallowed, ingestion unaffected). Defaults off → backwards compatible.
+**CONTRACT DECISION:** deliberate core edit (`observability.py`, `pipeline.py`) — non-emitted
+dispositions are only visible in the pipeline, so an emitter wrapper cannot capture the audit.
+
+---
+
+## Review 2026-07-07 — QA automation suite
+
+New test-only build (local, uncommitted): ~76 pytest tests across `tests/qa/test_f01_*`
+through `test_f17_*`, four `test_scenarios_*` files, and this phase's `test_property_invariants.py`,
+driven by a shared harness (`tests/_harness/fakes.py::build_memory_pipeline`,
+`tests/_harness/email_builder.py`, `tests/_harness/corpus.py`) per the coverage map in
+`docs/qa-partA-coverage.md`. Full fast suite: **637 passed, 4 deselected (slow), 2 xfailed**
+(the two pre-existing `E-1`-adjacent xfails from the 2026-06-30 extraction-edge-case pass).
+`mypy --strict` clean (86 source files; `packages = ["mailflow"]` scopes to `src/`, tests are
+not mypy-checked, consistent with prior phases). `hypothesis` installed cleanly (6.156.1), added
+to `dev` extras.
+
+**CI tiers** (as designed across Phases 0-5, none of this is wired into an actual CI config file —
+that's a follow-up, not part of this pass):
+- **commit** (every push): `pytest -m "not slow and not live"` + `mypy` — the 637-test fast suite
+  above, sub-6s, no external dependencies.
+- **nightly**: `pytest -m slow` — bulk-volume (`test_bulk_10k_emitted_once`), subprocess-restart,
+  and other large/slow scenario tests.
+- **gated** (manual/scheduled, requires real credentials): `pytest -m live` — no test currently
+  carries this marker; it's registered in `pyproject.toml` ahead of the first live-provider test
+  (Plan 2/3 territory) so that test doesn't also need a `pyproject.toml` edit.
+
+### Findings surfaced while building the property/fuzz tests (not patched — logged only)
+
+| ID | Sev | Finding | Evidence | Scope verdict |
+|----|-----|---------|----------|---------------|
+| **P1** | 🟡 Important | Retry-exhaustion is unreachable via `InMemoryDedupeStore`: `release()` deletes the attempt record entirely, so the next `try_claim` on the same key resets `attempts` to 0 on the following `record_attempt()` call — attempts never accumulate past 1 across separate `run_once()` calls (the real-world redelivery path), so dead-lettering-by-attempt-exhaustion at the default `max_attempts` can never be driven through the public store contract. Corroborates existing finding **I5** (2026-06-09 review) via an independent code path (found while designing the exactly-once property test, which needed to reason about repeated claims of the same key). | `src/mailflow/stores/memory.py` (`release`/`record_attempt`); `src/mailflow/core/pipeline.py` `_retry_or_dead_letter` (the `attempts >= max_attempts` branch) | **Deferred/duplicate of I5** — same root cause, not a new gap; do not action separately from I5. |
+| **P2** | ⚪ Low/doc | `Envelope.date_utc` is never populated by `MimeEnvelopeParser.parse_envelope` (only `MimeExtractor.extract_bytes` parses `Date`, per the note already in `tests/qa/test_f03_parse.py`) — any envelope-level (pre-extract) assertion about `date_utc` is trivially `None`. Documentation-only; no test gap since Phase 1/QA already places date-parsing assertions against the extractor, not the parser. | `src/mailflow/extract/envelope.py` (`parse_envelope` builds `Envelope(...)` with no `date_utc` field set); contrast `src/mailflow/extract/mime.py` `Date` try/except | **Doc note** — no action; matches the already-adopted test placement. |
+| **P3** | ⚪ Low | `MimeEnvelopeParser.parse_envelope`'s `_snippet()` calls `body.get_content()` on the preferred text/html part with no charset fallback: a `text/plain` part declaring an unregistered charset (e.g. `charset=x-totally-made-up`) raises `LookupError` out of `parse_envelope` itself, before extraction even runs. This is the same defect class as **E-1** (2026-06-30 review, which documented it in `extract/mime.py`) but on the pre-filter parse path — confirmed empirically (hand-crafted input) while scoping the "known exception" allowlist for `test_parser_never_crashes_on_random_bytes`; not found by the random-bytes fuzz itself (~7500 examples), since hitting it needs syntactically valid header structure that pure `st.binary()` essentially never produces. | `src/mailflow/extract/envelope.py` `_snippet` (`body.get_content()`); test allowlists `LookupError` accordingly rather than failing the fuzz run | **Phase gap (narrow), extends E-1** — same fix (`errors="replace"` fallback) would resolve both `mime.py` and `envelope.py` in one pass; low real-world frequency (malformed charset declarations), not patched here per scope (tests/docs only). |
+
+## Resolution 2026-07-07 — REL-3: I5 + P1 fixed (silent unbounded retry, poison never DLQs)
+
+**I5** and **P1** are now **FIXED**, not deferred. Confirmed red first: a poison message whose
+extraction always raises `TransientError`, driven across 5 separate `Pipeline`/`run_once()` calls
+(the real redelivery path) over shared `InMemoryDedupeStore`/`InMemoryCursorStore` at the default
+`max_attempts=3`, never dead-lettered — `attempts` reset to 0 on every redelivery because
+`release()` deleted the whole claim record. Reproducer: `tests/qa/test_rel3_retry_exhaustion.py`.
+
+**Fix**: `InMemoryDedupeStore`/`SqliteDedupeStore` `release()` now clears only the `claimed` flag
+(memory: `_ClaimRecord.claimed = False`; sqlite: `UPDATE claims SET claimed = 0 WHERE key=? AND
+done=0`) and keeps the record — `attempts` is no longer wiped. `try_claim` now succeeds when the
+key is absent OR present-but-not-claimed-and-not-done. **CONTRACT DECISION**: `attempts` is a
+LIFETIME counter per key (accumulates across claim/release cycles, i.e. across redeliveries), not
+a per-in-process-claim counter. External store method shapes (`try_claim`/`record_attempt`/
+`mark_done`/`release`) are unchanged, so a real Firestore/Redis adapter can still add lease expiry
+without touching callers.
+
+**Test encoding the OLD (buggy) contract, updated**: `tests/qa/test_f01_dedupe.py
+::test_release_resets_attempt_count` asserted attempts reset to 0 after release+re-claim; renamed
+to `test_release_keeps_lifetime_attempt_count` and now asserts attempts carry over (3rd
+`record_attempt()` after a release+re-claim returns 3, not 1). No other test asserted the old
+delete-on-release shape (`tests/test_sqlite_stores.py::test_dedupe_release_frees_undone_claim` /
+`test_dedupe_release_keeps_done_claim` only assert claim-freed/claim-still-blocked behavior, which
+is unchanged and still passes).
+
+---
+
+## Review 2026-07-13 — Live Graph mailbox smoke check (manual, not a unit-test pass)
+
+Reviewer: ad-hoc live verification against the real `techjaystest4@nsrecycle.com` Exchange
+Online mailbox (app-only Graph creds), run outside pytest to sanity-check the Graph adapter
+against actual API behavior the fake transport can't model. Not a coverage review of existing
+tests — a live-data check that happened to surface a real bug.
+
+### Actionable now — genuine bug, fixed
+
+| ID | Sev | Finding | Evidence | Fix |
+|----|-----|---------|----------|-----|
+| **G1** | 🔴 Critical | `GraphClient.list_attachments` requested `$select=id,name,contentType,size,isInline,contentId` on `/messages/{id}/attachments`. `contentId` is a property of the `fileAttachment` subtype only, not the base `microsoft.graph.attachment` type this list endpoint returns — Graph responded `400: Could not find a property named 'contentId' on type 'microsoft.graph.attachment'` on **every** message with an attachment. This is called from `GraphProvider._attach`, inside `provider.fetch()`, i.e. **before** `Pipeline._process`'s own try/except — so in the live notification-fed path this would crash `run_once()` outright (not merely dead-letter one message) the first time any attachment-bearing mail arrived. `_FakeGraphTransport` never modeled this Graph `$select`-on-polymorphic-type validation rule, so no existing unit test could catch it — confirmed by live reproduction, not by test failure. | `src/mailflow/adapters/graph/client.py:68-71` (pre-fix); reproduced live via direct Graph REST call, HTTP 400 | Fixed: dropped `contentId` from the `$select` (`GraphExtractor._attachments`, `src/mailflow/adapters/graph/extractor.py:54`, already does `a.get("contentId") or ""` — tolerates its absence). Re-ran `tests/qa/test_f17_fetch.py` (3/3 pass, no regression) plus a live `Pipeline.run_once()` against 10 real messages (4-attachment cases included): `RunReport: fetched=10 emitted=10 dropped=0 duplicates=0 dead_lettered=0`. |
+
+### Scope verdict
+
+**Phase gap in the live/Azure-API sense, not the unit-test sense** — the unit suite is deliberately
+100% offline (§1 of `testing-guide.md`), so this was never going to be caught there; it's a gap in
+*fixture fidelity* (the fake transport doesn't model Graph's per-type `$select` validation), not in
+test-count coverage. No new unit test added for the fake-transport gap itself (would require
+teaching `_FakeGraphTransport` Graph's real OData type-validation rules — logged here as a
+follow-up idea, not actioned, since the live check already proves the real fix). Full narrative in
+`docs/mailflow-final-report.md` §4 and `docs/testing-guide.md` §8.1.
